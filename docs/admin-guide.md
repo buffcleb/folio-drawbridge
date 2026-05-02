@@ -162,7 +162,6 @@ An **admin vault overview** widget appears on the WordPress dashboard for all SF
 - OTP failures in the last 30 days (highlighted in red if > 0)
 - A link to the full admin panel
 
-[[SCREENSHOT: WordPress dashboard showing the "Secure File Transfer — Vault Overview" admin widget with stat tiles]]
 ![WordPress Dashboard - Admin Widget](/images/WordpressDashboard_AdminWidget.jpg)
 
 ---

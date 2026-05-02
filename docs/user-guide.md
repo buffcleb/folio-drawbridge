@@ -10,7 +10,6 @@ A **vault** is an encrypted file container. You fill it with files, and then sha
 
 The **My Vaults** dashboard is at **wp-admin → My Vaults**.
 
-[[SCREENSHOT: My Vaults list page with three sample vaults showing Name, Status, Files, Shares, Created, and Expires columns]]
 ![User Dashboard - My Vaults](/images/UserDashboard_MyVaults.jpg)
 
 ---
@@ -106,8 +105,6 @@ The two-factor share flow:
 3. **One-time code** — a 6-digit code is emailed to the recipient. They have a limited time to enter it (configured by your admin, default 15 minutes).
 4. **Download access** — after successful verification, the recipient sees all files in the vault and can download them. A 30-minute download session is issued.
 
-[[SCREENSHOT: Recipient's verification page showing the email confirmation step]]
-[[SCREENSHOT: Recipient's download page showing vault file list with Download buttons]]
 ![Recipient - Email Confirmation](/images/Recipient_EmailConfirmation.jpg)
 ![Recipient - One Time Code](/images/Recipient_OneTimeCode.jpg)
 ![Recipient - Download access](/images/Recipient_DownloadPage.jpg)
