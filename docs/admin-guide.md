@@ -10,7 +10,7 @@ This guide covers the Secure Transfer admin panel, accessible at **Secure Transf
 
 The Dashboard gives a real-time overview of the entire plugin.
 
-![Admin Dashboard - Full](/images/AdminDashboard_Full_.jpg)
+![Admin Dashboard - Full](/images/AdminDashboard_Full.jpg)
 
 ### Stats cards
 
