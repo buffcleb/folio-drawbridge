@@ -27,6 +27,7 @@ When the constant is defined, the key is never stored in the database and the Se
 5. Paste it as the `SFT_MASTER_KEY` constant in `wp-config.php`.
 
 [[SCREENSHOT: Key generator modal with the generated key visible and Copy button highlighted]]
+![Admin Dashboard - Key generator modal](/images/AdminDashboard_Settings_EncryptionKeys.jpg)
 
 > **Warning:** Replacing an existing master key permanently breaks decryption of all previously uploaded files. Only generate a new key on a fresh installation with no uploaded files. If you need to rotate keys, you must decrypt and re-encrypt every file — there is no automated migration tool.
 
@@ -78,6 +79,7 @@ Expiry is applied at end-of-day (23:59:59 site time) on the selected date.
 Like download limits, a contextual checkbox appears when values change, offering to retroactively apply the new limits to existing shares.
 
 [[SCREENSHOT: Settings page showing Link Expiration section with the amber "Apply to existing shares" checkbox visible after a value was changed]]
+![Admin Dashboard - Link Expiration](/images/AdminDashboard_Settings_LinkExpiration.jpg)
 
 ---
 
@@ -104,7 +106,7 @@ Writes every audit event to an OS-level log file for ingestion by SIEM tools (Sp
 Both formats include: `timestamp_utc`, `event`, `vault_id`, `share_id`, `actor_id`, `ip`, `details`, `site`.
 
 **Requirements:**
-- Path must be an absolute path (e.g. `/var/log/sft-events.json`).
+- Path must be an absolute path (e.g. `/Sites/secure-download/app/public/sft-events.json`).
 - Path must not contain `..` segments.
 - The directory must already exist; the file is created on first write.
 - The web server process must have write permission to the directory.
@@ -112,6 +114,7 @@ Both formats include: `timestamp_utc`, `event`, `vault_id`, `share_id`, `actor_i
 If the path fails validation, the previous value is retained and a warning is shown. The invalid path is never saved.
 
 [[SCREENSHOT: SIEM Logging section of Settings with Log File Path and Format fields filled in]]
+![Admin Dashboard - Full](/images/AdminDashboard_Settings_SIEMLogging.jpg)
 
 ---
 

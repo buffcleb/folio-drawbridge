@@ -11,6 +11,7 @@ A **vault** is an encrypted file container. You fill it with files, and then sha
 The **My Vaults** dashboard is at **wp-admin → My Vaults**.
 
 [[SCREENSHOT: My Vaults list page with three sample vaults showing Name, Status, Files, Shares, Created, and Expires columns]]
+![User Dashboard - My Vaults](/images/UserDashboard_MyVaults.jpg)
 
 ---
 
@@ -49,13 +50,13 @@ Use the **Create New Vault** form at the bottom of the My Vaults page.
 
 After creating the vault you are taken directly to its detail page.
 
-[[SCREENSHOT: Create New Vault form with sample data filled in — name "Project Alpha Deliverables", description, and an expiry date]]
+![User Dashboard - Create New Vault](/images/UserDashboard_CreateNewVault.jpg)
 
 ---
 
 ## Vault Detail Page
 
-[[SCREENSHOT: Vault detail page for "Project Alpha Deliverables" showing the three sections: Files, Shares, Activity Log]]
+![User Dashboard - Create New Vault](/images/UserDashboard_VaultDetail.jpg)
 
 ### Editing vault expiry
 
@@ -73,6 +74,7 @@ In the **Files** section, click **Encrypt & Upload** (or drag a file onto the up
 - The maximum file size is configured by your administrator (shown as reference info on the upload form).
 
 [[SCREENSHOT: File upload area mid-upload showing progress bar at 60% with filename and file size]]
+![User Dashboard - Vault File Upload](/images/UserDashboard_VaultFileUpload.jpg)
 
 ### Deleting files
 
@@ -92,7 +94,8 @@ In the **Shares** section, use the **Share this vault** form to invite a recipie
 
 Click **Send Invite**. The recipient receives an email with a unique link.
 
-[[SCREENSHOT: Share creation form with recipient email, download limit "3", and an expiry date filled in]]
+![User Dashboard - Vault Share](/images/UserDashboard_VaultShare.jpg)
+
 
 ### How the recipient receives the files
 
@@ -105,6 +108,9 @@ The two-factor share flow:
 
 [[SCREENSHOT: Recipient's verification page showing the email confirmation step]]
 [[SCREENSHOT: Recipient's download page showing vault file list with Download buttons]]
+![Recipient - Email Confirmation](/images/Recipient_EmailConfirmation.jpg)
+![Recipient - One Time Code](/images/Recipient_OneTimeCode.jpg)
+![Recipient - Download access](/images/Recipient_DownloadPage.jpg)
 
 ### Editing a share
 
@@ -135,7 +141,7 @@ Administrators can see the full unfiltered audit log across all vaults at **Secu
 
 If your administrator has enabled it, a **Secure File Transfer — My Vaults** widget appears on your WordPress dashboard (wp-admin home). It shows your vault and file counts, active share count, and your last 5 activity events at a glance.
 
-[[SCREENSHOT: WordPress dashboard showing the "My Vaults" widget with stat tiles and recent activity table]]
+![WordPress Dashboard widget](/images/Recipient_DownloadPage.jpg)
 
 ---
 

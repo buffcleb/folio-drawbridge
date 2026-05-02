@@ -29,8 +29,6 @@ On first activation the plugin automatically:
 - Creates `wp-content/uploads/sft-chunks/` (chunked upload staging area, also `.htaccess` protected).
 - Schedules the hourly lifecycle cron event (`sft_hourly_lifecycle`).
 
-[[SCREENSHOT: Plugins screen with WP Secure File Transfer Pro activated and highlighted]]
-
 ---
 
 ## Initial Setup Checklist
@@ -43,7 +41,7 @@ After activation, complete these steps before accepting uploads:
 - [ ] **Configure share limits** — **Secure Transfer → Settings** lets you set defaults and maximums for download counts and link expiration windows.
 - [ ] **Grant user access** — by default only WordPress administrators can use vault features. See [Granting User Access](admin-guide.md#granting-user-access) to enable non-admin users.
 
-[[SCREENSHOT: Secure Transfer Dashboard with Security Status card showing all green indicators]]
+![Admin Dashboard - Full](/images/AdminDashboard_Full.jpg)
 
 ---
 
