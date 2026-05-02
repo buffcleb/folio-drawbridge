@@ -13,7 +13,7 @@ Encrypted file vaults with two-factor external sharing, comprehensive audit logg
 
 WP Secure File Transfer Pro lets authenticated WordPress users upload files into named **vaults**, where they are encrypted at rest using AES-256-CBC before being written to disk outside the webroot. Vault contents can be shared securely with external, unauthenticated recipients through a two-factor verification flow: invite email → email confirmation → one-time code. Every action across the plugin is recorded in an immutable audit log.
 
-[[SCREENSHOT: Admin Dashboard tab showing stat cards, 7-day activity sparkline, Recent Activity table, and Security Status card]]
+![Admin Dashboard](images/AdminDashboard.jpg)
 
 ---
 
@@ -71,7 +71,7 @@ Detailed documentation is in the [`docs/`](docs/) directory:
 4. Confirm **Dashboard → Security Status** shows all green.
 5. Go to **Secure Transfer → Users** to grant vault access to non-admin users.
 
-[[SCREENSHOT: Security Status card showing all green indicators: key source, algorithm, OTP TTL, storage path, and cron status]]
+![Admin Dashboard Security Status](images/AdminDashboard_SecurityStatus.jpg)
 
 ---
 
@@ -103,7 +103,7 @@ Place this line before the `/* That's all, stop editing! */` comment. When the c
 
 WordPress administrators are always exempt from share limits and expiration restrictions. Grant and manage access at **Secure Transfer → Users**.
 
-[[SCREENSHOT: Users tab showing SFT Admins section, Vault Users section, and the user search panel with contextual action buttons]]
+![Admin Dashboard - Users](images/AdminDashboard_Users.jpg)
 
 ---
 
@@ -116,8 +116,8 @@ WordPress administrators are always exempt from share limits and expiration rest
 5. A 32-byte download session token is issued as a WordPress transient (30-minute TTL).
 6. Each file download validates the session token and share accessibility before decrypting and streaming.
 
-[[SCREENSHOT: Recipient email confirmation page showing the email input form with the vault name and sender displayed]]
-[[SCREENSHOT: Recipient download page showing the file list for a vault with Download buttons and file sizes]]
+![Recipient Email Confirmation](images/Recipient_EmailConfirmation.jpg)
+![Recipient Download Page](images/Recipient_DownloadPage.jpg)
 
 ---
 
@@ -133,7 +133,7 @@ Accessible at **Secure Transfer** (requires `manage_options` or `sft_admin` capa
 | Users | Manage SFT Admins and Vault Users; grant, promote, demote, revoke; user search |
 | Settings | All plugin configuration; encryption key management; SIEM log output |
 
-[[SCREENSHOT: Vaults tab with the filter panel and a vault table showing sortable column headers with active sort indicator on "Created"]]
+![Admin Dashboard - Vaults](images/AdminDashboard_Vaults.jpg)
 
 ---
 
@@ -150,7 +150,7 @@ Users with vault access manage their own vaults under **My Vaults** in wp-admin.
 
 The `[sft_my_vaults]` shortcode renders equivalent functionality on any front-end page.
 
-[[SCREENSHOT: Vault detail page showing the Files section with two uploaded files, the Shares section with one active share, and the Share creation form]]
+![User Dashboard - Vault Detail](images/UserDashboard_VaultDetail.jpg)
 
 ---
 
@@ -168,7 +168,7 @@ Two widgets appear on the wp-admin home screen:
 - Last 5 activity events
 - Link to My Vaults
 
-[[SCREENSHOT: WordPress dashboard showing both widgets side by side — the admin overview widget and the personal My Vaults widget]]
+![Wordpress Dashboard -Widgets](images/WordpressDashboard_Widgets.jpg)
 
 ---
 
