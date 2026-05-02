@@ -112,9 +112,9 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<h3 style="margin-top:0;">Files (<?php echo count( $files ); ?>)</h3>
 
 		<?php if ( $files ) : ?>
-			<table class="sft-table widefat" style="margin-bottom:20px;">
+			<table id="sft-ud-files-<?php echo $vault_id; ?>" class="sft-table widefat" style="margin-bottom:20px;">
 				<thead><tr>
-					<th>Filename</th><th>Size</th><th>Uploaded</th><th></th>
+					<th>Filename</th><th>Size</th><th>Uploaded</th><th data-nosort></th>
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $files as $f ) : ?>
@@ -235,9 +235,9 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<h3 style="margin-top:0;">Shares (<?php echo count( $shares ); ?>)</h3>
 
 		<?php if ( $shares ) : ?>
-			<table class="sft-table widefat" style="margin-bottom:20px;">
+			<table id="sft-ud-shares-<?php echo $vault_id; ?>" class="sft-table widefat" style="margin-bottom:20px;">
 				<thead><tr>
-					<th>Recipient</th><th>Status</th><th>Downloads</th><th>Expires</th><th>Last Access</th><th></th>
+					<th>Recipient</th><th>Status</th><th>Downloads</th><th>Expires</th><th>Last Access</th><th data-nosort></th>
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $shares as $s ) :
@@ -270,7 +270,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 						</td>
 					</tr>
 					<?php if ( $editable ) : ?>
-					<tr id="<?php echo esc_attr( $edit_id ); ?>" style="display:none; background:#f9fafc;">
+					<tr id="<?php echo esc_attr( $edit_id ); ?>" data-subrow style="display:none; background:#f9fafc;">
 						<td colspan="6" style="padding:12px 10px;">
 							<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
 								<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
@@ -378,9 +378,9 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<?php if ( ! $audit ) : ?>
 			<p style="color:#888; font-size:13px;">No activity recorded for this vault yet.</p>
 		<?php else : ?>
-			<table class="sft-table widefat striped">
+			<table id="sft-ud-audit-<?php echo $vault_id; ?>" class="sft-table widefat striped">
 				<thead><tr>
-					<th>Event</th><th>Details</th><th>IP</th><th>Date/Time</th>
+					<th>Event</th><th data-nosort>Details</th><th>IP</th><th>Date/Time</th>
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $audit as $row ) :
@@ -400,5 +400,12 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 			</table>
 		<?php endif; ?>
 	</div>
+	<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		sftSortTable('sft-ud-files-<?php echo (int) $vault_id; ?>');
+		sftSortTable('sft-ud-shares-<?php echo (int) $vault_id; ?>');
+		sftSortTable('sft-ud-audit-<?php echo (int) $vault_id; ?>');
+	});
+	</script>
 	<?php
 }

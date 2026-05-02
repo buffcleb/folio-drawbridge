@@ -63,8 +63,12 @@ function sft_render_tab_audit(): void {
 	$args        = sft_audit_filter_args_from_get();
 	$per_page    = 25;
 	$paged       = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+	$a_orderby   = sanitize_key( $_GET['orderby'] ?? 'created_at' );
+	$a_order     = strtoupper( sanitize_key( $_GET['order'] ?? 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$args['per_page'] = $per_page;
 	$args['paged']    = $paged;
+	$args['orderby']  = $a_orderby;
+	$args['order']    = $a_order;
 
 	$rows        = sft_get_audit_logs( $args );
 	$total       = sft_count_audit_logs( $args );
@@ -166,15 +170,16 @@ function sft_render_tab_audit(): void {
 				<a href="<?php echo esc_url( $export_url ); ?>" class="button">Export to CSV</a>
 			</div>
 
+			<?php $audit_sort_base = array_merge( [ 'page' => 'sft-pro', 'tab' => 'audit' ], $filter_args ); ?>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<th>Event</th>
-					<th>Vault</th>
-					<th>Share</th>
-					<th>Actor</th>
-					<th>IP</th>
-					<th>Details</th>
-					<th>Date/Time</th>
+					<?php echo sft_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
+					<th data-nosort>IP</th>
+					<th data-nosort>Details</th>
+					<?php echo sft_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); ?>
 				</tr></thead>
 				<tbody>
 				<?php if ( ! $rows ) : ?>

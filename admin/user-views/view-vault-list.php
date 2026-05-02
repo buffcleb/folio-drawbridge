@@ -18,12 +18,20 @@ function sft_render_user_vault_list(): void {
 	$user_id     = get_current_user_id();
 	$per_page    = 20;
 	$paged       = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
-	$vaults      = sft_get_user_vaults( $user_id, [ 'per_page' => $per_page, 'paged' => $paged ] );
+	$vl_orderby  = sanitize_key( $_GET['orderby'] ?? 'created_at' );
+	$vl_order    = strtoupper( sanitize_key( $_GET['order'] ?? 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
+	$vaults      = sft_get_user_vaults( $user_id, [
+		'per_page' => $per_page,
+		'paged'    => $paged,
+		'orderby'  => $vl_orderby,
+		'order'    => $vl_order,
+	] );
 	$total       = (int) $wpdb->get_var( $wpdb->prepare(
 		"SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d", $user_id
 	) );
 	$total_pages = (int) ceil( $total / $per_page );
 	$base_url    = add_query_arg( [ 'page' => 'sft-my-vaults' ], admin_url( 'admin.php' ) );
+	$vl_sort_base = [ 'page' => 'sft-my-vaults' ];
 	?>
 
 	<!-- ── Vault list ──────────────────────────────────────────────────────── -->
@@ -39,13 +47,13 @@ function sft_render_user_vault_list(): void {
 		<?php else : ?>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<th>Vault Name</th>
-					<th>Status</th>
-					<th>Files</th>
-					<th>Shares</th>
-					<th>Created</th>
-					<th>Expires</th>
-					<th></th>
+					<?php echo sft_sortable_th( 'Vault Name', 'name',       $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Status',     'status',     $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<th data-nosort>Files</th>
+					<th data-nosort>Shares</th>
+					<?php echo sft_sortable_th( 'Created',    'created_at', $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Expires',    'expires_at', $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<th data-nosort></th>
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $vaults as $vault ) :

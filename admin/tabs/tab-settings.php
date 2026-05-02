@@ -387,10 +387,20 @@ function sft_render_tab_settings(): void {
 
 	function sftCopyKey() {
 		var el = document.getElementById('sft-key-output');
-		el.select();
-		document.execCommand('copy');
-		document.getElementById('sft-copy-confirm').style.display = 'inline';
-		setTimeout(function(){ document.getElementById('sft-copy-confirm').style.display = 'none'; }, 3000);
+		var key = el.value;
+		var confirm = document.getElementById('sft-copy-confirm');
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(key).then(function() {
+				confirm.style.display = 'inline';
+				setTimeout(function(){ confirm.style.display = 'none'; }, 3000);
+			});
+		} else {
+			// Fallback for older browsers.
+			el.select();
+			document.execCommand('copy');
+			confirm.style.display = 'inline';
+			setTimeout(function(){ confirm.style.display = 'none'; }, 3000);
+		}
 	}
 
 	function sftCloseKeyModal() {

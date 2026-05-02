@@ -127,12 +127,12 @@ function sft_render_tab_users(): void {
 			<?php if ( ! $sft_admin_users ) : ?>
 				<p style="color:#888;font-size:13px;margin-bottom:20px;">No SFT admins designated yet.</p>
 			<?php else : ?>
-				<table class="sft-table widefat striped" style="margin-bottom:24px;">
+				<table id="sft-admins-table" class="sft-table widefat striped" style="margin-bottom:24px;">
 					<thead><tr>
 						<th>User</th>
 						<th>Email</th>
 						<th>Vaults</th>
-						<th>Action</th>
+						<th data-nosort>Action</th>
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $sft_admin_users as $u ) :
@@ -170,12 +170,12 @@ function sft_render_tab_users(): void {
 			<?php if ( ! $vault_users ) : ?>
 				<p style="color:#888;font-size:13px;">No users have vault access yet.</p>
 			<?php else : ?>
-				<table class="sft-table widefat striped">
+				<table id="sft-vault-users-table" class="sft-table widefat striped">
 					<thead><tr>
 						<th>User</th>
 						<th>Email</th>
 						<th>Vaults</th>
-						<th>Action</th>
+						<th data-nosort>Action</th>
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $vault_users as $u ) :
@@ -206,5 +206,11 @@ function sft_render_tab_users(): void {
 			<?php endif; ?>
 		</div>
 	</div>
+	<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		sftSortTable('sft-admins-table');
+		sftSortTable('sft-vault-users-table');
+	});
+	</script>
 	<?php
 }

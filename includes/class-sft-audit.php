@@ -223,7 +223,7 @@ function sft_get_audit_logs( array $args = [] ): array {
 	];
 	$args = wp_parse_args( $args, $defaults );
 
-	$allowed_cols = [ 'created_at', 'event_type', 'vault_id', 'actor_id' ];
+	$allowed_cols = [ 'created_at', 'event_type', 'vault_id', 'share_id', 'actor_id' ];
 	$orderby = in_array( $args['orderby'], $allowed_cols, true ) ? $args['orderby'] : 'created_at';
 	$order   = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
 

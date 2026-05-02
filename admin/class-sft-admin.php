@@ -70,8 +70,16 @@ function sft_handle_admin_post(): void {
 		$delete_on_uninstall = isset( $_POST['sft_delete_on_uninstall'] ) ? '1' : '0';
 
 		// SIEM logging.
-		$siem_enabled  = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
-		$siem_log_path = sanitize_text_field( $_POST['sft_siem_log_path'] ?? '' );
+		$siem_enabled    = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
+		$siem_log_path   = sanitize_text_field( $_POST['sft_siem_log_path'] ?? '' );
+		$siem_path_error = '';
+		if ( $siem_log_path !== '' ) {
+			// Require absolute path and block path-traversal sequences.
+			if ( ! path_is_absolute( $siem_log_path ) || strpos( $siem_log_path, '..' ) !== false ) {
+				$siem_log_path   = get_option( 'sft_siem_log_path', '' ); // keep previous value
+				$siem_path_error = 'SIEM log path must be an absolute path with no ".." segments. Previous value retained.';
+			}
+		}
 		$siem_format   = in_array( $_POST['sft_siem_format'] ?? 'json', [ 'json', 'csv' ], true )
 			? sanitize_key( $_POST['sft_siem_format'] )
 			: 'json';
@@ -109,8 +117,11 @@ function sft_handle_admin_post(): void {
 				);
 			}
 		}
+		if ( $siem_path_error ) {
+			$notice .= ' ' . $siem_path_error;
+		}
 
-		sft_set_notice( $notice, 'success' );
+		sft_set_notice( $notice, $siem_path_error ? 'warning' : 'success' );
 		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
@@ -352,7 +363,8 @@ function sft_register_admin_help_tabs(): void {
 				'title'   => 'Browsing Vaults',
 				'content' =>
 					'<p>The Vaults tab lists every vault created on this site, across all users.</p>' .
-					'<p>Use the <strong>filter panel</strong> on the left to narrow the list by status (active, expired, archived) or by searching the vault name or owner.</p>' .
+					'<p>Use the <strong>filter panel</strong> on the left to narrow the list by status (active, expired, revoked, archived) or by searching the vault name. Use the filter URL to bookmark a specific filtered view.</p>' .
+					'<p>Click any sortable column header (Name, Status, Created, Expires) to sort the list. Click again to reverse direction. Sort state is preserved in the URL.</p>' .
 					'<p>Click a vault name or the <strong>Inspect</strong> button to open the vault inspector, which shows all files, shares, and the vault\'s own audit trail.</p>',
 			] );
 			$screen->add_help_tab( [
@@ -363,11 +375,13 @@ function sft_register_admin_help_tabs(): void {
 					'<ul>' .
 					'<li><strong>Download any file</strong> — admin downloads are fully decrypted on the fly and logged in the audit trail.</li>' .
 					'<li><strong>Delete a file</strong> — permanently removes the encrypted file from disk and the database.</li>' .
+					'<li><strong>Edit a share</strong> — update the download limit or expiry date on a pending or active share without revoking and recreating it.</li>' .
 					'<li><strong>Revoke a share</strong> — immediately blocks the recipient from accessing the vault, even if they have an active download session.</li>' .
-					'<li><strong>Change vault status</strong> — set a vault to active, archived, or expired. Expired and archived vaults cannot be shared or uploaded to.</li>' .
+					'<li><strong>Edit vault expiry</strong> — change or clear the vault\'s expiry date inline.</li>' .
+					'<li><strong>Change vault status</strong> — set a vault to active, expired, revoked, or archived. Non-active vaults cannot be shared or uploaded to.</li>' .
 					'<li><strong>Delete vault</strong> — permanently removes all files, shares, and the vault record. This cannot be undone.</li>' .
 					'</ul>' .
-					'<p>All admin actions in the vault inspector are recorded in the audit log with your user account and IP address.</p>',
+					'<p>All tables inside the inspector are sortable by clicking column headers. All admin actions are recorded in the audit log with your user account and IP address.</p>',
 			] );
 			break;
 
@@ -384,7 +398,8 @@ function sft_register_admin_help_tabs(): void {
 					'<li><strong>From / To</strong> — restrict the date range.</li>' .
 					'<li><strong>Search Details</strong> — case-insensitive keyword search across the event detail data (e.g. an email address, file name, or status value).</li>' .
 					'</ul>' .
-					'<p>Dates and times are displayed in the site\'s configured timezone (Settings → General).</p>',
+					'<p>Dates and times are displayed in the site\'s configured timezone (Settings → General).</p>' .
+					'<p>Click any sortable column header (Event, Vault, Share, Actor, Date/Time) to sort the results. Sort direction and all active filters are preserved in the URL, so you can bookmark specific views or share them with colleagues.</p>',
 			] );
 			$screen->add_help_tab( [
 				'id'      => 'sft-audit-export',
@@ -398,20 +413,38 @@ function sft_register_admin_help_tabs(): void {
 
 		case 'users':
 			$screen->add_help_tab( [
-				'id'      => 'sft-users-access',
-				'title'   => 'Granting Access',
+				'id'      => 'sft-users-roles',
+				'title'   => 'Access Roles',
 				'content' =>
-					'<p>By default only administrators can use the secure vault features. Use this tab to extend access to non-administrator users.</p>' .
-					'<p>To grant access, search for a user by their WordPress username or email address, then click <strong>Grant Access</strong>. The user will immediately see a <strong>My Vaults</strong> menu item in their wp-admin sidebar and can create and manage their own vaults.</p>' .
-					'<p>Administrators always have full access and do not appear in the granted-users list.</p>',
+					'<p>There are two levels of access below WordPress administrator:</p>' .
+					'<ul>' .
+					'<li><strong>SFT Admin</strong> — full access to the Secure Transfer admin panel: all tabs, the vault inspector, audit log export, settings, and the Users tab. Does not require WordPress administrator privileges.</li>' .
+					'<li><strong>Vault User</strong> — access to <strong>My Vaults</strong> only. Can create vaults, upload and delete files, create and revoke share links, and view their own activity log. Has no visibility into other users\' vaults or any admin panel tabs.</li>' .
+					'</ul>' .
+					'<p>WordPress administrators (<em>manage_options</em>) always have full SFT Admin access implicitly and do not appear in either list.</p>' .
+					'<p>Columns in both tables are sortable by clicking the column header.</p>',
+			] );
+			$screen->add_help_tab( [
+				'id'      => 'sft-users-grant',
+				'title'   => 'Granting & Promoting',
+				'content' =>
+					'<p>Search for any non-administrator user by their WordPress username or email address. The search panel shows the user\'s current SFT status and presents contextual action buttons:</p>' .
+					'<ul>' .
+					'<li><strong>Grant Vault Access</strong> — gives the user Vault User access. They immediately see <strong>My Vaults</strong> in their wp-admin sidebar.</li>' .
+					'<li><strong>Grant SFT Admin Access</strong> — gives the user full SFT Admin access without promoting them to WordPress administrator.</li>' .
+					'<li><strong>Promote to SFT Admin</strong> — upgrades an existing Vault User to SFT Admin.</li>' .
+					'</ul>',
 			] );
 			$screen->add_help_tab( [
 				'id'      => 'sft-users-revoke',
-				'title'   => 'Revoking Access',
+				'title'   => 'Demoting & Revoking',
 				'content' =>
-					'<p>The <strong>Users with Vault Access</strong> table lists every non-administrator who has been granted the <em>use_sft_vaults</em> capability.</p>' .
-					'<p>Click <strong>Revoke</strong> next to a user to remove their access. Revoking access does <em>not</em> delete their existing vaults or files — it only prevents them from logging in to manage vaults going forward. An admin can still inspect and manage their vaults from the Vaults tab.</p>' .
-					'<p>All grant and revoke actions are recorded in the audit log.</p>',
+					'<p>Actions available from the SFT Admins and Vault Users tables:</p>' .
+					'<ul>' .
+					'<li><strong>Demote to User</strong> — removes SFT Admin access but retains Vault User access. The user keeps their vaults.</li>' .
+					'<li><strong>Revoke</strong> / <strong>Remove All</strong> — removes all SFT access (both capabilities). Existing vaults and files are preserved; the user simply cannot log in to manage them. Administrators can still inspect the vaults from the Vaults tab.</li>' .
+					'</ul>' .
+					'<p>All grant, promote, demote, and revoke actions are recorded in the audit log.</p>',
 			] );
 			break;
 
@@ -573,6 +606,12 @@ function sft_enqueue_admin_assets( string $hook ): void {
 		.sft-filter-wrap { display:flex; gap:20px; align-items:flex-start; margin-top:20px; }
 		.sft-filter-panel { flex:0 0 220px; }
 		.sft-filter-body { flex:1; min-width:0; }
+
+		/* ── Sortable columns ── */
+		.sft-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
+		.sft-table th[data-sortable] { cursor:pointer; user-select:none; }
+		.sft-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
+		.sft-sort-ind.active { color:#2271b1; }
 	' );
 }
 
@@ -584,6 +623,65 @@ function sft_admin_inline_js(): void {
 			+ '?action=sft_admin_download&file_id=' + fileId
 			+ '&_wpnonce=' + encodeURIComponent('<?php echo wp_create_nonce( 'sft_admin_download' ); ?>');
 		window.location.href = url;
+	}
+
+	/**
+	 * Client-side table sort. Keeps data-subrow rows paired with their parent.
+	 * Call after DOM ready: sftSortTable('my-table-id')
+	 */
+	function sftSortTable(tableId) {
+		var tbl = document.getElementById(tableId);
+		if (!tbl) return;
+		var headers = tbl.querySelectorAll('thead th');
+		headers.forEach(function(th, colIdx) {
+			if (th.dataset.nosort !== undefined) return;
+			th.style.cursor = 'pointer';
+			th.style.userSelect = 'none';
+			var ind = document.createElement('span');
+			ind.className = 'sft-sort-ind';
+			ind.textContent = ' ↕';
+			th.appendChild(ind);
+			var asc = true;
+			th.addEventListener('click', function() {
+				// Reset all indicators.
+				headers.forEach(function(h) {
+					var i = h.querySelector('.sft-sort-ind');
+					if (i) { i.textContent = ' ↕'; i.classList.remove('active'); }
+				});
+				ind.textContent = asc ? ' ↑' : ' ↓';
+				ind.classList.add('active');
+
+				// Collect primary rows (not data-subrow), each with its trailing sub-rows.
+				var tbody = tbl.querySelector('tbody') || tbl;
+				var allRows = Array.from(tbody.querySelectorAll('tr'));
+				var groups = [];
+				allRows.forEach(function(row) {
+					if (row.dataset.subrow !== undefined) {
+						if (groups.length) groups[groups.length - 1].sub.push(row);
+					} else {
+						groups.push({ row: row, sub: [] });
+					}
+				});
+
+				// Sort groups by cell text, numeric if possible.
+				groups.sort(function(a, b) {
+					var ca = a.row.cells[colIdx] ? a.row.cells[colIdx].textContent.trim() : '';
+					var cb = b.row.cells[colIdx] ? b.row.cells[colIdx].textContent.trim() : '';
+					var na = parseFloat(ca.replace(/[^0-9.\-]/g, ''));
+					var nb = parseFloat(cb.replace(/[^0-9.\-]/g, ''));
+					if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+					return asc ? ca.localeCompare(cb) : cb.localeCompare(ca);
+				});
+
+				// Re-append rows in sorted order.
+				groups.forEach(function(g) {
+					tbody.appendChild(g.row);
+					g.sub.forEach(function(s) { tbody.appendChild(s); });
+				});
+
+				asc = !asc;
+			});
+		});
 	}
 	</script>
 	<?php
@@ -652,12 +750,42 @@ function sft_show_notice(): void {
 		return;
 	}
 	delete_transient( $key );
-	$class = $notice['type'] === 'error' ? 'notice-error' : 'notice-success';
+	$class = match ( $notice['type'] ) {
+		'error'   => 'notice-error',
+		'warning' => 'notice-warning',
+		default   => 'notice-success',
+	};
 	printf(
 		'<div class="notice %s is-dismissible" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $class ),
 		$notice['message'] // pre-escaped at set time
 	);
+}
+
+// ─── Sortable column header helper ───────────────────────────────────────────
+
+/**
+ * Renders a server-side sortable <th> element.
+ *
+ * @param string $label       Column label.
+ * @param string $col         orderby key sent in the URL.
+ * @param string $cur_col     Current active orderby value.
+ * @param string $cur_order   Current sort direction (ASC|DESC).
+ * @param array  $url_args    Base query args (page, tab, filters, etc.) merged into the sort URL.
+ * @param bool   $nosort      Pass true to render a plain unsortable <th>.
+ */
+function sft_sortable_th( string $label, string $col, string $cur_col, string $cur_order, array $url_args, bool $nosort = false ): string {
+	if ( $nosort ) {
+		return '<th>' . esc_html( $label ) . '</th>';
+	}
+	$active    = $cur_col === $col;
+	$new_order = ( $active && $cur_order === 'ASC' ) ? 'DESC' : 'ASC';
+	$url       = add_query_arg( array_merge( $url_args, [ 'orderby' => $col, 'order' => $new_order ] ), admin_url( 'admin.php' ) );
+	$indicator = $active
+		? '<span class="sft-sort-ind" style="color:#2271b1;"> ' . ( $cur_order === 'ASC' ? '↑' : '↓' ) . '</span>'
+		: '<span class="sft-sort-ind"> ↕</span>';
+	return '<th><a href="' . esc_url( $url ) . '" style="text-decoration:none;color:inherit;white-space:nowrap;">'
+		. esc_html( $label ) . $indicator . '</a></th>';
 }
 
 // ─── Shared pagination helper ─────────────────────────────────────────────────

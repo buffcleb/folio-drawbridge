@@ -79,4 +79,5 @@ require_once SFT_DIR . 'includes/class-sft-frontend.php';
 if ( is_admin() ) {
 	require_once SFT_DIR . 'admin/class-sft-admin.php';
 	require_once SFT_DIR . 'admin/class-sft-user-dashboard.php';
+	require_once SFT_DIR . 'admin/class-sft-dashboard-widgets.php';
 }

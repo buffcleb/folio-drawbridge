@@ -32,6 +32,8 @@ function sft_render_vault_list(): void {
 
 	$f_status  = sanitize_key( $_GET['f_status'] ?? '' );
 	$f_search  = sanitize_text_field( $_GET['f_search'] ?? '' );
+	$f_orderby = sanitize_key( $_GET['orderby'] ?? 'created_at' );
+	$f_order   = strtoupper( sanitize_key( $_GET['order'] ?? 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$per_page  = 25;
 	$paged     = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
 
@@ -40,6 +42,8 @@ function sft_render_vault_list(): void {
 		'search'   => $f_search,
 		'per_page' => $per_page,
 		'paged'    => $paged,
+		'orderby'  => $f_orderby,
+		'order'    => $f_order,
 	];
 
 	$vaults      = sft_get_all_vaults( $query_args );
@@ -47,6 +51,7 @@ function sft_render_vault_list(): void {
 	$total_pages = (int) ceil( $total / $per_page );
 
 	$filter_args = array_filter( [ 'f_status' => $f_status, 'f_search' => $f_search ] );
+	$sort_base   = array_merge( [ 'page' => 'sft-pro', 'tab' => 'vaults' ], $filter_args );
 	?>
 
 	<div style="display:flex; gap:20px; align-items:flex-start; margin-top:20px;">
@@ -83,14 +88,14 @@ function sft_render_vault_list(): void {
 			<p style="color:#888;font-size:13px;margin:0 0 8px;"><?php echo number_format( $total ); ?> vault<?php echo $total !== 1 ? 's' : ''; ?> found</p>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<th>Vault Name</th>
-					<th>Owner</th>
-					<th>Status</th>
-					<th>Files</th>
-					<th>Shares</th>
-					<th>Created</th>
-					<th>Expires</th>
-					<th>Actions</th>
+					<?php echo sft_sortable_th( 'Vault Name', 'name',       $f_orderby, $f_order, $sort_base ); ?>
+					<th data-nosort>Owner</th>
+					<?php echo sft_sortable_th( 'Status',     'status',     $f_orderby, $f_order, $sort_base ); ?>
+					<th data-nosort>Files</th>
+					<th data-nosort>Shares</th>
+					<?php echo sft_sortable_th( 'Created',    'created_at', $f_orderby, $f_order, $sort_base ); ?>
+					<?php echo sft_sortable_th( 'Expires',    'expires_at', $f_orderby, $f_order, $sort_base ); ?>
+					<th data-nosort>Actions</th>
 				</tr></thead>
 				<tbody>
 				<?php if ( ! $vaults ) : ?>
@@ -221,9 +226,9 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $files ) : ?>
 				<p style="color:#888;font-size:13px;">No files in this vault.</p>
 			<?php else : ?>
-				<table class="sft-table widefat">
+				<table id="sft-insp-files-<?php echo $vault_id; ?>" class="sft-table widefat">
 					<thead><tr>
-						<th>Filename</th><th>Size</th><th>Uploaded By</th><th>Date</th><th>Actions</th>
+						<th>Filename</th><th>Size</th><th>Uploaded By</th><th>Date</th><th data-nosort>Actions</th>
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $files as $f ) :
@@ -257,10 +262,10 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $shares ) : ?>
 				<p style="color:#888;font-size:13px;">No shares created for this vault.</p>
 			<?php else : ?>
-				<table class="sft-table widefat">
+				<table id="sft-insp-shares-<?php echo $vault_id; ?>" class="sft-table widefat">
 					<thead><tr>
 						<th>Recipient</th><th>Status</th><th>Created By</th><th>Downloads</th>
-						<th>Expires</th><th>Last Access</th><th>Actions</th>
+						<th>Expires</th><th>Last Access</th><th data-nosort>Actions</th>
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $shares as $s ) :
@@ -295,7 +300,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 							</td>
 						</tr>
 						<?php if ( $editable ) : ?>
-						<tr id="<?php echo esc_attr( $edit_id ); ?>" style="display:none;background:#f9fafc;">
+						<tr id="<?php echo esc_attr( $edit_id ); ?>" data-subrow style="display:none;background:#f9fafc;">
 							<td colspan="7" style="padding:12px 10px;">
 								<form method="post" action="<?php echo esc_url( $form_url ); ?>"
 								      style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
@@ -335,9 +340,9 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $audit_rows ) : ?>
 				<p style="color:#888;font-size:13px;">No audit events recorded for this vault.</p>
 			<?php else : ?>
-				<table class="sft-table widefat striped">
+				<table id="sft-insp-audit-<?php echo $vault_id; ?>" class="sft-table widefat striped">
 					<thead><tr>
-						<th>Event</th><th>Actor</th><th>IP</th><th>Details</th><th>Time</th>
+						<th>Event</th><th>Actor</th><th>IP</th><th data-nosort>Details</th><th>Time</th>
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $audit_rows as $row ) :
@@ -370,6 +375,11 @@ function sft_render_vault_inspector( int $vault_id ): void {
 		var el = document.getElementById(id);
 		el.style.display = el.style.display === 'none' ? '' : 'none';
 	}
+	document.addEventListener('DOMContentLoaded', function() {
+		sftSortTable('sft-insp-files-<?php echo (int) $vault_id; ?>');
+		sftSortTable('sft-insp-shares-<?php echo (int) $vault_id; ?>');
+		sftSortTable('sft-insp-audit-<?php echo (int) $vault_id; ?>');
+	});
 	</script>
 	<?php
 }

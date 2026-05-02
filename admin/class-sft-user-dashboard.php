@@ -82,7 +82,8 @@ function sft_register_user_dashboard_help_tabs(): void {
 			'title'   => 'Activity Log',
 			'content' =>
 				'<p>The <strong>Activity Log</strong> shows the 20 most recent events for this vault — uploads, downloads, share creation, OTP verifications, and more.</p>' .
-				'<p>Each entry records the event type, any relevant details, the IP address of the actor, and the date and time. This log is read-only and cannot be edited or deleted by users.</p>',
+				'<p>Each entry records the event type, any relevant details, the IP address of the actor, and the date and time in the site\'s configured timezone. This log is read-only and cannot be edited or deleted by users.</p>' .
+				'<p>Click any column header to sort. Your site administrator can view the full audit log across all vaults at <strong>Secure Transfer → Audit Log</strong>.</p>',
 		] );
 	} else {
 		// Vault list view.
@@ -92,6 +93,7 @@ function sft_register_user_dashboard_help_tabs(): void {
 			'content' =>
 				'<p>A <strong>vault</strong> is an encrypted container you can fill with files and then share securely with people outside this site.</p>' .
 				'<p>The vault list shows all of your vaults along with their status, file count, share count, creation date, and expiry date (if set).</p>' .
+				'<p>Click any sortable column header (Name, Status, Created, Expires) to sort the list. Click again to reverse direction.</p>' .
 				'<p>Click a vault name or the <strong>Open</strong> button to manage its files, shares, and activity log.</p>' .
 				'<p><strong>Vault statuses:</strong></p>' .
 				'<ul>' .
@@ -110,7 +112,8 @@ function sft_register_user_dashboard_help_tabs(): void {
 				'<li><strong>Description</strong> (optional) — a note visible only to you and administrators, to help remember the vault\'s purpose.</li>' .
 				'<li><strong>Expiry Date</strong> (optional) — the date after which the vault and all its share links automatically stop working. Leave blank for no expiry.</li>' .
 				'</ul>' .
-				'<p>After the vault is created you will be taken straight to its detail page where you can upload files and create share links.</p>',
+				'<p>After the vault is created you will be taken straight to its detail page where you can upload files and create share links.</p>' .
+				'<p><strong>Tip:</strong> A <em>My Vaults</em> summary widget on your WordPress dashboard home screen shows your vault counts and the last five activity events at a glance.</p>',
 		] );
 	}
 
@@ -164,7 +167,84 @@ function sft_enqueue_user_dashboard_assets( string $hook ): void {
 		.sft-form-actions { margin-top:16px; display:flex; gap:8px; }
 		.sft-notice-success { background:#d1e7dd; border-left:4px solid #0a3622; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
 		.sft-notice-error   { background:#f8d7da; border-left:4px solid #d63638; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
+
+		/* ── Sortable columns ── */
+		.sft-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
+		.sft-table th[data-sortable] { cursor:pointer; user-select:none; }
+		.sft-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
+		.sft-sort-ind.active { color:#2271b1; }
+
+		/* ── Pagination ── */
+		.sft-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
+		.sft-pagination a, .sft-pagination span { display:inline-flex; align-items:center; justify-content:center;
+		    min-width:32px; height:32px; padding:0 8px; border:1px solid #ccd0d4; border-radius:6px;
+		    font-size:13px; text-decoration:none; color:#2271b1; background:#fff; }
+		.sft-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
+		.sft-pagination a:hover { background:#f0f6fb; }
+		.sft-pagination .dots { border:none; background:none; color:#999; }
 	' );
+
+	add_action( 'admin_head', 'sft_user_dashboard_inline_js' );
+}
+
+function sft_user_dashboard_inline_js(): void {
+	if ( ( $_GET['page'] ?? '' ) !== 'sft-my-vaults' ) {
+		return;
+	}
+	?>
+	<script>
+	function sftSortTable(tableId) {
+		var tbl = document.getElementById(tableId);
+		if (!tbl) return;
+		var headers = tbl.querySelectorAll('thead th');
+		headers.forEach(function(th, colIdx) {
+			if (th.dataset.nosort !== undefined) return;
+			th.style.cursor = 'pointer';
+			th.style.userSelect = 'none';
+			var ind = document.createElement('span');
+			ind.className = 'sft-sort-ind';
+			ind.textContent = ' ↕';
+			th.appendChild(ind);
+			var asc = true;
+			th.addEventListener('click', function() {
+				headers.forEach(function(h) {
+					var i = h.querySelector('.sft-sort-ind');
+					if (i) { i.textContent = ' ↕'; i.classList.remove('active'); }
+				});
+				ind.textContent = asc ? ' ↑' : ' ↓';
+				ind.classList.add('active');
+
+				var tbody = tbl.querySelector('tbody') || tbl;
+				var allRows = Array.from(tbody.querySelectorAll('tr'));
+				var groups = [];
+				allRows.forEach(function(row) {
+					if (row.dataset.subrow !== undefined) {
+						if (groups.length) groups[groups.length - 1].sub.push(row);
+					} else {
+						groups.push({ row: row, sub: [] });
+					}
+				});
+
+				groups.sort(function(a, b) {
+					var ca = a.row.cells[colIdx] ? a.row.cells[colIdx].textContent.trim() : '';
+					var cb = b.row.cells[colIdx] ? b.row.cells[colIdx].textContent.trim() : '';
+					var na = parseFloat(ca.replace(/[^0-9.\-]/g, ''));
+					var nb = parseFloat(cb.replace(/[^0-9.\-]/g, ''));
+					if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+					return asc ? ca.localeCompare(cb) : cb.localeCompare(ca);
+				});
+
+				groups.forEach(function(g) {
+					tbody.appendChild(g.row);
+					g.sub.forEach(function(s) { tbody.appendChild(s); });
+				});
+
+				asc = !asc;
+			});
+		});
+	}
+	</script>
+	<?php
 }
 
 // ─── POST handler ─────────────────────────────────────────────────────────────

@@ -97,11 +97,15 @@ function sft_get_user_vaults( int $owner_id, array $args = [] ): array {
 		$values[] = $status;
 	}
 
+	$allowed_cols = [ 'name', 'status', 'created_at', 'expires_at' ];
+	$orderby = in_array( $args['orderby'] ?? '', $allowed_cols, true ) ? $args['orderby'] : 'created_at';
+	$order   = strtoupper( $args['order'] ?? 'DESC' ) === 'ASC' ? 'ASC' : 'DESC';
+
 	$where_sql = 'WHERE ' . implode( ' AND ', $where );
 	$limit_sql = $per_page > 0 ? $wpdb->prepare( 'LIMIT %d OFFSET %d', $per_page, ( $paged - 1 ) * $per_page ) : '';
 
 	return $wpdb->get_results(
-		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults {$where_sql} ORDER BY created_at DESC {$limit_sql}", $values )
+		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values )
 	) ?: [];
 }
 
@@ -111,11 +115,11 @@ function sft_get_user_vaults( int $owner_id, array $args = [] ): array {
 function sft_get_all_vaults( array $args = [] ): array {
 	global $wpdb;
 
-	[ $where_sql, $values, $limit_sql ] = sft_vaults_query_parts( $args );
+	[ $where_sql, $values, $limit_sql, $orderby, $order ] = sft_vaults_query_parts( $args );
 
 	$sql = "SELECT v.*, u.user_login as owner_login FROM {$wpdb->prefix}sft_vaults v
 	        LEFT JOIN {$wpdb->users} u ON u.ID = v.owner_id
-	        {$where_sql} ORDER BY v.created_at DESC {$limit_sql}";
+	        {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}";
 
 	return $values
 		? ( $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [] )
@@ -155,11 +159,15 @@ function sft_vaults_query_parts( array $args ): array {
 
 	$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
 
-	$per_page = (int) ( $args['per_page'] ?? 25 );
-	$paged    = max( 1, (int) ( $args['paged'] ?? 1 ) );
+	$allowed_cols = [ 'name', 'status', 'created_at', 'expires_at' ];
+	$orderby  = in_array( $args['orderby'] ?? '', $allowed_cols, true ) ? ( 'v.' . $args['orderby'] ) : 'v.created_at';
+	$order    = strtoupper( $args['order'] ?? 'DESC' ) === 'ASC' ? 'ASC' : 'DESC';
+
+	$per_page  = (int) ( $args['per_page'] ?? 25 );
+	$paged     = max( 1, (int) ( $args['paged'] ?? 1 ) );
 	$limit_sql = $per_page > 0 ? "LIMIT {$per_page} OFFSET " . ( ( $paged - 1 ) * $per_page ) : '';
 
-	return [ $where_sql, $values, $limit_sql ];
+	return [ $where_sql, $values, $limit_sql, $orderby, $order ];
 }
 
 /**
