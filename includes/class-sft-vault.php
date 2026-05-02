@@ -617,3 +617,108 @@ function sft_get_vault_total_size( int $vault_id ): int {
 		$wpdb->prepare( "SELECT COALESCE(SUM(file_size),0) FROM {$wpdb->prefix}sft_files WHERE vault_id = %d", $vault_id )
 	);
 }
+
+// ─── File type restrictions ───────────────────────────────────────────────────
+
+/**
+ * Returns true when the file is allowed by the site's extension allowlist.
+ *
+ * The allowlist is a comma-separated string of extensions in sft_allowed_file_extensions.
+ * An empty allowlist means all types are permitted.
+ *
+ * @param string $extension  Lowercase extension without leading dot (e.g. 'pdf').
+ * @return bool
+ */
+function sft_is_allowed_file_type( string $extension ): bool {
+	$raw = (string) get_option( 'sft_allowed_file_extensions', '' );
+	if ( $raw === '' ) {
+		return true; // no restriction
+	}
+
+	$allowed = array_filter( array_map( 'trim', explode( ',', strtolower( $raw ) ) ) );
+	return in_array( strtolower( $extension ), $allowed, true );
+}
+
+// ─── Storage quota ────────────────────────────────────────────────────────────
+
+/**
+ * Returns the total bytes stored across all vaults owned by $user_id.
+ */
+function sft_get_user_storage_used( int $user_id ): int {
+	global $wpdb;
+
+	return (int) $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT COALESCE(SUM(f.file_size), 0)
+			 FROM {$wpdb->prefix}sft_files f
+			 JOIN {$wpdb->prefix}sft_vaults v ON v.id = f.vault_id
+			 WHERE v.owner_id = %d",
+			$user_id
+		)
+	);
+}
+
+// ─── Vault transfer ───────────────────────────────────────────────────────────
+
+/**
+ * Transfers vault ownership to a different WordPress user.
+ *
+ * The new owner must have the use_sft_vaults or sft_admin capability.
+ * Admins are always permitted to own vaults regardless of capability.
+ *
+ * @param int $vault_id      Vault to transfer.
+ * @param int $new_owner_id  WP user ID of the new owner.
+ * @param int $actor_id      WP user ID performing the transfer (for audit log).
+ * @return true|WP_Error
+ */
+function sft_transfer_vault( int $vault_id, int $new_owner_id, int $actor_id ) {
+	global $wpdb;
+
+	$vault = sft_get_vault( $vault_id );
+	if ( ! $vault ) {
+		return new WP_Error( 'not_found', 'Vault not found.' );
+	}
+
+	$new_owner = get_userdata( $new_owner_id );
+	if ( ! $new_owner ) {
+		return new WP_Error( 'user_not_found', 'New owner user not found.' );
+	}
+
+	if ( ! sft_is_admin( $new_owner_id )
+		&& ! $new_owner->has_cap( 'use_sft_vaults' )
+		&& ! $new_owner->has_cap( 'sft_admin' ) ) {
+		return new WP_Error( 'no_capability', 'The new owner must have vault access. Grant them Vault User or SFT Admin access first.' );
+	}
+
+	if ( (int) $vault->owner_id === $new_owner_id ) {
+		return new WP_Error( 'same_owner', 'The new owner is already the current owner.' );
+	}
+
+	$old_owner_id = (int) $vault->owner_id;
+
+	$result = $wpdb->update(
+		"{$wpdb->prefix}sft_vaults",
+		[ 'owner_id' => $new_owner_id, 'updated_at' => current_time( 'mysql', true ) ],
+		[ 'id' => $vault_id ],
+		[ '%d', '%s' ],
+		[ '%d' ]
+	);
+
+	if ( $result === false ) {
+		return new WP_Error( 'db_error', 'Could not update vault ownership.' );
+	}
+
+	sft_log(
+		SFT_EVT_VAULT_TRANSFERRED,
+		$vault_id,
+		null,
+		[
+			'from_user_id' => $old_owner_id,
+			'to_user_id'   => $new_owner_id,
+			'to_login'     => $new_owner->user_login,
+		],
+		$actor_id
+	);
+
+	return true;
+}

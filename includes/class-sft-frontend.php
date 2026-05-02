@@ -144,6 +144,13 @@ function sft_render_share_page( string $token ): void {
 						</li>
 					<?php endforeach; ?>
 				</ul>
+				<?php if ( count( $files ) > 1 && class_exists( 'ZipArchive' ) ) : ?>
+					<div style="margin-top:14px;">
+						<a class="sft-btn sft-btn-secondary" href="#" onclick="sftDownloadZip(); return false;">
+							Download All as ZIP
+						</a>
+					</div>
+				<?php endif; ?>
 			<?php endif; ?>
 		</div>
 	</div>
@@ -198,6 +205,15 @@ function sft_render_share_page( string $token ): void {
 	function sftDownload(fileId) {
 		if (!sftData.dlToken) return;
 		var url = <?php echo wp_json_encode( home_url( '/' ) ); ?> + '?sft_download=' + fileId + '&dt=' + encodeURIComponent(sftData.dlToken);
+		var a = document.createElement('a');
+		a.href = url; a.download = ''; a.style.display = 'none';
+		document.body.appendChild(a); a.click(); document.body.removeChild(a);
+	}
+
+	function sftDownloadZip() {
+		if (!sftData.dlToken) return;
+		var url = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>
+			+ '?action=sft_zip_download&dt=' + encodeURIComponent(sftData.dlToken);
 		var a = document.createElement('a');
 		a.href = url; a.download = ''; a.style.display = 'none';
 		document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -306,7 +322,110 @@ function sft_handle_file_download( int $file_id ): void {
 	}
 
 	sft_increment_download_count( (int) $share->id );
+	sft_send_download_notification( (int) $share->id, $file_id, sft_get_client_ip() );
 	sft_serve_file( $file, $vault, (int) $share->id, false );
+}
+
+// ─── ZIP bulk download ────────────────────────────────────────────────────────
+
+add_action( 'wp_ajax_nopriv_sft_zip_download', 'sft_handle_zip_download' );
+add_action( 'wp_ajax_sft_zip_download',        'sft_handle_zip_download' );
+
+/**
+ * Streams all files in a vault as a single ZIP archive.
+ * Requires a valid download session token (?dt=TOKEN) and ZipArchive extension.
+ */
+function sft_handle_zip_download(): void {
+	if ( ! class_exists( 'ZipArchive' ) ) {
+		wp_die( 'ZIP download is not available on this server (ZipArchive extension required).', 500 );
+	}
+
+	$token = sanitize_text_field( $_GET['dt'] ?? '' );
+	if ( ! $token ) {
+		wp_die( 'Invalid download request.', 403 );
+	}
+
+	$session = sft_get_download_session( $token );
+	if ( ! $session ) {
+		wp_die( 'Download session expired or invalid. Please verify your identity again.', 403 );
+	}
+
+	$share = sft_get_share( (int) $session['share_id'] );
+	if ( ! $share || ! sft_share_is_accessible( $share ) ) {
+		wp_die( 'This share link is no longer available.', 403 );
+	}
+
+	$vault = sft_get_vault( (int) $share->vault_id );
+	if ( ! $vault ) {
+		wp_die( 'Vault not found.', 404 );
+	}
+
+	$files = sft_get_vault_files( (int) $vault->id );
+	if ( empty( $files ) ) {
+		wp_die( 'This vault has no files to download.', 404 );
+	}
+
+	// Build ZIP in a temp file.
+	$tmp_zip = wp_tempnam( 'sft_zip_' );
+	$zip     = new ZipArchive();
+
+	if ( $zip->open( $tmp_zip, ZipArchive::OVERWRITE ) !== true ) {
+		@unlink( $tmp_zip );
+		wp_die( 'Could not create ZIP archive.', 500 );
+	}
+
+	$dec_temps = [];
+	$added     = 0;
+
+	foreach ( $files as $file ) {
+		$enc_path = sft_vault_file_path( (int) $vault->id, $file->stored_name );
+		if ( ! file_exists( $enc_path ) ) {
+			continue;
+		}
+
+		$dec_tmp     = wp_tempnam( 'sft_dec' );
+		$dec_temps[] = $dec_tmp;
+
+		$ok = sft_decrypt_file_to_path(
+			$enc_path,
+			$vault->vault_salt,
+			$file->iv,
+			(int) $file->file_size,
+			$dec_tmp
+		);
+
+		if ( $ok ) {
+			$zip->addFile( $dec_tmp, $file->original_name );
+			$added++;
+		}
+	}
+
+	$zip->close(); // copies all addFile() data into the archive
+
+	foreach ( $dec_temps as $dec_tmp ) {
+		@unlink( $dec_tmp );
+	}
+
+	if ( $added === 0 ) {
+		@unlink( $tmp_zip );
+		wp_die( 'No files could be decrypted.', 500 );
+	}
+
+	// Log and send.
+	sft_increment_download_count( (int) $share->id );
+	sft_log( SFT_EVT_FILE_DOWNLOADED, (int) $vault->id, (int) $share->id,
+		[ 'zip' => true, 'file_count' => $added ] );
+
+	$safe_name = sanitize_file_name( $vault->name ) ?: 'vault';
+	header( 'Content-Type: application/zip' );
+	header( 'Content-Disposition: attachment; filename="' . $safe_name . '.zip"' );
+	header( 'Content-Length: ' . filesize( $tmp_zip ) );
+	header( 'Cache-Control: no-store' );
+
+	readfile( $tmp_zip );
+	@unlink( $tmp_zip );
+
+	exit;
 }
 
 // ─── AJAX: request OTP ────────────────────────────────────────────────────────
@@ -543,16 +662,11 @@ function sft_render_my_vaults_shortcode(): string {
 <!-- Upload File Modal -->
 <div id="sft-modal-upload" class="sft-mv-modal-overlay" style="display:none" onclick="sftCloseModal('sft-modal-upload')">
 	<div class="sft-mv-modal" onclick="event.stopPropagation()">
-		<h3>Upload File to Vault</h3>
+		<h3>Upload Files to Vault</h3>
 		<div id="sft-upload-modal-error" class="sft-mv-alert sft-mv-alert-error" style="display:none"></div>
-		<label>Select File (max <?php echo (int) get_option( 'sft_max_file_mb', 50 ); ?> MB)</label>
-		<input type="file" id="sft-file-input">
-		<div id="sft-upload-progress-wrap" style="display:none;margin-top:12px;">
-			<div style="background:#e2e3e5;border-radius:4px;overflow:hidden;height:14px;">
-				<div id="sft-upload-progress-bar" style="background:#2271b1;height:100%;width:0%;transition:width .2s;"></div>
-			</div>
-			<p id="sft-upload-progress-label" style="font-size:12px;color:#888;margin:4px 0 0;">Uploading…</p>
-		</div>
+		<label>Select Files (max <?php echo (int) get_option( 'sft_max_file_mb', 50 ); ?> MB each — hold Ctrl/Cmd to select multiple)</label>
+		<input type="file" id="sft-file-input" multiple>
+		<div id="sft-upload-queue" style="margin-top:10px;max-height:200px;overflow-y:auto;"></div>
 		<div class="sft-mv-actions">
 			<button id="sft-upload-btn" class="sft-mv-btn sft-mv-btn-primary" onclick="sftUploadFile()">Encrypt &amp; Upload</button>
 			<button id="sft-upload-cancel-btn" class="sft-mv-btn" style="background:#f0f2f5;color:#333" onclick="sftCloseModal('sft-modal-upload')">Cancel</button>
@@ -607,8 +721,7 @@ function sftOpenNewVaultModal() {
 function sftOpenUploadModal(vaultId) {
 	sftUserData.activeVaultId = vaultId;
 	document.getElementById('sft-file-input').value='';
-	document.getElementById('sft-upload-progress-wrap').style.display='none';
-	document.getElementById('sft-upload-progress-bar').style.width='0%';
+	document.getElementById('sft-upload-queue').innerHTML='';
 	document.getElementById('sft-upload-btn').disabled=false;
 	document.getElementById('sft-upload-cancel-btn').disabled=false;
 	sftHideError2('sft-upload-modal-error');
@@ -648,55 +761,89 @@ function sftGenerateUploadId() {
 		.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
 }
 
+function sftMvEsc(s) {
+	return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sftMvMakeQueueRow(fileName) {
+	var row = document.createElement('div');
+	row.style.cssText = 'margin-bottom:6px;padding:7px 10px;background:#f6f7f7;border-radius:4px;font-size:12px;';
+	row.innerHTML =
+		'<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+		+ '<span style="font-weight:600;word-break:break-all;">' + sftMvEsc(fileName) + '</span>'
+		+ '<span class="sft-mv-qlbl" style="color:#888;white-space:nowrap;margin-left:8px;">Queued</span></div>'
+		+ '<div style="background:#e0e0e0;border-radius:3px;height:7px;overflow:hidden;">'
+		+ '<div class="sft-mv-qbar" style="background:#2271b1;height:100%;width:0%;transition:width .15s;"></div></div>';
+	return row;
+}
+
+async function sftUploadOneFile(file, rowEl) {
+	var bar   = rowEl.querySelector('.sft-mv-qbar');
+	var lbl   = rowEl.querySelector('.sft-mv-qlbl');
+	var CHUNK = sftUserData.chunkSize;
+	var total = Math.ceil(file.size / CHUNK) || 1;
+	var uid   = sftGenerateUploadId();
+	lbl.textContent = 'Uploading…';
+	for (var i = 0; i < total; i++) {
+		var start = i * CHUNK;
+		var fd    = new FormData();
+		fd.append('action',       'sft_upload_chunk');
+		fd.append('_wpnonce',     sftUserData.nonce);
+		fd.append('vault_id',     sftUserData.activeVaultId);
+		fd.append('upload_id',    uid);
+		fd.append('chunk_index',  i);
+		fd.append('total_chunks', total);
+		fd.append('file_name',    file.name);
+		fd.append('total_size',   file.size);
+		fd.append('chunk',        file.slice(start, Math.min(start + CHUNK, file.size)), file.name);
+		var r = await fetch(sftUserData.ajaxUrl, {method:'POST', body:fd});
+		var j = await r.json();
+		if (!j.success) throw new Error(j.data || 'Upload failed.');
+		var pct = Math.round((i + 1) / total * 100);
+		bar.style.width = pct + '%';
+		lbl.textContent = j.data.complete ? 'Done' : pct + '%';
+	}
+}
+
 async function sftUploadFile() {
-	var input = document.getElementById('sft-file-input');
+	var input   = document.getElementById('sft-file-input');
+	var queueEl = document.getElementById('sft-upload-queue');
 	sftHideError2('sft-upload-modal-error');
-	if (!input.files.length) { sftShowError2('sft-upload-modal-error','Please select a file.'); return; }
+	if (!input.files.length) { sftShowError2('sft-upload-modal-error','Please select at least one file.'); return; }
 
-	var file = input.files[0];
-	var btn  = document.getElementById('sft-upload-btn');
-	var wrap = document.getElementById('sft-upload-progress-wrap');
-	var bar  = document.getElementById('sft-upload-progress-bar');
-	var lbl  = document.getElementById('sft-upload-progress-label');
-
+	var btn = document.getElementById('sft-upload-btn');
+	var ccl = document.getElementById('sft-upload-cancel-btn');
 	btn.disabled = true;
-	document.getElementById('sft-upload-cancel-btn').disabled = true;
-	wrap.style.display = '';
+	ccl.disabled = true;
+	queueEl.innerHTML = '';
 
-	var CHUNK   = sftUserData.chunkSize;
-	var total   = Math.ceil(file.size / CHUNK) || 1;
-	var uid     = sftGenerateUploadId();
+	var files = Array.from(input.files);
+	var rows  = files.map(function(f) {
+		var row = sftMvMakeQueueRow(f.name);
+		queueEl.appendChild(row);
+		return row;
+	});
 
-	try {
-		for (var i = 0; i < total; i++) {
-			var start = i * CHUNK;
-			var fd    = new FormData();
-			fd.append('action',       'sft_upload_chunk');
-			fd.append('_wpnonce',     sftUserData.nonce);
-			fd.append('vault_id',     sftUserData.activeVaultId);
-			fd.append('upload_id',    uid);
-			fd.append('chunk_index',  i);
-			fd.append('total_chunks', total);
-			fd.append('file_name',    file.name);
-			fd.append('total_size',   file.size);
-			fd.append('chunk',        file.slice(start, Math.min(start + CHUNK, file.size)), file.name);
-
-			var r = await fetch(sftUserData.ajaxUrl, {method:'POST', body:fd});
-			var j = await r.json();
-			if (!j.success) throw new Error(j.data || 'Upload failed.');
-
-			var pct = Math.round((i + 1) / total * 100);
-			bar.style.width = pct + '%';
-			lbl.textContent = j.data.complete ? 'Encrypting & saving…' : 'Uploading ' + pct + '%…';
+	var hasError = false;
+	for (var i = 0; i < files.length; i++) {
+		try {
+			await sftUploadOneFile(files[i], rows[i]);
+			rows[i].querySelector('.sft-mv-qlbl').style.color = '#0a3622';
+		} catch(e) {
+			var lbl = rows[i].querySelector('.sft-mv-qlbl');
+			lbl.textContent = 'Error: ' + e.message;
+			lbl.style.color = '#d63638';
+			hasError = true;
 		}
+	}
+
+	if (!hasError) {
 		sftCloseModal('sft-modal-upload');
-		sftShowNotice('File encrypted and uploaded. Reloading…', 'success');
-		setTimeout(function(){ location.reload(); }, 1200);
-	} catch(e) {
+		sftShowNotice(files.length + ' file(s) encrypted and uploaded. Reloading…', 'success');
+		setTimeout(function(){ location.reload(); }, 1400);
+	} else {
 		btn.disabled = false;
-		document.getElementById('sft-upload-cancel-btn').disabled = false;
-		wrap.style.display = 'none';
-		sftShowError2('sft-upload-modal-error', e.message);
+		ccl.disabled = false;
 	}
 }
 
@@ -841,6 +988,25 @@ function sft_ajax_upload_chunk_handler(): void {
 	}
 	fclose( $out );
 	@rmdir( $upload_dir );
+
+	// File type restriction check ($upload_dir already cleaned at this point).
+	$ext = strtolower( pathinfo( $original_name, PATHINFO_EXTENSION ) );
+	if ( ! sft_is_allowed_file_type( $ext ) ) {
+		@unlink( $assembled );
+		wp_send_json_error( "File type .{$ext} is not permitted on this site." );
+	}
+
+	// Per-user storage quota check (admins exempt).
+	if ( ! sft_is_admin( $user_id ) ) {
+		$quota_mb = (int) get_option( 'sft_storage_quota_mb', 0 );
+		if ( $quota_mb > 0 ) {
+			$used = sft_get_user_storage_used( $user_id );
+			if ( $used + $total_size > $quota_mb * 1024 * 1024 ) {
+				@unlink( $assembled );
+				wp_send_json_error( "Upload would exceed your storage quota of {$quota_mb} MB." );
+			}
+		}
+	}
 
 	// Encrypt and store; clean up temp file regardless of outcome.
 	$result = sft_encrypt_and_store_file( $vault_id, $assembled, $original_name, $total_size, $user_id );

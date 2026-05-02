@@ -48,6 +48,7 @@ function sft_handle_admin_post(): void {
 		// Two-factor.
 		$otp_ttl          = max( 5, min( 60, (int) ( $_POST['sft_otp_ttl_minutes'] ?? 15 ) ) );
 		$otp_max_attempts = max( 1, min( 20, (int) ( $_POST['sft_otp_max_attempts'] ?? 5 ) ) );
+		$otp_cooldown     = max( 0, min( 300, (int) ( $_POST['sft_otp_cooldown_seconds'] ?? 60 ) ) );
 
 		// Download limits.
 		$allow_unlimited_downloads = isset( $_POST['sft_allow_unlimited_downloads'] ) ? '1' : '0';
@@ -69,6 +70,25 @@ function sft_handle_admin_post(): void {
 		// Data & privacy.
 		$delete_on_uninstall = isset( $_POST['sft_delete_on_uninstall'] ) ? '1' : '0';
 
+		// Notifications.
+		$notify_on_download  = isset( $_POST['sft_notify_on_download'] ) ? '1' : '0';
+		$expiry_warning_days = max( 0, (int) ( $_POST['sft_expiry_warning_days'] ?? 0 ) );
+
+		// File type restrictions.
+		$allowed_extensions = sanitize_text_field( $_POST['sft_allowed_file_extensions'] ?? '' );
+
+		// Storage quotas.
+		$storage_quota_mb = max( 0, (int) ( $_POST['sft_storage_quota_mb'] ?? 0 ) );
+
+		// Email templates.
+		$email_template_types = [ 'invite', 'otp', 'download_notification', 'expiry_warning' ];
+		$email_template_data  = [];
+		foreach ( $email_template_types as $type ) {
+			$subject = sanitize_text_field( $_POST[ "sft_email_{$type}_subject" ] ?? '' );
+			$body    = sanitize_textarea_field( $_POST[ "sft_email_{$type}_body" ] ?? '' );
+			$email_template_data[ $type ] = compact( 'subject', 'body' );
+		}
+
 		// SIEM logging.
 		$siem_enabled    = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
 		$siem_log_path   = sanitize_text_field( $_POST['sft_siem_log_path'] ?? '' );
@@ -86,6 +106,7 @@ function sft_handle_admin_post(): void {
 
 		update_option( 'sft_otp_ttl_minutes',            $otp_ttl );
 		update_option( 'sft_otp_max_attempts',            $otp_max_attempts );
+		update_option( 'sft_otp_cooldown_seconds',        $otp_cooldown );
 		update_option( 'sft_allow_unlimited_downloads',   $allow_unlimited_downloads );
 		update_option( 'sft_default_max_downloads',       $default_max_downloads );
 		update_option( 'sft_max_download_limit',          $max_download_limit );
@@ -99,6 +120,14 @@ function sft_handle_admin_post(): void {
 		update_option( 'sft_siem_enabled',                $siem_enabled );
 		update_option( 'sft_siem_log_path',               $siem_log_path );
 		update_option( 'sft_siem_format',                 $siem_format );
+		update_option( 'sft_notify_on_download',          $notify_on_download );
+		update_option( 'sft_expiry_warning_days',         $expiry_warning_days );
+		update_option( 'sft_allowed_file_extensions',     $allowed_extensions );
+		update_option( 'sft_storage_quota_mb',            $storage_quota_mb );
+		foreach ( $email_template_data as $type => $tmpl ) {
+			update_option( "sft_email_{$type}_subject", $tmpl['subject'] );
+			update_option( "sft_email_{$type}_body",    $tmpl['body'] );
+		}
 
 		sft_log( SFT_EVT_SETTINGS_SAVED, null, null, [
 			'otp_ttl_minutes'  => $otp_ttl,
@@ -194,6 +223,28 @@ function sft_handle_admin_post(): void {
 			sft_set_notice( 'Vault permanently deleted.', 'success' );
 		}
 		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// ── Admin: transfer vault ownership ──────────────────────────────────────
+	if ( isset( $_POST['sft_admin_transfer_vault'] ) ) {
+		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
+		$new_login  = sanitize_text_field( $_POST['new_owner_login'] ?? '' );
+		$new_user   = $new_login ? ( get_user_by( 'login', $new_login ) ?: get_user_by( 'email', $new_login ) ) : null;
+		$redirect   = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) );
+
+		if ( ! $vault_id || ! $new_user ) {
+			sft_set_notice( 'User not found: "' . esc_html( $new_login ) . '". Check the login name or email and try again.', 'error' );
+		} else {
+			$result = sft_transfer_vault( $vault_id, (int) $new_user->ID, get_current_user_id() );
+			if ( is_wp_error( $result ) ) {
+				sft_set_notice( $result->get_error_message(), 'error' );
+			} else {
+				sft_set_notice( 'Vault transferred to ' . esc_html( $new_user->user_login ) . '.', 'success' );
+			}
+		}
+
+		wp_redirect( $redirect );
 		exit;
 	}
 

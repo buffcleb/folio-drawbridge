@@ -272,6 +272,90 @@ function sft_stream_decrypt_file(
 	return $success;
 }
 
+/**
+ * Decrypts a vault file and writes the plaintext to $dest_path on disk.
+ * Used by the ZIP bulk-download handler to build an archive server-side.
+ *
+ * @param string $source_path    Path to the encrypted file.
+ * @param string $vault_salt     Vault's salt for key derivation.
+ * @param string $iv_hex         Per-file IV stored in the database.
+ * @param int    $plaintext_size Unencrypted file size in bytes.
+ * @param string $dest_path      Writable path for the decrypted output.
+ * @return bool True on success.
+ */
+function sft_decrypt_file_to_path(
+	string $source_path,
+	string $vault_salt,
+	string $iv_hex,
+	int    $plaintext_size,
+	string $dest_path
+): bool {
+	if ( ! function_exists( 'openssl_decrypt' ) ) {
+		return false;
+	}
+
+	$in  = @fopen( $source_path, 'rb' );
+	$out = @fopen( $dest_path, 'wb' );
+	if ( ! $in || ! $out ) {
+		if ( $in )  fclose( $in );
+		if ( $out ) fclose( $out );
+		return false;
+	}
+
+	$key   = sft_derive_vault_key( $vault_salt );
+	$iv    = hex2bin( $iv_hex );
+	$block = 16;
+
+	$intermediate_chunks = (int) ( ( $plaintext_size - 1 ) / SFT_STREAM_CHUNK );
+	$last_plain_bytes    = $plaintext_size - $intermediate_chunks * SFT_STREAM_CHUNK;
+	$last_cipher_bytes   = ( $last_plain_bytes % $block === 0 )
+		? $last_plain_bytes + $block
+		: (int) ( ceil( $last_plain_bytes / $block ) ) * $block;
+
+	$current_iv = $iv;
+	$success    = true;
+
+	for ( $i = 0; $i < $intermediate_chunks; $i++ ) {
+		$cipher_chunk = fread( $in, SFT_STREAM_CHUNK );
+		if ( $cipher_chunk === false || strlen( $cipher_chunk ) !== SFT_STREAM_CHUNK ) {
+			$success = false;
+			break;
+		}
+		$decrypted = openssl_decrypt(
+			$cipher_chunk, 'AES-256-CBC', $key,
+			OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $current_iv
+		);
+		if ( $decrypted === false ) {
+			$success = false;
+			break;
+		}
+		fwrite( $out, $decrypted );
+		$current_iv = substr( $cipher_chunk, -$block );
+	}
+
+	if ( $success ) {
+		$cipher_chunk = fread( $in, $last_cipher_bytes );
+		if ( $cipher_chunk === false || strlen( $cipher_chunk ) !== $last_cipher_bytes ) {
+			$success = false;
+		} else {
+			$decrypted = openssl_decrypt(
+				$cipher_chunk, 'AES-256-CBC', $key,
+				OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $current_iv
+			);
+			if ( $decrypted === false ) {
+				$success = false;
+			} else {
+				$pad = ord( $decrypted[-1] );
+				fwrite( $out, substr( $decrypted, 0, -$pad ) );
+			}
+		}
+	}
+
+	fclose( $in );
+	fclose( $out );
+	return $success;
+}
+
 // ─── Random token generation ──────────────────────────────────────────────────
 
 /**

@@ -146,9 +146,9 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 			<div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
 				<div style="flex:1; min-width:200px;">
 					<label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">
-						File <span style="font-weight:400; color:#888;">(max <?php echo $max_file_mb; ?> MB)</span>
+						Files <span style="font-weight:400; color:#888;">(max <?php echo $max_file_mb; ?> MB each — hold Ctrl/Cmd to select multiple)</span>
 					</label>
-					<input type="file" id="sft-ud-file-input" style="width:100%; padding:6px;">
+					<input type="file" id="sft-ud-file-input" multiple style="width:100%; padding:6px;">
 				</div>
 				<div>
 					<button type="button" id="sft-ud-upload-btn" class="button button-primary" onclick="sftUdUpload()">
@@ -156,12 +156,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 					</button>
 				</div>
 			</div>
-			<div id="sft-ud-progress-wrap" style="display:none; margin-top:10px;">
-				<div style="background:#f0f2f5; border-radius:4px; overflow:hidden; height:16px;">
-					<div id="sft-ud-progress-bar" style="background:#2271b1; height:100%; width:0%; transition:width .2s;"></div>
-				</div>
-				<p id="sft-ud-progress-label" style="font-size:12px; color:#888; margin:4px 0 0;">Uploading…</p>
-			</div>
+			<div id="sft-ud-file-queue" style="margin-top:10px;"></div>
 			<p id="sft-ud-upload-error" style="display:none; color:#d63638; font-size:13px; margin:8px 0 0;"></p>
 		</div>
 		<script>
@@ -179,51 +174,82 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 			var el = document.getElementById(id);
 			el.style.display = el.style.display === 'none' ? '' : 'none';
 		}
-		async function sftUdUpload() {
-			var input = document.getElementById('sft-ud-file-input');
-			var errEl = document.getElementById('sft-ud-upload-error');
-			errEl.style.display = 'none';
-			if (!input.files.length) {
-				errEl.textContent = 'Please select a file.';
-				errEl.style.display = '';
-				return;
-			}
-			var file = input.files[0];
-			var btn  = document.getElementById('sft-ud-upload-btn');
-			var wrap = document.getElementById('sft-ud-progress-wrap');
-			var bar  = document.getElementById('sft-ud-progress-bar');
-			var lbl  = document.getElementById('sft-ud-progress-label');
-			btn.disabled = true;
-			wrap.style.display = '';
+		async function sftUdUploadOne(file, rowEl) {
+			var bar = rowEl.querySelector('.sft-ud-bar');
+			var lbl = rowEl.querySelector('.sft-ud-lbl');
 			var CHUNK = sftUd.chunkSize;
 			var total = Math.ceil(file.size / CHUNK) || 1;
 			var uid   = sftUdGenId();
-			try {
-				for (var i = 0; i < total; i++) {
-					var start = i * CHUNK;
-					var fd = new FormData();
-					fd.append('action',       'sft_upload_chunk');
-					fd.append('_wpnonce',     sftUd.nonce);
-					fd.append('vault_id',     sftUd.vaultId);
-					fd.append('upload_id',    uid);
-					fd.append('chunk_index',  i);
-					fd.append('total_chunks', total);
-					fd.append('file_name',    file.name);
-					fd.append('total_size',   file.size);
-					fd.append('chunk',        file.slice(start, Math.min(start + CHUNK, file.size)), file.name);
-					var r = await fetch(sftUd.ajaxUrl, {method:'POST', body:fd});
-					var j = await r.json();
-					if (!j.success) throw new Error(j.data || 'Upload failed.');
-					var pct = Math.round((i + 1) / total * 100);
-					bar.style.width = pct + '%';
-					lbl.textContent = j.data.complete ? 'Encrypting & saving…' : 'Uploading ' + pct + '%…';
-				}
-				window.location.reload();
-			} catch(e) {
-				btn.disabled = false;
-				wrap.style.display = 'none';
-				errEl.textContent = e.message;
+			for (var i = 0; i < total; i++) {
+				var start = i * CHUNK;
+				var fd = new FormData();
+				fd.append('action',       'sft_upload_chunk');
+				fd.append('_wpnonce',     sftUd.nonce);
+				fd.append('vault_id',     sftUd.vaultId);
+				fd.append('upload_id',    uid);
+				fd.append('chunk_index',  i);
+				fd.append('total_chunks', total);
+				fd.append('file_name',    file.name);
+				fd.append('total_size',   file.size);
+				fd.append('chunk',        file.slice(start, Math.min(start + CHUNK, file.size)), file.name);
+				var r = await fetch(sftUd.ajaxUrl, {method:'POST', body:fd});
+				var j = await r.json();
+				if (!j.success) throw new Error(j.data || 'Upload failed.');
+				var pct = Math.round((i + 1) / total * 100);
+				bar.style.width = pct + '%';
+				lbl.textContent = j.data.complete ? 'Done' : pct + '%';
+			}
+		}
+		function sftUdMakeRow(file) {
+			var row = document.createElement('div');
+			row.style.cssText = 'margin-bottom:6px;padding:8px 10px;background:#f6f7f7;border-radius:4px;font-size:12px;';
+			row.innerHTML =
+				'<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+				+ '<span style="font-weight:600;">' + sftEsc(file.name) + '</span>'
+				+ '<span class="sft-ud-lbl" style="color:#888;">Queued</span></div>'
+				+ '<div style="background:#e0e0e0;border-radius:3px;height:8px;overflow:hidden;">'
+				+ '<div class="sft-ud-bar" style="background:#2271b1;height:100%;width:0%;transition:width .2s;"></div></div>';
+			return row;
+		}
+		function sftEsc(s) {
+			return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+		}
+		async function sftUdUpload() {
+			var input  = document.getElementById('sft-ud-file-input');
+			var errEl  = document.getElementById('sft-ud-upload-error');
+			var queueEl = document.getElementById('sft-ud-file-queue');
+			errEl.style.display = 'none';
+			if (!input.files.length) {
+				errEl.textContent = 'Please select at least one file.';
 				errEl.style.display = '';
+				return;
+			}
+			var btn   = document.getElementById('sft-ud-upload-btn');
+			btn.disabled = true;
+			queueEl.innerHTML = '';
+			var files = Array.from(input.files);
+			var rows  = files.map(function(f) {
+				var row = sftUdMakeRow(f);
+				queueEl.appendChild(row);
+				return row;
+			});
+			var hasError = false;
+			for (var i = 0; i < files.length; i++) {
+				var lbl = rows[i].querySelector('.sft-ud-lbl');
+				lbl.textContent = 'Uploading…';
+				try {
+					await sftUdUploadOne(files[i], rows[i]);
+					lbl.style.color = '#0a3622';
+				} catch(e) {
+					lbl.textContent = 'Error: ' + e.message;
+					lbl.style.color = '#d63638';
+					hasError = true;
+				}
+			}
+			if (!hasError) {
+				window.location.reload();
+			} else {
+				btn.disabled = false;
 			}
 		}
 		</script>

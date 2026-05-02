@@ -72,7 +72,6 @@ In the **Files** section, click **Encrypt & Upload** (or drag a file onto the up
 - A progress bar shows chunk-by-chunk upload progress for large files.
 - The maximum file size is configured by your administrator (shown as reference info on the upload form).
 
-[[SCREENSHOT: File upload area mid-upload showing progress bar at 60% with filename and file size]]
 ![User Dashboard - Vault File Upload](/images/UserDashboard_VaultFileUpload.jpg)
 
 ### Deleting files

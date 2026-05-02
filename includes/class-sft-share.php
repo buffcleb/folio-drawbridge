@@ -358,6 +358,29 @@ function sft_send_otp( int $share_id, string $email ) {
 		return new WP_Error( 'email_mismatch', 'The email address you entered does not match our records for this share.' );
 	}
 
+	// Enforce rate limit: reject if the most recent unused OTP was issued too recently.
+	$cooldown = (int) get_option( 'sft_otp_cooldown_seconds', 60 );
+	if ( $cooldown > 0 ) {
+		$recent_created = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT created_at FROM {$wpdb->prefix}sft_otps
+				 WHERE share_id = %d AND used_at IS NULL
+				 ORDER BY created_at DESC LIMIT 1",
+				$share_id
+			)
+		);
+		if ( $recent_created ) {
+			$age = time() - strtotime( $recent_created . ' UTC' );
+			if ( $age < $cooldown ) {
+				$wait = $cooldown - $age;
+				return new WP_Error(
+					'otp_cooldown',
+					sprintf( 'Please wait %d second(s) before requesting a new code.', $wait )
+				);
+			}
+		}
+	}
+
 	// Expire any previous unused OTPs for this share.
 	$wpdb->query(
 		$wpdb->prepare(

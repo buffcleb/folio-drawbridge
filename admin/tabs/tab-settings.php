@@ -12,10 +12,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 function sft_render_tab_settings(): void {
 	$otp_ttl              = (int) get_option( 'sft_otp_ttl_minutes', 15 );
 	$otp_max_attempts     = (int) get_option( 'sft_otp_max_attempts', 5 );
+	$otp_cooldown         = (int) get_option( 'sft_otp_cooldown_seconds', 60 );
 	$max_file_mb          = (int) get_option( 'sft_max_file_mb', 50 );
 	$prune_enabled        = get_option( 'sft_audit_prune_enabled', '0' );
 	$prune_days           = (int) get_option( 'sft_audit_prune_days', 365 );
 	$delete_on_uninst     = get_option( 'sft_delete_on_uninstall', '0' );
+
+	// Notifications.
+	$notify_on_download   = get_option( 'sft_notify_on_download', '0' );
+	$expiry_warning_days  = (int) get_option( 'sft_expiry_warning_days', 0 );
+
+	// File type restrictions.
+	$allowed_extensions   = (string) get_option( 'sft_allowed_file_extensions', '' );
+
+	// Storage quota.
+	$storage_quota_mb     = (int) get_option( 'sft_storage_quota_mb', 0 );
+
+	// Email templates.
+	$email_templates = [];
+	foreach ( [ 'invite', 'otp', 'download_notification', 'expiry_warning' ] as $type ) {
+		$email_templates[ $type ] = [
+			'subject' => (string) get_option( "sft_email_{$type}_subject", '' ),
+			'body'    => (string) get_option( "sft_email_{$type}_body", '' ),
+		];
+		$defaults = sft_get_email_template( $type );
+		$email_templates[ $type ]['subject_placeholder'] = $defaults['subject'];
+		$email_templates[ $type ]['body_placeholder']    = $defaults['body'];
+	}
 
 	// Download limit settings.
 	$allow_unlimited_dl   = get_option( 'sft_allow_unlimited_downloads', '1' );
@@ -57,6 +80,14 @@ function sft_render_tab_settings(): void {
 						<input type="number" id="sft_otp_max_attempts" name="sft_otp_max_attempts"
 						       value="<?php echo $otp_max_attempts; ?>" min="1" max="10" style="width:80px;">
 						<p class="description">Number of incorrect OTP attempts allowed before the code is invalidated and a new one must be requested. Minimum 1, maximum 10.</p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="sft_otp_cooldown_seconds">OTP Rate Limit (seconds)</label></th>
+					<td>
+						<input type="number" id="sft_otp_cooldown_seconds" name="sft_otp_cooldown_seconds"
+						       value="<?php echo $otp_cooldown; ?>" min="0" max="300" style="width:80px;">
+						<p class="description">Minimum seconds a recipient must wait before requesting a new code. 0 = no limit. Range 0–300.</p>
 					</td>
 				</tr>
 			</table>
@@ -262,6 +293,110 @@ function sft_render_tab_settings(): void {
 					</td>
 				</tr>
 			</table>
+		</div>
+
+		<!-- ── Notifications ────────────────────────────────────────────────────── -->
+		<div class="sft-card">
+			<h2 style="margin-top:0;">Notifications</h2>
+			<table class="form-table" style="margin-top:0;">
+				<tr>
+					<th>Download Notification</th>
+					<td>
+						<label>
+							<input type="checkbox" name="sft_notify_on_download" value="1" <?php checked( $notify_on_download, '1' ); ?>>
+							Email vault owner each time a recipient downloads a file
+						</label>
+						<p class="description">One email per file download via the recipient share flow. Admin inspector downloads are not included.</p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="sft_expiry_warning_days">Share Expiry Warning (days)</label></th>
+					<td>
+						<input type="number" id="sft_expiry_warning_days" name="sft_expiry_warning_days"
+						       value="<?php echo $expiry_warning_days; ?>" min="0" style="width:80px;">
+						<p class="description">Email vault owners this many days before a share link expires. 0 = disabled. Warning is sent once per share via hourly WP-Cron.</p>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<!-- ── File Type Restrictions ───────────────────────────────────────────── -->
+		<div class="sft-card">
+			<h2 style="margin-top:0;">File Type Restrictions</h2>
+			<table class="form-table" style="margin-top:0;">
+				<tr>
+					<th><label for="sft_allowed_file_extensions">Allowed Extensions</label></th>
+					<td>
+						<input type="text" id="sft_allowed_file_extensions" name="sft_allowed_file_extensions"
+						       value="<?php echo esc_attr( $allowed_extensions ); ?>"
+						       style="width:100%;max-width:400px;" placeholder="pdf, docx, xlsx, jpg, png">
+						<p class="description">Comma-separated list of permitted file extensions (e.g. <code>pdf, docx, jpg</code>). Leave blank to allow all file types. Case-insensitive.</p>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<!-- ── Storage Quotas ───────────────────────────────────────────────────── -->
+		<div class="sft-card">
+			<h2 style="margin-top:0;">Storage Quotas</h2>
+			<table class="form-table" style="margin-top:0;">
+				<tr>
+					<th><label for="sft_storage_quota_mb">Per-User Quota (MB)</label></th>
+					<td>
+						<input type="number" id="sft_storage_quota_mb" name="sft_storage_quota_mb"
+						       value="<?php echo $storage_quota_mb; ?>" min="0" style="width:80px;">
+						<p class="description">Maximum total encrypted storage per vault user across all their vaults. 0 = no limit. WordPress and SFT admins are exempt.</p>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<!-- ── Email Templates ──────────────────────────────────────────────────── -->
+		<div class="sft-card">
+			<h2 style="margin-top:0;">Email Templates</h2>
+			<p style="font-size:13px;color:#555;margin-top:-6px;margin-bottom:16px;">
+				Customize subject and body for each system email. Leave blank to use the built-in default. Use <code>{placeholder}</code> tokens — available tokens are listed below each body field.
+			</p>
+			<?php
+			$tmpl_labels = [
+				'invite'                => 'Share Invite',
+				'otp'                   => 'OTP Verification Code',
+				'download_notification' => 'Download Notification',
+				'expiry_warning'        => 'Share Expiry Warning',
+			];
+			$tmpl_hints = [
+				'invite'                => '{site_name}, {vault_name}, {owner_name}, {recipient_email}, {share_url}, {expires_note}',
+				'otp'                   => '{site_name}, {otp_code}, {otp_ttl}',
+				'download_notification' => '{site_name}, {vault_name}, {owner_name}, {recipient_email}, {file_name}, {download_count}, {recipient_ip}',
+				'expiry_warning'        => '{site_name}, {vault_name}, {owner_name}, {recipient_email}, {expiry_date}, {days_until_expiry}',
+			];
+			foreach ( $email_templates as $type => $tmpl ) : ?>
+			<div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #f0f2f5;">
+				<h3 style="font-size:14px;margin:0 0 10px;"><?php echo esc_html( $tmpl_labels[ $type ] ); ?></h3>
+				<table class="form-table" style="margin-top:0;">
+					<tr>
+						<th><label for="sft_email_<?php echo esc_attr( $type ); ?>_subject">Subject</label></th>
+						<td>
+							<input type="text" id="sft_email_<?php echo esc_attr( $type ); ?>_subject"
+							       name="sft_email_<?php echo esc_attr( $type ); ?>_subject"
+							       value="<?php echo esc_attr( $tmpl['subject'] ); ?>"
+							       placeholder="<?php echo esc_attr( $tmpl['subject_placeholder'] ); ?>"
+							       style="width:100%;max-width:520px;">
+						</td>
+					</tr>
+					<tr>
+						<th><label for="sft_email_<?php echo esc_attr( $type ); ?>_body">Body</label></th>
+						<td>
+							<textarea id="sft_email_<?php echo esc_attr( $type ); ?>_body"
+							          name="sft_email_<?php echo esc_attr( $type ); ?>_body"
+							          rows="6" style="width:100%;max-width:520px;font-family:monospace;font-size:12px;"
+							          placeholder="<?php echo esc_attr( $tmpl['body_placeholder'] ); ?>"><?php echo esc_textarea( $tmpl['body'] ); ?></textarea>
+							<p class="description">Placeholders: <code><?php echo esc_html( $tmpl_hints[ $type ] ); ?></code></p>
+						</td>
+					</tr>
+				</table>
+			</div>
+			<?php endforeach; ?>
 		</div>
 
 		<!-- ── Data & Privacy ───────────────────────────────────────────────── -->

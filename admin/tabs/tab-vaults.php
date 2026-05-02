@@ -220,6 +220,22 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			</form>
 		</div>
 
+		<!-- Transfer ownership -->
+		<div class="sft-card" style="margin-top:0; padding:14px 20px;">
+			<button type="button" class="button button-small" onclick="sftAdmToggle('sft-adm-transfer-form')">Transfer Ownership</button>
+			<div id="sft-adm-transfer-form" style="display:none;margin-top:12px;">
+				<p style="font-size:13px;margin:0 0 8px;">Enter the login name or email of the new vault owner. They must already have Vault User or SFT Admin access.</p>
+				<form method="post" style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+					<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
+					<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+					<input type="text" name="new_owner_login" placeholder="username or email"
+					       style="width:220px;padding:4px 8px;font-size:13px;" required>
+					<input type="submit" name="sft_admin_transfer_vault" value="Transfer" class="button button-primary">
+					<button type="button" class="button" onclick="sftAdmToggle('sft-adm-transfer-form')">Cancel</button>
+				</form>
+			</div>
+		</div>
+
 		<!-- Files -->
 		<div class="sft-card">
 			<h3 style="margin-top:0;">Encrypted Files (<?php echo count( $files ); ?>)</h3>

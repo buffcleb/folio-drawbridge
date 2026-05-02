@@ -1,6 +1,6 @@
 # WP Secure File Transfer Pro
 
-**Version:** 1.1.1  
+**Version:** 1.2.0  
 **Requires WordPress:** 5.3+  
 **Requires PHP:** 7.4+  
 **License:** GPL-3.0-or-later
@@ -223,6 +223,18 @@ Enable **Delete all plugin data on uninstall** in Settings before removing the p
 ---
 
 ## Changelog
+
+### 1.2.0
+- **Multi-file upload** — file inputs now accept `multiple` files. Files upload sequentially through the existing chunked system with per-file progress rows. Available in both the admin vault inspector and the `[sft_my_vaults]` shortcode.
+- **ZIP bulk download** — recipients with a valid download session see a **Download All as ZIP** button when a vault has more than one file. All vault files are decrypted server-side and streamed as a single archive. Requires the PHP `ZipArchive` extension; the button is hidden automatically when unavailable.
+- **Download notification** — when enabled (Settings → Notifications), an email is sent to the vault owner each time a recipient downloads a file via a share link.
+- **Share expiry warnings** — configure a lead time (days) in Settings. The lifecycle cron emails the vault owner before each share link expires; each share is warned only once (`expiry_warning_sent` flag).
+- **Email templates** — customize subject and body for all four system emails (Share Invite, OTP Code, Download Notification, Expiry Warning) with `{placeholder}` tokens. Blank fields fall back to built-in defaults.
+- **File type restrictions** — a comma-separated extension allowlist in Settings → File Type Restrictions blocks uploads of disallowed file types at the server-side chunk-finalize step.
+- **Per-user storage quota** — set a per-user MB ceiling in Settings → Storage Quotas. Enforcement happens server-side at upload time; WordPress and SFT admins are exempt.
+- **OTP rate limiting** — configurable cooldown (seconds) between OTP requests prevents recipients from requesting codes in rapid succession.
+- **Vault transfer** — admins can transfer vault ownership to any user with vault access directly from the vault inspector.
+- **DB version migration** — added `SFT_DB_VERSION` constant and `sft_maybe_upgrade_db()` for safe, idempotent schema updates via `dbDelta()` on `plugins_loaded`.
 
 ### 1.1.1
 - **Resend share invite** — a **Resend** button on every pending or active share re-sends the original invite email to the recipient using the same share token and link. Available in both the admin vault inspector and the user vault detail page. The action is recorded in the audit log as `share_resent`.

@@ -9,9 +9,11 @@
  * Event type constants (use these everywhere; never raw strings):
  *
  *   VAULT_CREATED        VAULT_DELETED        VAULT_EXPIRED         VAULT_STATUS_CHANGED
+ *   VAULT_TRANSFERRED
  *   FILE_UPLOADED        FILE_DELETED         FILE_DOWNLOADED       FILE_SERVED_ADMIN
- *   SHARE_CREATED        SHARE_REVOKED        SHARE_EXPIRED
+ *   SHARE_CREATED        SHARE_REVOKED        SHARE_EXPIRED         SHARE_RESENT
  *   OTP_REQUESTED        OTP_FAILED           OTP_SUCCESS           OTP_EXPIRED
+ *   DOWNLOAD_NOTIFIED    EXPIRY_WARNING_SENT
  *   ADMIN_VAULT_ACCESS   SETTINGS_SAVED
  *
  * @package WPSecureFileTransferPro
@@ -41,6 +43,9 @@ define( 'SFT_EVT_OTP_SUCCESS',         'otp_success' );
 define( 'SFT_EVT_OTP_EXPIRED',         'otp_expired' );
 define( 'SFT_EVT_ADMIN_VAULT_ACCESS',  'admin_vault_access' );
 define( 'SFT_EVT_SETTINGS_SAVED',      'settings_saved' );
+define( 'SFT_EVT_VAULT_TRANSFERRED',   'vault_transferred' );
+define( 'SFT_EVT_DOWNLOAD_NOTIFIED',   'download_notified' );
+define( 'SFT_EVT_EXPIRY_WARNING_SENT', 'expiry_warning_sent' );
 
 // ─── Core logging function ────────────────────────────────────────────────────
 
@@ -317,8 +322,11 @@ function sft_audit_event_label( string $event_type ): string {
 		SFT_EVT_OTP_FAILED         => 'OTP Verification Failed',
 		SFT_EVT_OTP_SUCCESS        => 'OTP Verified',
 		SFT_EVT_OTP_EXPIRED        => 'OTP Expired',
-		SFT_EVT_ADMIN_VAULT_ACCESS => 'Admin Vault Access',
-		SFT_EVT_SETTINGS_SAVED     => 'Settings Saved',
+		SFT_EVT_ADMIN_VAULT_ACCESS  => 'Admin Vault Access',
+		SFT_EVT_SETTINGS_SAVED      => 'Settings Saved',
+		SFT_EVT_VAULT_TRANSFERRED   => 'Vault Transferred',
+		SFT_EVT_DOWNLOAD_NOTIFIED   => 'Download Notification Sent',
+		SFT_EVT_EXPIRY_WARNING_SENT => 'Expiry Warning Sent',
 	];
 
 	return $map[ $event_type ] ?? ucwords( str_replace( '_', ' ', $event_type ) );

@@ -36,6 +36,7 @@ function sft_schedule_lifecycle_cron(): void {
 function sft_run_lifecycle(): void {
 	sft_expire_vaults();
 	sft_expire_shares();
+	sft_send_expiry_warnings();
 	sft_cleanup_otps();
 	sft_auto_prune_audit();
 	sft_cleanup_orphaned_chunks();
@@ -146,4 +147,40 @@ function sft_auto_prune_audit(): int {
 	}
 
 	return sft_prune_audit_log( $days );
+}
+
+// ─── Share expiry warnings ────────────────────────────────────────────────────
+
+/**
+ * Emails vault owners for share links expiring within the configured warning window.
+ * Only runs when sft_expiry_warning_days > 0 (0 = disabled).
+ * Sets expiry_warning_sent = 1 on each share after the email is sent.
+ *
+ * @return int Number of warnings sent.
+ */
+function sft_send_expiry_warnings(): int {
+	global $wpdb;
+
+	$warning_days = (int) get_option( 'sft_expiry_warning_days', 0 );
+	if ( $warning_days < 1 ) {
+		return 0;
+	}
+
+	$shares = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}sft_shares
+			 WHERE status IN ('pending','active')
+			   AND expires_at IS NOT NULL
+			   AND expires_at > UTC_TIMESTAMP()
+			   AND expires_at <= DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			   AND expiry_warning_sent = 0",
+			$warning_days
+		)
+	) ?: [];
+
+	foreach ( $shares as $share ) {
+		sft_send_expiry_warning( $share );
+	}
+
+	return count( $shares );
 }

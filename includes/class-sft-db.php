@@ -80,17 +80,18 @@ function sft_create_tables() {
 
 	// Shares: a record granting a specific email address access to a vault.
 	$sql_shares = "CREATE TABLE {$wpdb->prefix}sft_shares (
-		id              bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-		vault_id        bigint(20) unsigned NOT NULL,
-		created_by      bigint(20) unsigned NOT NULL,
-		recipient_email varchar(255)        NOT NULL,
-		share_token     varchar(64)         NOT NULL,
-		status          varchar(20)         NOT NULL DEFAULT 'pending',
-		max_downloads   int(11)             NOT NULL DEFAULT 0,
-		download_count  int(11)             NOT NULL DEFAULT 0,
-		expires_at      datetime            DEFAULT NULL,
-		created_at      datetime            NOT NULL,
-		last_accessed   datetime            DEFAULT NULL,
+		id                    bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		vault_id              bigint(20) unsigned NOT NULL,
+		created_by            bigint(20) unsigned NOT NULL,
+		recipient_email       varchar(255)        NOT NULL,
+		share_token           varchar(64)         NOT NULL,
+		status                varchar(20)         NOT NULL DEFAULT 'pending',
+		max_downloads         int(11)             NOT NULL DEFAULT 0,
+		download_count        int(11)             NOT NULL DEFAULT 0,
+		expires_at            datetime            DEFAULT NULL,
+		expiry_warning_sent   tinyint(1)          NOT NULL DEFAULT 0,
+		created_at            datetime            NOT NULL,
+		last_accessed         datetime            DEFAULT NULL,
 		PRIMARY KEY (id),
 		UNIQUE KEY share_token (share_token),
 		KEY vault_id (vault_id),
@@ -171,6 +172,21 @@ function sft_ensure_vault_subdir( int $vault_id ): string {
  */
 function sft_vault_file_path( int $vault_id, string $stored_name ): string {
 	return SFT_VAULT_DIR . $vault_id . '/' . $stored_name;
+}
+
+// ─── DB version migration ─────────────────────────────────────────────────────
+
+add_action( 'plugins_loaded', 'sft_maybe_upgrade_db' );
+
+/**
+ * Runs dbDelta() when the stored DB version is behind SFT_DB_VERSION.
+ * Safe to call on every page load — dbDelta does nothing when the schema matches.
+ */
+function sft_maybe_upgrade_db(): void {
+	if ( get_option( 'sft_db_version' ) !== SFT_DB_VERSION ) {
+		sft_create_tables();
+		update_option( 'sft_db_version', SFT_DB_VERSION );
+	}
 }
 
 // ─── Audit log pruning ────────────────────────────────────────────────────────
