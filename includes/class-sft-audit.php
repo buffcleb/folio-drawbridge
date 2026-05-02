@@ -66,6 +66,9 @@ function sft_log(
 		$actor_id = get_current_user_id() ?: null;
 	}
 
+	$ip         = sft_get_client_ip();
+	$created_at = current_time( 'mysql', true );
+
 	$wpdb->insert(
 		"{$wpdb->prefix}sft_audit",
 		[
@@ -73,13 +76,88 @@ function sft_log(
 			'vault_id'   => $vault_id,
 			'share_id'   => $share_id,
 			'actor_id'   => $actor_id,
-			'ip_address' => sft_get_client_ip(),
+			'ip_address' => $ip,
 			'user_agent' => substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ),
 			'details'    => $details ? wp_json_encode( $details ) : null,
-			'created_at' => current_time( 'mysql', true ),
+			'created_at' => $created_at,
 		],
 		[ '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s' ]
 	);
+
+	sft_siem_write( $event_type, $vault_id, $share_id, $actor_id, $ip, $details, $created_at );
+}
+
+// ─── SIEM file logger ─────────────────────────────────────────────────────────
+
+/**
+ * Appends an audit event to the SIEM log file if file logging is enabled.
+ *
+ * Controlled by three options set in Settings:
+ *   sft_siem_enabled   — '1' to enable
+ *   sft_siem_log_path  — absolute path to the log file
+ *   sft_siem_format    — 'json' (one JSON object per line) or 'csv'
+ *
+ * The file is written with LOCK_EX so concurrent requests don't interleave.
+ * A CSV header row is written when the file is first created.
+ */
+function sft_siem_write(
+	string $event_type,
+	?int   $vault_id,
+	?int   $share_id,
+	?int   $actor_id,
+	string $ip,
+	array  $details,
+	string $created_at
+): void {
+	if ( get_option( 'sft_siem_enabled', '0' ) !== '1' ) {
+		return;
+	}
+
+	$path = trim( (string) get_option( 'sft_siem_log_path', '' ) );
+	if ( ! $path ) {
+		return;
+	}
+
+	$format = get_option( 'sft_siem_format', 'json' );
+
+	if ( $format === 'csv' ) {
+		$new_file = ! file_exists( $path );
+		$fh       = fopen( 'php://temp', 'r+' );
+		if ( $new_file ) {
+			fputcsv( $fh, [ 'timestamp_utc', 'event', 'vault_id', 'share_id', 'actor_id', 'ip', 'details', 'site' ] );
+			rewind( $fh );
+			$header = stream_get_contents( $fh );
+			rewind( $fh );
+		}
+		fputcsv( $fh, [
+			$created_at,
+			$event_type,
+			$vault_id  ?? '',
+			$share_id  ?? '',
+			$actor_id  ?? '',
+			$ip,
+			$details ? wp_json_encode( $details ) : '',
+			get_site_url(),
+		] );
+		rewind( $fh );
+		$line = stream_get_contents( $fh );
+		fclose( $fh );
+		$content = ( $new_file ? $header : '' ) . $line;
+	} else {
+		$content = wp_json_encode( [
+			'timestamp_utc' => $created_at,
+			'event'         => $event_type,
+			'vault_id'      => $vault_id,
+			'share_id'      => $share_id,
+			'actor_id'      => $actor_id,
+			'ip'            => $ip,
+			'details'       => $details,
+			'site'          => get_site_url(),
+		] ) . "\n";
+	}
+
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+	@file_put_contents( $path, $content, FILE_APPEND | LOCK_EX );
 }
 
 // ─── IP resolution ────────────────────────────────────────────────────────────

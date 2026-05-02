@@ -21,12 +21,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Returns true if the current user may use the vault features.
- * Admins (manage_options) are always allowed; non-admins need the
- * use_sft_vaults capability granted via the admin Users tab.
+ * SFT admins and WP admins are always allowed; others need the use_sft_vaults capability.
  */
 function sft_user_can_use(): bool {
 	return is_user_logged_in() &&
-		( current_user_can( 'manage_options' ) || current_user_can( 'use_sft_vaults' ) );
+		( sft_is_admin() || current_user_can( 'use_sft_vaults' ) );
 }
 
 // ─── Query vars ───────────────────────────────────────────────────────────────
@@ -380,7 +379,7 @@ function sft_render_my_vaults_shortcode(): string {
 	$ajax_url = admin_url( 'admin-ajax.php' );
 
 	// Share form global limits (admins are exempt).
-	$sc_is_admin        = current_user_can( 'manage_options' );
+	$sc_is_admin        = sft_is_admin();
 	$sc_allow_unlim_dl  = get_option( 'sft_allow_unlimited_downloads', '1' ) === '1';
 	$sc_default_dl      = (int) get_option( 'sft_default_max_downloads', 0 );
 	$sc_dl_ceiling      = (int) get_option( 'sft_max_download_limit', 0 );
@@ -579,7 +578,8 @@ function sft_render_my_vaults_shortcode(): string {
 			Link Expires
 			<?php echo $sc_expiry_required ? '<span style="color:#d63638;">*</span>' : '(optional)'; ?>
 		</label>
-		<input type="datetime-local" id="sft-share-expires"
+		<input type="date" id="sft-share-expires"
+		       min="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>"
 		       <?php echo $sc_expiry_required; ?>>
 		<div class="sft-mv-actions">
 			<button class="sft-mv-btn sft-mv-btn-primary" onclick="sftCreateShare()">Send Invite</button>
@@ -623,8 +623,8 @@ function sftOpenShareModal(vaultId) {
 	dlEl.value = lim.defaultDl;
 	dlEl.min   = lim.dlMin;
 	if (lim.dlMax > 0) { dlEl.max = lim.dlMax; } else { dlEl.removeAttribute('max'); }
-	exEl.value = lim.defaultExpiry;
-	if (lim.expiryMax) { exEl.max = lim.expiryMax; } else { exEl.removeAttribute('max'); }
+	exEl.value = lim.defaultExpiry ? lim.defaultExpiry.substring(0,10) : '';
+	if (lim.expiryMax) { exEl.max = lim.expiryMax.substring(0,10); } else { exEl.removeAttribute('max'); }
 	if (lim.expiryRequired) { exEl.setAttribute('required',''); } else { exEl.removeAttribute('required'); }
 	sftHideError2('sft-share-modal-error');
 	document.getElementById('sft-modal-share').style.display='flex';
@@ -701,9 +701,10 @@ async function sftUploadFile() {
 }
 
 function sftCreateShare() {
-	var email   = document.getElementById('sft-share-email').value.trim();
-	var maxdl   = document.getElementById('sft-share-maxdl').value;
-	var expires = document.getElementById('sft-share-expires').value;
+	var email      = document.getElementById('sft-share-email').value.trim();
+	var maxdl      = document.getElementById('sft-share-maxdl').value;
+	var expiresRaw = document.getElementById('sft-share-expires').value;
+	var expires    = expiresRaw ? expiresRaw + ' 23:59:59' : '';
 	if (!email) { sftShowError2('sft-share-modal-error','Recipient email is required.'); return; }
 	sftUserPost({ action:'sft_ajax_create_share', vault_id:sftUserData.activeVaultId, email:email, max_downloads:maxdl, expires_at:expires, _wpnonce:sftUserData.nonce })
 		.then(function(r) {
@@ -787,7 +788,7 @@ function sft_ajax_upload_chunk_handler(): void {
 	if ( ! $vault || $vault->status !== 'active' ) {
 		wp_send_json_error( 'Vault not found or not active.' );
 	}
-	if ( (int) $vault->owner_id !== $user_id && ! current_user_can( 'manage_options' ) ) {
+	if ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) {
 		wp_send_json_error( 'Access denied.' );
 	}
 
@@ -908,7 +909,7 @@ function sft_ajax_upload_file_handler(): void {
 
 	if ( ! $vault || (int) $vault->owner_id !== $user_id ) {
 		// Admins may also upload to any vault.
-		if ( ! current_user_can( 'manage_options' ) || ! $vault ) {
+		if ( ! sft_is_admin() || ! $vault ) {
 			wp_send_json_error( 'Vault not found or access denied.' );
 		}
 	}
@@ -941,7 +942,7 @@ function sft_ajax_create_share_handler(): void {
 
 	$vault = sft_get_vault( $vault_id );
 	if ( ! $vault || (int) $vault->owner_id !== $user_id ) {
-		if ( ! current_user_can( 'manage_options' ) || ! $vault ) {
+		if ( ! sft_is_admin() || ! $vault ) {
 			wp_send_json_error( 'Vault not found or access denied.' );
 		}
 	}
@@ -950,7 +951,7 @@ function sft_ajax_create_share_handler(): void {
 	if ( $expires_at ) {
 		$ts = strtotime( $expires_at );
 		if ( $ts ) {
-			$expires_mysql = gmdate( 'Y-m-d H:i:s', $ts );
+			$expires_mysql = gmdate( 'Y-m-d 23:59:59', $ts );
 		}
 	}
 
@@ -979,7 +980,7 @@ function sft_ajax_delete_file_handler(): void {
 	}
 
 	$vault = sft_get_vault( (int) $file->vault_id );
-	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! current_user_can( 'manage_options' ) ) ) {
+	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) ) {
 		wp_send_json_error( 'Access denied.' );
 	}
 
@@ -998,7 +999,7 @@ function sft_ajax_delete_vault_handler(): void {
 	$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
 	$vault    = sft_get_vault( $vault_id );
 
-	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! current_user_can( 'manage_options' ) ) ) {
+	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) ) {
 		wp_send_json_error( 'Vault not found or access denied.' );
 	}
 
@@ -1022,7 +1023,7 @@ function sft_ajax_revoke_share_handler(): void {
 	}
 
 	$vault = sft_get_vault( (int) $share->vault_id );
-	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! current_user_can( 'manage_options' ) ) ) {
+	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) ) {
 		wp_send_json_error( 'Access denied.' );
 	}
 

@@ -63,16 +63,20 @@ function sft_create_share(
 	}
 
 	// Enforce global share limits unless the creator is an admin.
-	$creator = get_userdata( $created_by );
-	$is_admin = $creator && $creator->has_cap( 'manage_options' );
+	$is_admin = sft_is_admin( $created_by );
 
 	if ( ! $is_admin ) {
 		// Download limit.
 		if ( $max_downloads === 0 && get_option( 'sft_allow_unlimited_downloads', '1' ) === '0' ) {
 			$max_downloads = (int) get_option( 'sft_default_max_downloads', 10 );
+			if ( $max_downloads === 0 ) {
+				$max_downloads = 1; // guard against misconfigured default
+			}
 		}
+		// Only cap positive values — never override an explicitly-unlimited (0) share
+		// when unlimited downloads are permitted.
 		$ceiling = (int) get_option( 'sft_max_download_limit', 0 );
-		if ( $ceiling > 0 && ( $max_downloads === 0 || $max_downloads > $ceiling ) ) {
+		if ( $ceiling > 0 && $max_downloads > $ceiling ) {
 			$max_downloads = $ceiling;
 		}
 
@@ -193,6 +197,51 @@ function sft_revoke_share( int $share_id, int $actor_id ): bool {
 
 	if ( $result !== false ) {
 		sft_log( SFT_EVT_SHARE_REVOKED, (int) $share->vault_id, $share_id, [], $actor_id );
+	}
+
+	return $result !== false;
+}
+
+/**
+ * Updates the download limit and/or expiry date of an existing active/pending share.
+ *
+ * @param int    $share_id      Share to update.
+ * @param int    $max_downloads New download cap (0 = unlimited).
+ * @param string $expires_at    New expiry as MySQL datetime, or '' to clear.
+ * @param int    $actor_id      WP user ID performing the update (for audit log).
+ * @return bool True on success.
+ */
+function sft_update_share( int $share_id, int $max_downloads, string $expires_at, int $actor_id ): bool {
+	global $wpdb;
+
+	$share = sft_get_share( $share_id );
+	if ( ! $share ) {
+		return false;
+	}
+
+	$result = $wpdb->update(
+		"{$wpdb->prefix}sft_shares",
+		[
+			'max_downloads' => $max_downloads,
+			'expires_at'    => $expires_at ?: null,
+		],
+		[ 'id' => $share_id ],
+		[ '%d', '%s' ],
+		[ '%d' ]
+	);
+
+	if ( $result !== false ) {
+		sft_log(
+			SFT_EVT_SHARE_CREATED,
+			(int) $share->vault_id,
+			$share_id,
+			[
+				'action'        => 'updated',
+				'max_downloads' => $max_downloads,
+				'expires_at'    => $expires_at ?: 'never',
+			],
+			$actor_id
+		);
 	}
 
 	return $result !== false;
@@ -469,7 +518,7 @@ function sft_increment_download_count( int $share_id ): int {
 /**
  * Retroactively applies current global download and expiry limits to all active/pending shares.
  *
- * Skips shares owned by admins (manage_options). Returns the count of updated shares.
+ * Skips shares owned by SFT admins. Returns the count of updated shares.
  */
 function sft_enforce_share_limits(): int {
 	global $wpdb;
@@ -490,8 +539,7 @@ function sft_enforce_share_limits(): int {
 	$updated = 0;
 
 	foreach ( $shares as $share ) {
-		$owner = get_userdata( (int) $share->owner_id );
-		if ( $owner && $owner->has_cap( 'manage_options' ) ) {
+		if ( sft_is_admin( (int) $share->owner_id ) ) {
 			continue;
 		}
 

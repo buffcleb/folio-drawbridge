@@ -1,6 +1,6 @@
 # WP Secure File Transfer Pro
 
-**Version:** 1.0.1
+**Version:** 1.0.2
 **Requires WordPress:** 5.3+
 **Requires PHP:** 7.4+
 **License:** GPL-3.0-or-later
@@ -129,13 +129,20 @@ Files are uploaded in chunks computed from your server's actual PHP limits, so t
 
 ## Granting User Access
 
-By default only administrators can use vault features.
+By default only administrators can use vault features. Two non-administrator user types exist:
+
+| Type | Capability | Access |
+|---|---|---|
+| **SFT Admin** | `sft_admin` | Full Secure Transfer admin panel — all tabs, vault inspector, audit log |
+| **User** | `use_sft_vaults` | My Vaults dashboard only — create, upload, share, revoke |
+
+WordPress administrators (`manage_options`) always have full access to both and are not listed in the Users tab.
 
 1. Go to **Secure Transfer → Users**.
 2. Search for a user by login or email address.
-3. Click **Grant Access**.
+3. Click **Grant Vault Access** or **Grant SFT Admin Access**.
 
-The user gains the `use_sft_vaults` capability and immediately sees **My Vaults** in their wp-admin sidebar. Revoking access removes the capability but does not delete their vaults or files.
+Revoking access removes the capability but does not delete their vaults or files. An SFT Admin can be demoted to Vault User without losing their vaults.
 
 ---
 
@@ -160,10 +167,10 @@ Accessible at **Secure Transfer** (requires `manage_options`).
 | Tab | Description |
 |---|---|
 | Dashboard | Real-time stats, 7-day download sparkline, recent activity, security status |
-| Vaults | Browse all vaults; inspect files, shares, and audit trail for any vault |
-| Audit Log | Filterable, paginated event log; CSV export; manual prune |
-| Users | Grant and revoke `use_sft_vaults` capability per user |
-| Settings | All plugin configuration; encryption key management |
+| Vaults | Browse all vaults; inspect files, shares, and audit trail for any vault; edit vault expiry and shares inline |
+| Audit Log | Filterable, paginated event log; CSV export; manual prune; all timestamps in site timezone |
+| Users | Manage SFT Admins and Vault Users; grant, promote, demote, and revoke access |
+| Settings | All plugin configuration; encryption key management; SIEM log file output |
 
 ---
 
@@ -242,6 +249,40 @@ If **Delete all plugin data on uninstall** is enabled in Settings, removing the 
 - Delete all plugin transients.
 
 This is irreversible. Disable the setting before uninstalling if you want to preserve data.
+
+---
+
+## Changelog
+
+### 1.0.2
+- **SFT Admin user type** — a new `sft_admin` capability grants non-WordPress-administrator users full access to the Secure Transfer admin panel. WordPress administrators continue to have full access implicitly. Promote, demote, and revoke from the redesigned Users tab.
+- **Users tab redesign** — replaced WP role column with two sections: SFT Admins and Vault Users. Search panel shows current SFT status with contextual action buttons.
+- **Timezone display** — all dates and times throughout the plugin (audit log, vault inspector, user dashboard, CSV export) now display in the site's configured timezone (Settings → General) rather than UTC.
+- **SIEM logging** — new Settings option to write every audit event to an OS log file in JSON (NDJSON) or CSV format for ingestion by Splunk, Datadog, ELK, and other SIEM tools.
+- **Admin vault expiry editing** — admins can edit a vault's expiry date inline from the vault inspector, matching the capability already available in the user dashboard.
+- **Admin share editing** — admins can edit a share's download limit and expiry date inline from the vault inspector.
+
+### 1.0.1
+- **Streaming encryption/decryption** — AES-256-CBC encrypt and decrypt now process files in 1 MB chunks, eliminating PHP memory exhaustion on large files (e.g. 2+ GB).
+- **Chunked file upload** — Large files are split client-side and reassembled server-side via AJAX, bypassing `upload_max_filesize` and `post_max_size` PHP limits. Both the admin vault panel and the `[sft_my_vaults]` shortcode support chunked upload with a live progress bar.
+- **Download limits and link expiration** — Administrators can configure default and maximum download counts and expiry windows. Settings are enforced at share creation time and can be retroactively applied to existing shares via **Apply Limits to Existing Shares**.
+- **Vault expiry editing** — Vault owners can now edit or clear a vault's expiry date from the vault detail page after creation.
+- **Share editing** — Pending and active shares can now have their download limit and expiry date updated inline without revoking and recreating them.
+- **Date picker** — Share and vault expiry fields now use a `date` input (full calendar picker) instead of a segmented `datetime-local` control. Expiries are applied at end-of-day (23:59:59 UTC).
+- **OTP attempt limit setting** — Maximum verification attempts is now configurable in Settings (previously hard-coded).
+- **Encryption key generator** — Server-side key generation with a copy-to-clipboard modal for placing the key in `wp-config.php`.
+- **Audit log details filter** — The audit log can now be filtered by keyword against the details column.
+- **Role-based access (Users tab)** — Administrators can grant and revoke the `use_sft_vaults` capability per user from the admin panel.
+- **Bug fix** — `sft_max_download_limit` and `sft_max_expiry_days` settings were incorrectly clamped to a minimum of 1 when saved, preventing the "no ceiling" (0) value from being stored.
+- **Bug fix** — Download limit ceiling no longer overrides a share explicitly set to unlimited (0) when unlimited downloads are permitted.
+
+### 1.0.0
+- Initial release.
+- AES-256-CBC encrypted vault storage with per-vault HMAC-SHA256 key derivation.
+- Two-factor external sharing (invite link → email verification → one-time code).
+- Immutable audit log with CSV export and optional auto-pruning.
+- Super-admin vault inspector with file download, share revocation, and vault status management.
+- WP-Cron lifecycle management for expired vaults, shares, OTPs, and orphaned upload chunks.
 
 ---
 

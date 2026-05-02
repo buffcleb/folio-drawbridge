@@ -67,8 +67,8 @@ function sft_render_user_vault_list(): void {
 						<td><span class="sft-badge sft-badge-<?php echo esc_attr( $vault->status ); ?>"><?php echo esc_html( $vault->status ); ?></span></td>
 						<td><?php echo (int) $file_count; ?></td>
 						<td><?php echo (int) $share_count; ?></td>
-						<td style="color:#888; font-size:12px;"><?php echo esc_html( gmdate( 'M j, Y', strtotime( $vault->created_at ) ) ); ?></td>
-						<td style="color:#888; font-size:12px;"><?php echo $vault->expires_at ? esc_html( gmdate( 'M j, Y', strtotime( $vault->expires_at ) ) ) : '—'; ?></td>
+						<td style="color:#888; font-size:12px;"><?php echo esc_html( sft_format_date( $vault->created_at, 'M j, Y' ) ); ?></td>
+						<td style="color:#888; font-size:12px;"><?php echo $vault->expires_at ? esc_html( sft_format_date( $vault->expires_at, 'M j, Y' ) ) : '—'; ?></td>
 						<td>
 							<a href="<?php echo esc_url( $detail_url ); ?>" class="sft-btn">Open</a>
 						</td>

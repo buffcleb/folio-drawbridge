@@ -35,7 +35,7 @@ function sft_handle_admin_post(): void {
 	if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'sft-pro' ) {
 		return;
 	}
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! sft_is_admin() ) {
 		wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-sft-pro' ) );
 	}
 
@@ -69,6 +69,13 @@ function sft_handle_admin_post(): void {
 		// Data & privacy.
 		$delete_on_uninstall = isset( $_POST['sft_delete_on_uninstall'] ) ? '1' : '0';
 
+		// SIEM logging.
+		$siem_enabled  = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
+		$siem_log_path = sanitize_text_field( $_POST['sft_siem_log_path'] ?? '' );
+		$siem_format   = in_array( $_POST['sft_siem_format'] ?? 'json', [ 'json', 'csv' ], true )
+			? sanitize_key( $_POST['sft_siem_format'] )
+			: 'json';
+
 		update_option( 'sft_otp_ttl_minutes',            $otp_ttl );
 		update_option( 'sft_otp_max_attempts',            $otp_max_attempts );
 		update_option( 'sft_allow_unlimited_downloads',   $allow_unlimited_downloads );
@@ -81,6 +88,9 @@ function sft_handle_admin_post(): void {
 		update_option( 'sft_audit_prune_enabled',         $prune_enabled );
 		update_option( 'sft_audit_prune_days',            $prune_days );
 		update_option( 'sft_delete_on_uninstall',         $delete_on_uninstall );
+		update_option( 'sft_siem_enabled',                $siem_enabled );
+		update_option( 'sft_siem_log_path',               $siem_log_path );
+		update_option( 'sft_siem_format',                 $siem_format );
 
 		sft_log( SFT_EVT_SETTINGS_SAVED, null, null, [
 			'otp_ttl_minutes'  => $otp_ttl,
@@ -88,7 +98,19 @@ function sft_handle_admin_post(): void {
 			'otp_max_attempts' => $otp_max_attempts,
 		] );
 
-		sft_set_notice( 'Settings saved.', 'success' );
+		$notice = 'Settings saved.';
+		if ( isset( $_POST['sft_apply_to_existing_dl'] ) || isset( $_POST['sft_apply_to_existing_expiry'] ) ) {
+			$enforced = sft_enforce_share_limits();
+			if ( $enforced > 0 ) {
+				$notice .= sprintf(
+					' <strong>%d</strong> existing share%s updated to match the new limits.',
+					$enforced,
+					$enforced === 1 ? '' : 's'
+				);
+			}
+		}
+
+		sft_set_notice( $notice, 'success' );
 		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
@@ -160,7 +182,7 @@ function sft_handle_admin_post(): void {
 		exit;
 	}
 
-	// ── Grant vault access to a user ─────────────────────────────────────────
+	// ── Grant vault (User) access ────────────────────────────────────────────
 	if ( isset( $_POST['sft_grant_user'] ) ) {
 		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
@@ -175,18 +197,93 @@ function sft_handle_admin_post(): void {
 		exit;
 	}
 
-	// ── Revoke vault access from a user ──────────────────────────────────────
+	// ── Grant SFT Admin access ───────────────────────────────────────────────
+	if ( isset( $_POST['sft_grant_sft_admin'] ) ) {
+		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user    = $user_id ? get_userdata( $user_id ) : null;
+		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
+			$user->add_cap( 'sft_admin', true );
+			$user->add_cap( 'use_sft_vaults', true );
+			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
+				[ 'action' => 'grant_sft_admin', 'target_user' => $user->user_login ],
+				get_current_user_id() );
+			sft_set_notice( 'SFT Admin access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
+		}
+		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// ── Promote vault user to SFT Admin ─────────────────────────────────────
+	if ( isset( $_POST['sft_promote_sft_admin'] ) ) {
+		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user    = $user_id ? get_userdata( $user_id ) : null;
+		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
+			$user->add_cap( 'sft_admin', true );
+			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
+				[ 'action' => 'promote_to_sft_admin', 'target_user' => $user->user_login ],
+				get_current_user_id() );
+			sft_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> promoted to SFT Admin.', 'success' );
+		}
+		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// ── Demote SFT Admin to vault user ──────────────────────────────────────
+	if ( isset( $_POST['sft_demote_sft_admin'] ) ) {
+		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user    = $user_id ? get_userdata( $user_id ) : null;
+		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
+			$user->remove_cap( 'sft_admin' );
+			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
+				[ 'action' => 'demote_sft_admin', 'target_user' => $user->user_login ],
+				get_current_user_id() );
+			sft_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> demoted to Vault User.', 'success' );
+		}
+		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// ── Revoke all SFT access from a user ────────────────────────────────────
 	if ( isset( $_POST['sft_revoke_user'] ) ) {
 		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
 			$user->remove_cap( 'use_sft_vaults' );
+			$user->remove_cap( 'sft_admin' );
 			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
-				[ 'action' => 'revoke_vault_access', 'target_user' => $user->user_login ],
+				[ 'action' => 'revoke_all_access', 'target_user' => $user->user_login ],
 				get_current_user_id() );
-			sft_set_notice( 'Vault access revoked for <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
+			sft_set_notice( 'All SFT access revoked for <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
 		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// ── Admin: edit vault expiry ─────────────────────────────────────────────
+	if ( isset( $_POST['sft_admin_edit_vault_expiry'] ) ) {
+		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
+		$raw_date   = sanitize_text_field( $_POST['vault_new_expires'] ?? '' );
+		$expires_at = $raw_date ? $raw_date . ' 23:59:59' : '';
+		if ( $vault_id ) {
+			sft_update_vault_expiry( $vault_id, $expires_at, get_current_user_id() );
+			sft_set_notice( $expires_at ? 'Vault expiry updated.' : 'Vault expiry cleared.', 'success' );
+		}
+		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// ── Admin: edit share ────────────────────────────────────────────────────
+	if ( isset( $_POST['sft_admin_edit_share'] ) ) {
+		$share_id      = (int) ( $_POST['share_id'] ?? 0 );
+		$vault_id      = (int) ( $_POST['vault_id'] ?? 0 );
+		$max_downloads = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
+		$raw_date      = sanitize_text_field( $_POST['share_new_expires'] ?? '' );
+		$expires_at    = $raw_date ? $raw_date . ' 23:59:59' : '';
+		if ( $share_id ) {
+			sft_update_share( $share_id, $max_downloads, $expires_at, get_current_user_id() );
+			sft_set_notice( 'Share updated.', 'success' );
+		}
+		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 }
@@ -199,7 +296,7 @@ function sft_register_admin_menu(): void {
 	$hook = add_menu_page(
 		'WP Secure File Transfer Pro',
 		'Secure Transfer',
-		'manage_options',
+		'sft_admin',
 		'sft-pro',
 		'sft_admin_page',
 		'dashicons-lock',
@@ -323,37 +420,81 @@ function sft_register_admin_help_tabs(): void {
 				'id'      => 'sft-settings-twofactor',
 				'title'   => 'Two-Factor Verification',
 				'content' =>
-					'<p><strong>OTP Validity</strong> — how many minutes a one-time code remains valid after it is emailed to a share recipient. Shorter values are more secure; longer values are more forgiving if email delivery is slow. Range: 5–60 minutes.</p>' .
-					'<p><strong>Max Verification Attempts</strong> — how many times a recipient can enter an incorrect code before it is invalidated and they must request a new one. Lower values reduce brute-force risk.</p>',
+					'<p>These settings control the one-time code (OTP) sent to share recipients as the second factor of authentication before they can download files.</p>' .
+					'<p><strong>OTP Validity</strong> — how many minutes a verification code remains valid after it is emailed. Shorter values reduce the window of opportunity if an email is intercepted; longer values are more forgiving if email delivery is slow. Range: 5–60 minutes.</p>' .
+					'<p><strong>Max Verification Attempts</strong> — the number of incorrect codes a recipient can enter before the code is invalidated and they must request a new one. Lower values reduce brute-force risk. Range: 1–10.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-limits',
-				'title'   => 'Download Limits & Expiration',
+				'id'      => 'sft-settings-dl-limits',
+				'title'   => 'Download Limits',
 				'content' =>
-					'<p>These settings control what constraints non-administrator users must follow when creating share links. Administrators are always exempt.</p>' .
-					'<p><strong>Download Limits</strong></p>' .
+					'<p>These settings cap how many times a single share link can be used to download files. All limits apply only to non-administrator users — administrators are always exempt.</p>' .
 					'<ul>' .
-					'<li><em>Allow Unlimited Downloads</em> — when unchecked, every share must have a finite download count.</li>' .
-					'<li><em>Default Download Limit</em> — pre-filled value in the share creation form. Set to 0 for no pre-fill (when unlimited is allowed).</li>' .
-					'<li><em>Maximum Download Limit</em> — the highest value a user can enter. Set to 0 to impose no ceiling.</li>' .
+					'<li><strong>Allow Unlimited Downloads</strong> — when unchecked, every share must be given a finite download count. Users cannot leave this field blank.</li>' .
+					'<li><strong>Default Download Limit</strong> — the value pre-filled in the share creation form. Set to 0 for no pre-fill (useful when unlimited is allowed and most shares are intended to be unlimited).</li>' .
+					'<li><strong>Maximum Download Limit</strong> — the hard ceiling users cannot exceed when entering a limit. Set to 0 to impose no ceiling. This does not affect shares set to unlimited when unlimited is permitted.</li>' .
 					'</ul>' .
-					'<p><strong>Link Expiration</strong></p>' .
+					'<p>When you change these values, a checkbox appears offering to retroactively apply the new limits to existing active and pending shares that currently exceed them. Shares already within the limits and administrator shares are always skipped.</p>',
+			] );
+			$screen->add_help_tab( [
+				'id'      => 'sft-settings-expiration',
+				'title'   => 'Link Expiration',
+				'content' =>
+					'<p>These settings control when share links automatically expire. All limits apply only to non-administrator users — administrators are always exempt.</p>' .
 					'<ul>' .
-					'<li><em>Allow No Expiry</em> — when unchecked, every share must have an expiration date.</li>' .
-					'<li><em>Default Expiry</em> — days from today pre-filled in the share form. Set to 0 for no pre-fill.</li>' .
-					'<li><em>Maximum Expiry</em> — furthest-out expiration date allowed, in days from today. Set to 0 for no ceiling.</li>' .
+					'<li><strong>Allow No Expiry</strong> — when unchecked, every share must be given an expiration date. Users cannot leave this field blank.</li>' .
+					'<li><strong>Default Expiry</strong> — days from today pre-filled in the share creation form. Set to 0 for no pre-fill.</li>' .
+					'<li><strong>Maximum Expiry</strong> — the furthest-out expiration date a user can set, expressed as days from today. Set to 0 for no ceiling.</li>' .
 					'</ul>' .
-					'<p>Use <strong>Apply Limits to Existing Shares</strong> to retroactively enforce the current settings on shares that were created before these limits were configured.</p>',
+					'<p>Expiry is always enforced at end-of-day (23:59:59 UTC) on the selected date.</p>' .
+					'<p>When you change these values, a checkbox appears offering to retroactively apply the new limits to existing active and pending shares that currently exceed them.</p>',
+			] );
+			$screen->add_help_tab( [
+				'id'      => 'sft-settings-uploads',
+				'title'   => 'File Uploads',
+				'content' =>
+					'<p><strong>Maximum File Size</strong> — the plugin-level ceiling on uploaded files, in megabytes.</p>' .
+					'<p>Unlike a standard WordPress file upload, this plugin splits files into small chunks on the client before sending them to the server. Each chunk is sized to fit within your server\'s <code>upload_max_filesize</code> and <code>post_max_size</code> PHP limits, and the chunks are reassembled into the complete file server-side. This means the plugin-level maximum can safely <strong>exceed</strong> those server limits — for example, you can accept 2 GB files even if <code>upload_max_filesize</code> is set to 8M.</p>',
+			] );
+			$screen->add_help_tab( [
+				'id'      => 'sft-settings-siem',
+				'title'   => 'SIEM Logging',
+				'content' =>
+					'<p>When enabled, every audit event is appended to a log file on the server in addition to being stored in the database. This allows external security information and event management (SIEM) tools such as Splunk, Datadog, or the ELK stack to ingest plugin activity in real time.</p>' .
+					'<p><strong>Log File Path</strong> — the absolute path to the log file. The directory must exist and the web server process must have write permission. The file is created automatically on first write.</p>' .
+					'<p><strong>Log Format</strong></p>' .
+					'<ul>' .
+					'<li><em>JSON</em> — one JSON object per line (NDJSON / JSON Lines format). Each line is a complete, self-contained event and can be streamed directly into most log aggregators.</li>' .
+					'<li><em>CSV</em> — a comma-separated file with a header row written once when the file is first created. Suitable for ingestion into spreadsheet tools or systems that prefer flat tabular data.</li>' .
+					'</ul>' .
+					'<p>Both formats include: timestamp (UTC), event type, vault ID, share ID, actor ID, IP address, event details, and site URL.</p>',
+			] );
+			$screen->add_help_tab( [
+				'id'      => 'sft-settings-audit-retention',
+				'title'   => 'Audit Log Retention',
+				'content' =>
+					'<p>The audit log grows over time. These settings help manage its size.</p>' .
+					'<p><strong>Auto-Prune</strong> — when enabled, the hourly WP-Cron lifecycle job automatically deletes audit entries older than the configured retention window. Useful for compliance with data-retention policies.</p>' .
+					'<p><strong>Retention Window</strong> — entries older than this many days are deleted when auto-prune runs. Minimum 30 days.</p>' .
+					'<p>You can also prune manually at any time from the <strong>Audit Log</strong> tab using the Manual Prune panel in the filter sidebar. The manual prune respects the same day threshold but runs immediately rather than waiting for cron.</p>',
 			] );
 			$screen->add_help_tab( [
 				'id'      => 'sft-settings-key',
 				'title'   => 'Encryption Key',
 				'content' =>
-					'<p>The master encryption key is used to derive a unique per-vault encryption key for every vault. All files are encrypted with AES-256-CBC.</p>' .
-					'<p>The most secure configuration is to define the key as a PHP constant in <code>wp-config.php</code>:</p>' .
+					'<p>The master encryption key is the root secret from which every vault\'s unique per-vault encryption key is derived. All files are encrypted with AES-256-CBC. The key must be a 64-character hexadecimal string (32 raw bytes).</p>' .
+					'<p>The most secure configuration is to define the key as a PHP constant in <code>wp-config.php</code> so it is never stored in the database:</p>' .
 					'<pre><code>define( \'SFT_MASTER_KEY\', \'your-64-hex-char-key\' );</code></pre>' .
-					'<p>Use the <strong>Generate New Key</strong> button to produce a cryptographically secure key. The key is generated server-side and never stored — copy it immediately into wp-config.php.</p>' .
-					'<p><strong>Warning:</strong> Replacing an existing key will permanently break decryption of all files already uploaded. Only generate a new key on a fresh installation.</p>',
+					'<p>Use the <strong>Generate New Key</strong> button to produce a cryptographically secure key server-side. The key is shown once and never stored by the plugin — copy it immediately into <code>wp-config.php</code>.</p>' .
+					'<p><strong>Warning:</strong> Replacing an existing key will permanently break decryption of all files already uploaded. Only generate a new key on a fresh installation with no uploaded files.</p>',
+			] );
+			$screen->add_help_tab( [
+				'id'      => 'sft-settings-data',
+				'title'   => 'Data & Privacy / Storage',
+				'content' =>
+					'<p><strong>Delete all plugin data on uninstall</strong> — when checked, removing the plugin from the Plugins screen permanently drops all five database tables, deletes all encrypted files from disk, and removes all plugin options and transients. This is irreversible. Leave unchecked if you want to preserve data across a reinstall.</p>' .
+					'<p><strong>Encrypted file storage</strong> — shows the directory where encrypted vault files are written (<code>wp-content/uploads/sft-vaults/</code>). The directory is protected by an <code>.htaccess</code> file that blocks direct HTTP access. Files are never served directly — all downloads go through PHP, which decrypts them on the fly.</p>' .
+					'<p>The storage status indicator confirms whether the directory exists, is protected by <code>.htaccess</code>, and is writable by the web server.</p>',
 			] );
 			break;
 	}
@@ -453,7 +594,7 @@ function sft_admin_inline_js(): void {
 add_action( 'wp_ajax_sft_admin_download', 'sft_ajax_admin_download' );
 
 function sft_ajax_admin_download(): void {
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! sft_is_admin() ) {
 		wp_die( 'Access denied.', 403 );
 	}
 
@@ -485,7 +626,7 @@ function sft_ajax_admin_download(): void {
 add_action( 'wp_ajax_sft_generate_key_preview', 'sft_ajax_generate_key_preview' );
 
 function sft_ajax_generate_key_preview(): void {
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! sft_is_admin() ) {
 		wp_send_json_error( 'Access denied.', 403 );
 	}
 
@@ -567,7 +708,7 @@ function sft_render_pagination( int $current, int $total_pages, array $extra_arg
 // ─── Main admin page callback ─────────────────────────────────────────────────
 
 function sft_admin_page(): void {
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! sft_is_admin() ) {
 		wp_die( esc_html__( 'You do not have permission to access this page.', 'wp-sft-pro' ) );
 	}
 

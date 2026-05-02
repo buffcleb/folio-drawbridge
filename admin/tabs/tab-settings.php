@@ -27,6 +27,11 @@ function sft_render_tab_settings(): void {
 	$default_expiry_days  = (int) get_option( 'sft_default_expiry_days', 0 );
 	$max_expiry_days      = (int) get_option( 'sft_max_expiry_days', 0 );
 
+	// SIEM logging settings.
+	$siem_enabled  = get_option( 'sft_siem_enabled', '0' );
+	$siem_log_path = (string) get_option( 'sft_siem_log_path', '' );
+	$siem_format   = get_option( 'sft_siem_format', 'json' );
+
 	$form_url = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) );
 	$ajax_url = admin_url( 'admin-ajax.php' );
 	?>
@@ -89,6 +94,15 @@ function sft_render_tab_settings(): void {
 					</td>
 				</tr>
 			</table>
+			<div id="sft-dl-enforce-wrap" style="display:none;margin-top:16px;padding:14px 16px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;">
+				<label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;">
+					<input type="checkbox" name="sft_apply_to_existing_dl" value="1" style="margin-top:2px;flex-shrink:0;">
+					<span>
+						<strong>Apply to existing shares</strong> — retroactively enforce the new download limits on all active and pending shares that currently exceed them.
+						Shares already within the limits and administrator shares are not changed.
+					</span>
+				</label>
+			</div>
 		</div>
 
 		<!-- ── Link Expiration ──────────────────────────────────────────────── -->
@@ -123,21 +137,15 @@ function sft_render_tab_settings(): void {
 					</td>
 				</tr>
 			</table>
-		</div>
-
-		<!-- ── Apply limits to existing shares ─────────────────────────────── -->
-		<div style="border:1px solid #fd7e14;border-radius:4px;padding:20px;margin-top:20px;background:#fff9f5;">
-			<h3 style="margin:0 0 6px;font-size:14px;color:#a84300;">
-				Apply Download Limits &amp; Link Expiration to Existing Shares
-			</h3>
-			<p style="font-size:13px;margin:0 0 14px;color:#555;">
-				The two sections above (<strong>Download Limits</strong> and <strong>Link Expiration</strong>)
-				only apply to new shares by default. Click the button below to retroactively enforce the
-				current settings on all active and pending shares that exceed them.
-				Shares already within the limits are not changed. Admins' shares are always skipped.
-			</p>
-			<input type="submit" name="sft_enforce_share_limits" value="Apply Limits to Existing Shares" class="button"
-			       onclick="return confirm('Apply current download and expiration limits to all existing shares that exceed them? This cannot be undone.');">
+			<div id="sft-expiry-enforce-wrap" style="display:none;margin-top:16px;padding:14px 16px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;">
+				<label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;">
+					<input type="checkbox" name="sft_apply_to_existing_expiry" value="1" style="margin-top:2px;flex-shrink:0;">
+					<span>
+						<strong>Apply to existing shares</strong> — retroactively enforce the new expiration limits on all active and pending shares that currently exceed them.
+						Shares already within the limits and administrator shares are not changed.
+					</span>
+				</label>
+			</div>
 		</div>
 
 		<!-- ── File Uploads ─────────────────────────────────────────────────── -->
@@ -150,7 +158,13 @@ function sft_render_tab_settings(): void {
 						<input type="number" id="sft_max_file_mb" name="sft_max_file_mb"
 						       value="<?php echo $max_file_mb; ?>" min="1" style="width:80px;">
 						<p class="description">
-							Server-level limits: <code>upload_max_filesize</code> = <strong><?php echo esc_html( ini_get( 'upload_max_filesize' ) ); ?></strong>,
+							Files are uploaded in chunks and reassembled server-side, so this limit can safely
+							<strong>exceed</strong> your server's <code>upload_max_filesize</code> and <code>post_max_size</code> PHP settings.
+							Each chunk is sized to fit within those server limits automatically.
+						</p>
+						<p class="description" style="margin-top:6px;">
+							Current server limits (for reference only):
+							<code>upload_max_filesize</code> = <strong><?php echo esc_html( ini_get( 'upload_max_filesize' ) ); ?></strong>,
 							<code>post_max_size</code> = <strong><?php echo esc_html( ini_get( 'post_max_size' ) ); ?></strong>.
 						</p>
 					</td>
@@ -204,6 +218,50 @@ function sft_render_tab_settings(): void {
 			</div>
 
 			<button type="button" class="button" onclick="sftOpenKeyModal()">Generate New Key for wp-config.php</button>
+		</div>
+
+		<!-- ── SIEM Logging ─────────────────────────────────────────────────── -->
+		<div class="sft-card">
+			<h2 style="margin-top:0;">SIEM Logging</h2>
+			<p style="font-size:13px;color:#555;margin-top:-6px;margin-bottom:16px;">
+				Log all audit events to an OS file for ingestion by external SIEM tools (Splunk, Datadog, ELK, etc.).
+			</p>
+			<table class="form-table" style="margin-top:0;">
+				<tr>
+					<th>Enable SIEM Log</th>
+					<td>
+						<label>
+							<input type="checkbox" name="sft_siem_enabled" value="1" <?php checked( $siem_enabled, '1' ); ?>>
+							Write every audit event to the log file below
+						</label>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="sft_siem_log_path">Log File Path</label></th>
+					<td>
+						<input type="text" id="sft_siem_log_path" name="sft_siem_log_path"
+						       value="<?php echo esc_attr( $siem_log_path ); ?>"
+						       style="width:100%;max-width:520px;" placeholder="/var/log/sft-audit.json">
+						<p class="description">
+							Absolute path to the log file on the server. The web server process must have write permission.
+							Example: <code>/var/log/sft-audit.log</code>
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th>Log Format</th>
+					<td>
+						<label style="margin-right:20px;">
+							<input type="radio" name="sft_siem_format" value="json" <?php checked( $siem_format, 'json' ); ?>>
+							JSON <span style="font-size:12px;color:#888;">(one object per line — NDJSON)</span>
+						</label>
+						<label>
+							<input type="radio" name="sft_siem_format" value="csv" <?php checked( $siem_format, 'csv' ); ?>>
+							CSV <span style="font-size:12px;color:#888;">(header row written once on first create)</span>
+						</label>
+					</td>
+				</tr>
+			</table>
 		</div>
 
 		<!-- ── Data & Privacy ───────────────────────────────────────────────── -->
@@ -343,6 +401,45 @@ function sft_render_tab_settings(): void {
 	document.getElementById('sft-key-modal-overlay').addEventListener('click', function(e) {
 		if (e.target === this) sftCloseKeyModal();
 	});
+
+	// ── Show "apply to existing" checkboxes when settings change ────────────
+	(function() {
+		var dlFields     = ['sft_allow_unlimited_downloads', 'sft_default_max_downloads', 'sft_max_download_limit'];
+		var expiryFields = ['sft_allow_no_expiry', 'sft_default_expiry_days', 'sft_max_expiry_days'];
+
+		function getVal(name) {
+			var el = document.querySelector('[name="' + name + '"]');
+			if (!el) return null;
+			return el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
+		}
+
+		var dlOrig = {}, expiryOrig = {};
+		dlFields.forEach(function(n)     { dlOrig[n]     = getVal(n); });
+		expiryFields.forEach(function(n) { expiryOrig[n] = getVal(n); });
+
+		function checkDl() {
+			var changed = dlFields.some(function(n) { return getVal(n) !== dlOrig[n]; });
+			var wrap = document.getElementById('sft-dl-enforce-wrap');
+			wrap.style.display = changed ? '' : 'none';
+			if (!changed) wrap.querySelector('input[type=checkbox]').checked = false;
+		}
+
+		function checkExpiry() {
+			var changed = expiryFields.some(function(n) { return getVal(n) !== expiryOrig[n]; });
+			var wrap = document.getElementById('sft-expiry-enforce-wrap');
+			wrap.style.display = changed ? '' : 'none';
+			if (!changed) wrap.querySelector('input[type=checkbox]').checked = false;
+		}
+
+		dlFields.forEach(function(n) {
+			var el = document.querySelector('[name="' + n + '"]');
+			if (el) el.addEventListener('change', checkDl);
+		});
+		expiryFields.forEach(function(n) {
+			var el = document.querySelector('[name="' + n + '"]');
+			if (el) el.addEventListener('change', checkExpiry);
+		});
+	})();
 	</script>
 	<?php
 }

@@ -22,7 +22,7 @@ function sft_maybe_export_audit_csv(): void {
 	if ( ( $_GET['tab'] ?? '' ) !== 'audit' || ! isset( $_GET['sft_export_audit'] ) ) {
 		return;
 	}
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! sft_is_admin() ) {
 		return;
 	}
 	check_admin_referer( 'sft_export_audit' );
@@ -49,7 +49,7 @@ function sft_maybe_export_audit_csv(): void {
 			$actor,
 			$row->ip_address,
 			$detail,
-			wp_date( 'Y-m-d H:i:s', strtotime( $row->created_at ) ),
+			sft_format_date( $row->created_at, 'Y-m-d H:i:s' ),
 		] );
 	}
 
@@ -196,7 +196,7 @@ function sft_render_tab_audit(): void {
 						<td><?php echo $actor ? esc_html( $actor->user_login ) : '<em>system</em>'; ?></td>
 						<td style="font-size:11px;color:#888;"><?php echo esc_html( $row->ip_address ); ?></td>
 						<td style="font-size:12px;color:#666;max-width:260px;word-break:break-word;"><?php echo esc_html( $detail_str ); ?></td>
-						<td style="color:#888;white-space:nowrap;font-size:12px;"><?php echo esc_html( wp_date( 'M j, Y g:i A', strtotime( $row->created_at ) ) ); ?></td>
+						<td style="color:#888;white-space:nowrap;font-size:12px;"><?php echo esc_html( sft_format_date( $row->created_at ) ); ?></td>
 					</tr>
 				<?php endforeach; endif; ?>
 				</tbody>

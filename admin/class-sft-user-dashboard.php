@@ -193,7 +193,7 @@ function sft_handle_user_dashboard_post(): void {
 		if ( ! $vault ) {
 			wp_die( 'Vault not found.' );
 		}
-		if ( (int) $vault->owner_id !== $user_id && ! current_user_can( 'manage_options' ) ) {
+		if ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) {
 			wp_die( 'Access denied.' );
 		}
 		return $vault;
@@ -282,10 +282,10 @@ function sft_handle_user_dashboard_post(): void {
 
 		$email        = sanitize_email( $_POST['share_email'] ?? '' );
 		$max_dl       = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
-		$expires      = sanitize_text_field( $_POST['share_expires'] ?? '' );
+		$expires       = sanitize_text_field( $_POST['share_expires'] ?? '' );
 		$expires_mysql = '';
 		if ( $expires ) {
-			$ts = strtotime( $expires );
+			$ts = strtotime( $expires . ' 23:59:59' );
 			if ( $ts ) {
 				$expires_mysql = gmdate( 'Y-m-d H:i:s', $ts );
 			}
@@ -311,6 +311,45 @@ function sft_handle_user_dashboard_post(): void {
 			sft_revoke_share( $share_id, $user_id );
 			sft_ud_set_notice( 'Share revoked.', 'success' );
 		}
+		wp_redirect( $detail_url( $vault_id ) );
+		exit;
+	}
+
+	// ── Edit share (download limit + expiry) ──────────────────────────────────
+	if ( isset( $_POST['sft_ud_edit_share'] ) ) {
+		$share_id = (int) ( $_POST['share_id'] ?? 0 );
+		$share    = sft_get_share( $share_id );
+		if ( $share ) {
+			$assert_vault_owner( (int) $share->vault_id );
+			$max_dl  = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
+			$expires = sanitize_text_field( $_POST['share_new_expires'] ?? '' );
+			$expires_mysql = '';
+			if ( $expires ) {
+				$ts = strtotime( $expires . ' 23:59:59' );
+				if ( $ts ) {
+					$expires_mysql = gmdate( 'Y-m-d H:i:s', $ts );
+				}
+			}
+			sft_update_share( $share_id, $max_dl, $expires_mysql, $user_id );
+			sft_ud_set_notice( 'Share updated.', 'success' );
+		}
+		wp_redirect( $detail_url( $vault_id ) );
+		exit;
+	}
+
+	// ── Edit vault expiry ─────────────────────────────────────────────────────
+	if ( isset( $_POST['sft_ud_edit_vault_expiry'] ) ) {
+		$assert_vault_owner( $vault_id );
+		$expires = sanitize_text_field( $_POST['vault_new_expires'] ?? '' );
+		$expires_mysql = '';
+		if ( $expires ) {
+			$ts = strtotime( $expires . ' 23:59:59' );
+			if ( $ts ) {
+				$expires_mysql = gmdate( 'Y-m-d H:i:s', $ts );
+			}
+		}
+		sft_update_vault_expiry( $vault_id, $expires_mysql, $user_id );
+		sft_ud_set_notice( 'Vault expiry updated.', 'success' );
 		wp_redirect( $detail_url( $vault_id ) );
 		exit;
 	}

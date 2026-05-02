@@ -18,7 +18,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 	$vault    = sft_get_vault( $vault_id );
 	$back_url = add_query_arg( [ 'page' => 'sft-my-vaults' ], admin_url( 'admin.php' ) );
 
-	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! current_user_can( 'manage_options' ) ) ) {
+	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) ) {
 		echo '<p><a href="' . esc_url( $back_url ) . '">← Back to My Vaults</a></p>';
 		echo '<p style="color:#d63638;">Vault not found or access denied.</p>';
 		return;
@@ -33,7 +33,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 	$max_file_mb = (int) get_option( 'sft_max_file_mb', 50 );
 
 	// Share form global limits (non-admin users are subject to these).
-	$is_admin_user          = current_user_can( 'manage_options' );
+	$is_admin_user          = sft_is_admin();
 	$allow_unlimited_dl     = get_option( 'sft_allow_unlimited_downloads', '1' ) === '1';
 	$default_max_downloads  = (int) get_option( 'sft_default_max_downloads', 0 );
 	$max_download_ceiling   = (int) get_option( 'sft_max_download_limit', 0 );
@@ -42,17 +42,16 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 	$max_expiry_days        = (int) get_option( 'sft_max_expiry_days', 0 );
 
 	// Pre-fill values for the share form.
-	$share_default_dl       = $default_max_downloads;
-	$share_dl_max_attr      = ( ! $is_admin_user && $max_download_ceiling > 0 ) ? $max_download_ceiling : '';
-	$share_dl_min           = ( ! $is_admin_user && ! $allow_unlimited_dl ) ? 1 : 0;
-	$share_expiry_default   = '';
-	if ( $default_expiry_days > 0 ) {
-		$share_expiry_default = gmdate( 'Y-m-d\TH:i', strtotime( "+{$default_expiry_days} days" ) );
-	}
-	$share_expiry_max_attr  = ( ! $is_admin_user && $max_expiry_days > 0 )
-		? gmdate( 'Y-m-d\TH:i', strtotime( "+{$max_expiry_days} days" ) )
+	$share_default_dl      = $default_max_downloads;
+	$share_dl_max_attr     = ( ! $is_admin_user && $max_download_ceiling > 0 ) ? $max_download_ceiling : '';
+	$share_dl_min          = ( ! $is_admin_user && ! $allow_unlimited_dl ) ? 1 : 0;
+	$share_expiry_default  = $default_expiry_days > 0 ? gmdate( 'Y-m-d', strtotime( "+{$default_expiry_days} days" ) ) : '';
+	$share_expiry_max_attr = ( ! $is_admin_user && $max_expiry_days > 0 )
+		? gmdate( 'Y-m-d', strtotime( "+{$max_expiry_days} days" ) )
 		: '';
-	$share_expiry_required  = ( ! $is_admin_user && ! $allow_no_expiry );
+	$share_expiry_required = ( ! $is_admin_user && ! $allow_no_expiry );
+
+	$today = gmdate( 'Y-m-d' );
 	?>
 
 	<p style="margin-top:16px;"><a href="<?php echo esc_url( $back_url ); ?>">← Back to My Vaults</a></p>
@@ -65,23 +64,47 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 				<span class="sft-badge sft-badge-<?php echo esc_attr( $vault->status ); ?>"><?php echo esc_html( $vault->status ); ?></span>
 			</h2>
 			<p style="color:#888; font-size:13px; margin:0;">
-				Created <?php echo esc_html( gmdate( 'M j, Y', strtotime( $vault->created_at ) ) ); ?>
+				Created <?php echo esc_html( sft_format_date( $vault->created_at, 'M j, Y' ) ); ?>
 				<?php if ( $vault->expires_at ) : ?>
-					&bull; Expires <?php echo esc_html( gmdate( 'M j, Y g:i A', strtotime( $vault->expires_at ) ) ); ?>
+					&bull; Expires <?php echo esc_html( sft_format_date( $vault->expires_at, 'M j, Y' ) ); ?>
 				<?php endif; ?>
 			</p>
 			<?php if ( $vault->description ) : ?>
 				<p style="color:#555; font-size:13px; margin:4px 0 0;"><?php echo esc_html( $vault->description ); ?></p>
 			<?php endif; ?>
 		</div>
-		<?php if ( $is_active ) : ?>
-		<form method="post" action="<?php echo esc_url( $form_url ); ?>"
-		      onsubmit="return confirm('Permanently delete vault &quot;<?php echo esc_js( $vault->name ); ?>&quot; and all its files?');">
-			<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-			<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
-			<input type="submit" name="sft_ud_delete_vault" value="Delete Vault" class="button sft-danger">
-		</form>
-		<?php endif; ?>
+		<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;">
+			<!-- Edit expiry -->
+			<button type="button" class="button" onclick="sftUdToggle('sft-expiry-form')">Edit Expiry</button>
+			<?php if ( $is_active ) : ?>
+			<form method="post" action="<?php echo esc_url( $form_url ); ?>"
+			      onsubmit="return confirm('Permanently delete vault &quot;<?php echo esc_js( $vault->name ); ?>&quot; and all its files?');">
+				<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
+				<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+				<input type="submit" name="sft_ud_delete_vault" value="Delete Vault" class="button sft-danger">
+			</form>
+			<?php endif; ?>
+		</div>
+	</div>
+
+	<!-- Edit vault expiry inline form -->
+	<div id="sft-expiry-form" style="display:none; margin-top:12px;">
+		<div class="sft-card" style="margin-top:0; padding:16px;">
+			<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+				<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
+				<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+				<div class="sft-form-row" style="margin:0; flex:1; min-width:160px;">
+					<label for="sft-vault-new-expires" style="margin-bottom:4px;">Expiry Date <span style="font-weight:400;color:#888;">(leave blank to remove)</span></label>
+					<input type="date" id="sft-vault-new-expires" name="vault_new_expires"
+					       value="<?php echo $vault->expires_at ? esc_attr( gmdate( 'Y-m-d', strtotime( $vault->expires_at ) ) ) : ''; ?>"
+					       min="<?php echo esc_attr( $today ); ?>">
+				</div>
+				<div>
+					<input type="submit" name="sft_ud_edit_vault_expiry" value="Save Expiry" class="button button-primary">
+					<button type="button" class="button" style="margin-left:4px;" onclick="sftUdToggle('sft-expiry-form')">Cancel</button>
+				</div>
+			</form>
+		</div>
 	</div>
 
 	<!-- ── Files ──────────────────────────────────────────────────────────── -->
@@ -98,7 +121,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 					<tr>
 						<td><?php echo esc_html( $f->original_name ); ?></td>
 						<td style="color:#888;"><?php echo esc_html( size_format( $f->file_size ) ); ?></td>
-						<td style="color:#888; font-size:12px;"><?php echo esc_html( gmdate( 'M j, Y g:i A', strtotime( $f->uploaded_at ) ) ); ?></td>
+						<td style="color:#888; font-size:12px;"><?php echo esc_html( sft_format_date( $f->uploaded_at ) ); ?></td>
 						<td>
 							<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:inline;"
 							      onsubmit="return confirm('Delete <?php echo esc_js( $f->original_name ); ?>?');">
@@ -151,6 +174,10 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		function sftUdGenId() {
 			return Array.from(crypto.getRandomValues(new Uint8Array(16)))
 				.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+		}
+		function sftUdToggle(id) {
+			var el = document.getElementById(id);
+			el.style.display = el.style.display === 'none' ? '' : 'none';
 		}
 		async function sftUdUpload() {
 			var input = document.getElementById('sft-ud-file-input');
@@ -214,18 +241,22 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $shares as $s ) :
-					$dl_info = $s->max_downloads > 0
+					$dl_info    = $s->max_downloads > 0
 						? (int) $s->download_count . ' / ' . (int) $s->max_downloads
 						: (int) $s->download_count . ' / ∞';
+					$editable   = in_array( $s->status, [ 'pending', 'active' ], true );
+					$edit_id    = 'sft-share-edit-' . (int) $s->id;
+					$cur_expiry = $s->expires_at ? gmdate( 'Y-m-d', strtotime( $s->expires_at ) ) : '';
 				?>
 					<tr>
 						<td><?php echo esc_html( $s->recipient_email ); ?></td>
 						<td><span class="sft-badge sft-badge-<?php echo esc_attr( $s->status ); ?>"><?php echo esc_html( $s->status ); ?></span></td>
 						<td style="font-size:13px;"><?php echo esc_html( $dl_info ); ?></td>
-						<td style="color:#888; font-size:12px;"><?php echo $s->expires_at ? esc_html( gmdate( 'M j, Y', strtotime( $s->expires_at ) ) ) : '—'; ?></td>
-						<td style="color:#888; font-size:12px;"><?php echo $s->last_accessed ? esc_html( gmdate( 'M j, Y g:i A', strtotime( $s->last_accessed ) ) ) : 'Never'; ?></td>
-						<td>
-							<?php if ( in_array( $s->status, [ 'pending', 'active' ], true ) ) : ?>
+						<td style="color:#888; font-size:12px;"><?php echo $s->expires_at ? esc_html( sft_format_date( $s->expires_at, 'M j, Y' ) ) : '—'; ?></td>
+						<td style="color:#888; font-size:12px;"><?php echo $s->last_accessed ? esc_html( sft_format_date( $s->last_accessed ) ) : 'Never'; ?></td>
+						<td style="white-space:nowrap;">
+							<?php if ( $editable ) : ?>
+								<button type="button" class="sft-btn" onclick="sftUdToggle('<?php echo esc_js( $edit_id ); ?>')">Edit</button>
 								<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:inline;"
 								      onsubmit="return confirm('Revoke access for <?php echo esc_js( $s->recipient_email ); ?>?');">
 									<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
@@ -234,10 +265,54 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 									<input type="submit" name="sft_ud_revoke_share" value="Revoke" class="sft-btn sft-danger">
 								</form>
 							<?php else : ?>
-								<span style="color:#aaa; font-size:12px;"><?php echo ucfirst( $s->status ); ?></span>
+								<span style="color:#aaa; font-size:12px;"><?php echo esc_html( ucfirst( $s->status ) ); ?></span>
 							<?php endif; ?>
 						</td>
 					</tr>
+					<?php if ( $editable ) : ?>
+					<tr id="<?php echo esc_attr( $edit_id ); ?>" style="display:none; background:#f9fafc;">
+						<td colspan="6" style="padding:12px 10px;">
+							<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+								<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
+								<input type="hidden" name="vault_id"  value="<?php echo $vault_id; ?>">
+								<input type="hidden" name="share_id"  value="<?php echo (int) $s->id; ?>">
+								<div class="sft-form-row" style="margin:0; min-width:120px;">
+									<label style="font-size:12px;">
+										Download Limit
+										<?php if ( $is_admin_user || $allow_unlimited_dl ) : ?>
+											<span style="font-weight:400;color:#888;">(0 = ∞)</span>
+										<?php endif; ?>
+									</label>
+									<input type="number" name="share_max_downloads"
+									       value="<?php echo (int) $s->max_downloads; ?>"
+									       min="<?php echo $share_dl_min; ?>"
+									       <?php if ( $share_dl_max_attr !== '' ) : ?>max="<?php echo $share_dl_max_attr; ?>"<?php endif; ?>
+									       style="width:90px; padding:5px 8px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px;">
+								</div>
+								<div class="sft-form-row" style="margin:0; min-width:160px;">
+									<label style="font-size:12px;">
+										Expires
+										<?php if ( ! $share_expiry_required ) : ?>
+											<span style="font-weight:400;color:#888;">(optional)</span>
+										<?php else : ?>
+											<span style="color:#d63638;">*</span>
+										<?php endif; ?>
+									</label>
+									<input type="date" name="share_new_expires"
+									       value="<?php echo esc_attr( $cur_expiry ); ?>"
+									       min="<?php echo esc_attr( $today ); ?>"
+									       <?php if ( $share_expiry_max_attr !== '' ) : ?>max="<?php echo esc_attr( $share_expiry_max_attr ); ?>"<?php endif; ?>
+									       <?php if ( $share_expiry_required ) : ?>required<?php endif; ?>
+									       style="padding:5px 8px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px;">
+								</div>
+								<div>
+									<input type="submit" name="sft_ud_edit_share" value="Save" class="button button-primary">
+									<button type="button" class="button" style="margin-left:4px;" onclick="sftUdToggle('<?php echo esc_js( $edit_id ); ?>')">Cancel</button>
+								</div>
+							</form>
+						</td>
+					</tr>
+					<?php endif; ?>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
@@ -282,8 +357,9 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 								<span style="color:#d63638;">*</span>
 							<?php endif; ?>
 						</label>
-						<input type="datetime-local" id="sft-share-expires" name="share_expires"
+						<input type="date" id="sft-share-expires" name="share_expires"
 						       value="<?php echo esc_attr( $share_expiry_default ); ?>"
+						       min="<?php echo esc_attr( $today ); ?>"
 						       <?php if ( $share_expiry_max_attr !== '' ) : ?>max="<?php echo esc_attr( $share_expiry_max_attr ); ?>"<?php endif; ?>
 						       <?php if ( $share_expiry_required ) : ?>required<?php endif; ?>>
 					</div>
@@ -304,7 +380,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<?php else : ?>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<th>Event</th><th>Details</th><th>IP</th><th>Date/Time (UTC)</th>
+					<th>Event</th><th>Details</th><th>IP</th><th>Date/Time</th>
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $audit as $row ) :
@@ -317,7 +393,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 						<td><strong><?php echo esc_html( sft_audit_event_label( $row->event_type ) ); ?></strong></td>
 						<td style="font-size:12px; color:#666; max-width:280px; word-break:break-word;"><?php echo esc_html( $detail_str ); ?></td>
 						<td style="font-size:11px; color:#aaa;"><?php echo esc_html( $row->ip_address ); ?></td>
-						<td style="color:#888; white-space:nowrap; font-size:12px;"><?php echo esc_html( gmdate( 'M j, Y g:i A', strtotime( $row->created_at ) ) ); ?></td>
+						<td style="color:#888; white-space:nowrap; font-size:12px;"><?php echo esc_html( sft_format_date( $row->created_at ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>

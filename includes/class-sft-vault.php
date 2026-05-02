@@ -189,6 +189,36 @@ function sft_update_vault_status( int $vault_id, string $new_status, ?int $actor
 }
 
 /**
+ * Updates a vault's expiry date. Pass an empty string to remove the expiry.
+ */
+function sft_update_vault_expiry( int $vault_id, string $expires_at, int $actor_id ): bool {
+	global $wpdb;
+
+	$result = $wpdb->update(
+		"{$wpdb->prefix}sft_vaults",
+		[
+			'expires_at' => $expires_at ?: null,
+			'updated_at' => current_time( 'mysql', true ),
+		],
+		[ 'id' => $vault_id ],
+		[ '%s', '%s' ],
+		[ '%d' ]
+	);
+
+	if ( $result !== false ) {
+		sft_log(
+			SFT_EVT_VAULT_STATUS,
+			$vault_id,
+			null,
+			[ 'action' => 'expiry_updated', 'expires_at' => $expires_at ?: 'never' ],
+			$actor_id
+		);
+	}
+
+	return $result !== false;
+}
+
+/**
  * Permanently deletes a vault, all its files (from disk + DB), and all shares.
  * Writes a single audit event before deletion.
  */
