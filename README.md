@@ -125,8 +125,9 @@ WordPress administrators are always exempt from share limits and expiration rest
 5. A 32-byte download session token is issued as a WordPress transient (30-minute TTL).
 6. Each file download validates the session token and share accessibility before decrypting and streaming.
 
-![Recipient Email Confirmation](images/Recipient_EmailConfirmation.jpg)
-![Recipient Download Page](images/Recipient_DownloadPage.jpg)
+
+<img src="/images/Recipient_EmailConfirmation.jpg" width="300" />
+<img src="/images/Recipient_DownloadPage.jpg" width="300" />
 
 ---
 
