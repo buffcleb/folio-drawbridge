@@ -5,8 +5,8 @@
 ## File Structure
 
 ```
-wp-secure-file-transfer-pro/
-├── wp-secure-file-transfer-pro.php     # Plugin entry point, constants, bootstrap
+folio-drawbridge/
+├── folio-drawbridge.php     # Plugin entry point, constants, bootstrap
 ├── uninstall.php                       # Clean removal — drops tables, deletes files
 ├── README.md                           # Overview and changelog
 ├── docs/
@@ -237,9 +237,9 @@ Runs hourly via `sft_lifecycle_tasks()`:
 
 | Function | File | Purpose |
 |---|---|---|
-| `sft_is_admin(?int)` | wp-secure-file-transfer-pro.php | True if user has admin-level SFT access |
+| `sft_is_admin(?int)` | folio-drawbridge.php | True if user has admin-level SFT access |
 | `sft_user_can_use(?int)` | class-sft-frontend.php | True if user has any SFT vault access |
-| `sft_format_date(string, string)` | wp-secure-file-transfer-pro.php | Convert UTC DB datetime to site timezone string |
+| `sft_format_date(string, string)` | folio-drawbridge.php | Convert UTC DB datetime to site timezone string |
 | `sft_create_vault(...)` | class-sft-vault.php | Insert vault record, return vault ID |
 | `sft_get_vault(int)` | class-sft-vault.php | Single vault row by ID |
 | `sft_get_user_vaults(int, array)` | class-sft-vault.php | All vaults for owner with optional filter/sort/page |

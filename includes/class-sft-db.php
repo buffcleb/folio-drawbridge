@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── Activation ───────────────────────────────────────────────────────────────
 
-register_activation_hook( SFT_DIR . 'wp-secure-file-transfer-pro.php', 'sft_activate' );
+register_activation_hook( SFT_DIR . 'folio-drawbridge.php', 'sft_activate' );
 
 function sft_activate() {
 	sft_create_tables();
@@ -32,7 +32,7 @@ function sft_activate() {
 
 // ─── Deactivation ─────────────────────────────────────────────────────────────
 
-register_deactivation_hook( SFT_DIR . 'wp-secure-file-transfer-pro.php', 'sft_deactivate' );
+register_deactivation_hook( SFT_DIR . 'folio-drawbridge.php', 'sft_deactivate' );
 
 function sft_deactivate() {
 	wp_clear_scheduled_hook( 'sft_lifecycle_cron' );

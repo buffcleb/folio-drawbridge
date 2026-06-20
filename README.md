@@ -74,7 +74,7 @@ Detailed documentation is in the [`docs/`](docs/) directory:
 
 ## Quick Start
 
-1. Upload `wp-secure-file-transfer-pro/` to `/wp-content/plugins/` and activate.
+1. Upload `folio-drawbridge/` to `/wp-content/plugins/` and activate.
 2. Go to **Folio Drawbridge → Settings** and generate a master encryption key.
 3. Copy the key into `wp-config.php` as `define('SFT_MASTER_KEY', '...');`.
 4. Confirm **Dashboard → Security Status** shows all green.

@@ -21,7 +21,7 @@ var_dump( extension_loaded('openssl'), extension_loaded('mbstring') );
 
 ## Installing the Plugin
 
-1. Upload the `wp-secure-file-transfer-pro` directory to `/wp-content/plugins/`.
+1. Upload the `folio-drawbridge` directory to `/wp-content/plugins/`.
 2. In wp-admin navigate to **Plugins → Installed Plugins** and activate **Folio Drawbridge**.
 
 On first activation the plugin automatically:
