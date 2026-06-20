@@ -1,6 +1,6 @@
 <?php
 /**
- * Email notifications for WP Secure File Transfer Pro.
+ * Email notifications for Folio Drawbridge.
  *
  * Provides a lightweight template engine and two notification types:
  *
@@ -27,7 +27,7 @@
  * Templates are loaded from wp_options (set via Settings → Email Templates).
  * An empty saved template falls back to the hardcoded defaults below.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

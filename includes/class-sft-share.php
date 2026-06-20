@@ -1,6 +1,6 @@
 <?php
 /**
- * Share management and two-factor access flow for WP Secure File Transfer Pro.
+ * Share management and two-factor access flow for Folio Drawbridge.
  *
  * Two-factor share flow:
  *   1. Authenticated user calls sft_create_share() → unique URL token generated,
@@ -24,7 +24,7 @@
  *   expired  — past expires_at; set by the lifecycle cron.
  *   revoked  — manually revoked by the vault owner or an admin.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

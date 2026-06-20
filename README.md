@@ -1,4 +1,4 @@
-# WP Secure File Transfer Pro
+# Folio Drawbridge
 
 **Version:** 1.2.0  
 **Requires WordPress:** 5.3+  
@@ -11,7 +11,7 @@ Encrypted file vaults with two-factor external sharing, comprehensive audit logg
 
 ## What It Does
 
-WP Secure File Transfer Pro lets authenticated WordPress users upload files into named **vaults**, where they are encrypted at rest using AES-256-CBC before being written to disk outside the webroot. Vault contents can be shared securely with external, unauthenticated recipients through a two-factor verification flow: invite email → email confirmation → one-time code. Every action across the plugin is recorded in an immutable audit log.
+Folio Drawbridge lets authenticated WordPress users upload files into named **vaults**, where they are encrypted at rest using AES-256-CBC before being written to disk outside the webroot. Vault contents can be shared securely with external, unauthenticated recipients through a two-factor verification flow: invite email → email confirmation → one-time code. Every action across the plugin is recorded in an immutable audit log.
 
 ![Admin Dashboard](images/AdminDashboard.jpg)
 
@@ -75,10 +75,10 @@ Detailed documentation is in the [`docs/`](docs/) directory:
 ## Quick Start
 
 1. Upload `wp-secure-file-transfer-pro/` to `/wp-content/plugins/` and activate.
-2. Go to **Secure Transfer → Settings** and generate a master encryption key.
+2. Go to **Folio Drawbridge → Settings** and generate a master encryption key.
 3. Copy the key into `wp-config.php` as `define('SFT_MASTER_KEY', '...');`.
 4. Confirm **Dashboard → Security Status** shows all green.
-5. Go to **Secure Transfer → Users** to grant vault access to non-admin users.
+5. Go to **Folio Drawbridge → Users** to grant vault access to non-admin users.
 
 ![Admin Dashboard Security Status](images/AdminDashboard_SecurityStatus.jpg)
 
@@ -107,10 +107,10 @@ Place this line before the `/* That's all, stop editing! */` comment. When the c
 | Role | Capability | Access |
 |---|---|---|
 | WordPress Admin | `manage_options` | Full access — always implicit |
-| **SFT Admin** | `sft_admin` | Full Secure Transfer admin panel — all tabs, vault inspector, audit export, settings, Users tab |
+| **SFT Admin** | `sft_admin` | Full Folio Drawbridge admin panel — all tabs, vault inspector, audit export, settings, Users tab |
 | **Vault User** | `use_sft_vaults` | My Vaults only — create, upload, share, revoke |
 
-WordPress administrators are always exempt from share limits and expiration restrictions. Grant and manage access at **Secure Transfer → Users**.
+WordPress administrators are always exempt from share limits and expiration restrictions. Grant and manage access at **Folio Drawbridge → Users**.
 
 ![Admin Dashboard - Users](images/AdminDashboard_Users.jpg)
 
@@ -135,7 +135,7 @@ WordPress administrators are always exempt from share limits and expiration rest
 
 ## Admin Panel
 
-Accessible at **Secure Transfer** (requires `manage_options` or `sft_admin` capability).
+Accessible at **Folio Drawbridge** (requires `manage_options` or `sft_admin` capability).
 
 | Tab | Description |
 |---|---|
@@ -215,7 +215,7 @@ Chunked upload staging files live in `wp-content/uploads/sft-chunks/` and are cl
 
 ## Configuration Summary
 
-All settings at **Secure Transfer → Settings**. See [Configuration](docs/configuration.md) for full details.
+All settings at **Folio Drawbridge → Settings**. See [Configuration](docs/configuration.md) for full details.
 
 | Section | Key Settings |
 |---|---|
@@ -267,7 +267,7 @@ Enable **Delete all plugin data on uninstall** in Settings before removing the p
 - **Documentation** — new `docs/` directory with six reference guides: Installation, Configuration, User Guide, Admin Guide, Security Reference, and Architecture.
 
 ### 1.0.2
-- **SFT Admin user type** — new `sft_admin` capability grants non-WordPress-administrator users full access to the Secure Transfer admin panel. WordPress administrators continue to have full access implicitly. Promote, demote, and revoke from the redesigned Users tab.
+- **SFT Admin user type** — new `sft_admin` capability grants non-WordPress-administrator users full access to the Folio Drawbridge admin panel. WordPress administrators continue to have full access implicitly. Promote, demote, and revoke from the redesigned Users tab.
 - **Users tab redesign** — replaced WP role column with two sections: SFT Admins and Vault Users. Search panel shows current SFT status with contextual action buttons.
 - **Timezone display** — all dates and times throughout the plugin (audit log, vault inspector, user dashboard, CSV export) now display in the site's configured timezone (Settings → General) rather than UTC.
 - **SIEM logging** — write every audit event to an OS log file in JSON (NDJSON) or CSV format for ingestion by Splunk, Datadog, ELK, and other SIEM tools.

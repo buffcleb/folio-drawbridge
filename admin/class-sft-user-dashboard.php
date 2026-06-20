@@ -13,7 +13,7 @@
  *   Default (?page=sft-my-vaults)            — vault list + create form
  *   Detail  (?page=sft-my-vaults&vault_id=N) — files, shares, vault audit log
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -83,7 +83,7 @@ function sft_register_user_dashboard_help_tabs(): void {
 			'content' =>
 				'<p>The <strong>Activity Log</strong> shows the 20 most recent events for this vault — uploads, downloads, share creation, OTP verifications, and more.</p>' .
 				'<p>Each entry records the event type, any relevant details, the IP address of the actor, and the date and time in the site\'s configured timezone. This log is read-only and cannot be edited or deleted by users.</p>' .
-				'<p>Click any column header to sort. Your site administrator can view the full audit log across all vaults at <strong>Secure Transfer → Audit Log</strong>.</p>',
+				'<p>Click any column header to sort. Your site administrator can view the full audit log across all vaults at <strong>Folio Drawbridge → Audit Log</strong>.</p>',
 		] );
 	} else {
 		// Vault list view.
@@ -259,7 +259,7 @@ function sft_handle_user_dashboard_post(): void {
 		return;
 	}
 	if ( ! sft_user_can_use() ) {
-		wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-sft-pro' ) );
+		wp_die( esc_html__( 'You do not have permission to perform this action.', 'folio-drawbridge' ) );
 	}
 
 	check_admin_referer( 'sft_user_dashboard_action', 'sft_user_nonce' );
@@ -490,7 +490,7 @@ function sft_ud_show_notice(): void {
 
 function sft_user_dashboard_page(): void {
 	if ( ! sft_user_can_use() ) {
-		wp_die( esc_html__( 'You do not have permission to access this page.', 'wp-sft-pro' ) );
+		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
 	$vault_id = (int) ( $_GET['vault_id'] ?? 0 );

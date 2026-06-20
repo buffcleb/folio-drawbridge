@@ -9,7 +9,7 @@
  *   Audit Log  — filterable, paginated event log for all plugin activity
  *   Settings   — OTP TTL, max file size, audit retention, and data deletion policy
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -36,7 +36,7 @@ function sft_handle_admin_post(): void {
 		return;
 	}
 	if ( ! sft_is_admin() ) {
-		wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-sft-pro' ) );
+		wp_die( esc_html__( 'You do not have permission to perform this action.', 'folio-drawbridge' ) );
 	}
 
 	check_admin_referer( 'sft_admin_action', 'sft_nonce' );
@@ -390,8 +390,8 @@ add_action( 'admin_menu', 'sft_register_admin_menu' );
 
 function sft_register_admin_menu(): void {
 	$hook = add_menu_page(
-		'WP Secure File Transfer Pro',
-		'Secure Transfer',
+		'Folio Drawbridge',
+		'Folio Drawbridge',
 		'sft_admin',
 		'sft-pro',
 		'sft_admin_page',
@@ -506,7 +506,7 @@ function sft_register_admin_help_tabs(): void {
 				'content' =>
 					'<p>There are two levels of access below WordPress administrator:</p>' .
 					'<ul>' .
-					'<li><strong>SFT Admin</strong> — full access to the Secure Transfer admin panel: all tabs, the vault inspector, audit log export, settings, and the Users tab. Does not require WordPress administrator privileges.</li>' .
+					'<li><strong>SFT Admin</strong> — full access to the Folio Drawbridge admin panel: all tabs, the vault inspector, audit log export, settings, and the Users tab. Does not require WordPress administrator privileges.</li>' .
 					'<li><strong>Vault User</strong> — access to <strong>My Vaults</strong> only. Can create vaults, upload and delete files, create and revoke share links, and view their own activity log. Has no visibility into other users\' vaults or any admin panel tabs.</li>' .
 					'</ul>' .
 					'<p>WordPress administrators (<em>manage_options</em>) always have full SFT Admin access implicitly and do not appear in either list.</p>' .
@@ -663,7 +663,7 @@ function sft_register_admin_help_tabs(): void {
 	}
 
 	$screen->set_help_sidebar(
-		'<p><strong>WP Secure File Transfer Pro</strong></p>' .
+		'<p><strong>Folio Drawbridge</strong></p>' .
 		'<p>Version ' . SFT_VERSION . '</p>' .
 		'<hr>' .
 		'<p>Encrypted vault storage with two-factor external sharing and full audit logging.</p>'
@@ -967,14 +967,14 @@ function sft_render_pagination( int $current, int $total_pages, array $extra_arg
 
 function sft_admin_page(): void {
 	if ( ! sft_is_admin() ) {
-		wp_die( esc_html__( 'You do not have permission to access this page.', 'wp-sft-pro' ) );
+		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
 	$current_tab = sanitize_key( $_GET['tab'] ?? 'dashboard' );
 
 	sft_show_notice();
 
-	echo '<div class="wrap"><h1>WP Secure File Transfer Pro</h1>';
+	echo '<div class="wrap"><h1>Folio Drawbridge</h1>';
 	echo '<h2 class="nav-tab-wrapper">';
 
 	$tabs = [

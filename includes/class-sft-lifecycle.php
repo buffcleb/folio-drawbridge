@@ -1,6 +1,6 @@
 <?php
 /**
- * Lifecycle management for WP Secure File Transfer Pro.
+ * Lifecycle management for Folio Drawbridge.
  *
  * A WP-Cron event ('sft_lifecycle_cron') runs hourly and:
  *   1. Marks vaults past their expires_at as 'expired'.
@@ -10,7 +10,7 @@
  *
  * All expiry actions write audit events so the record is complete.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

@@ -1,13 +1,15 @@
 <?php
 /**
- * Plugin Name: WP Secure File Transfer Pro
- * Description: Encrypted file vaults with two-factor external sharing, comprehensive audit logging, lifecycle management, and super-admin vault oversight.
- * Version:     1.2.0
- * Requires PHP: 7.4
- * License:     GPL-3.0-or-later
- * License URI: https://www.gnu.org/licenses/gpl-3.0.html
+ * Plugin Name:       Folio Drawbridge
+ * Description:       Encrypted file vaults with two-factor external sharing, comprehensive audit logging, lifecycle management, and role-based vault oversight.
+ * Version:           1.2.0
+ * Requires at least: 5.3
+ * Requires PHP:      7.4
+ * License:           GPL-3.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
+ * Text Domain:       folio-drawbridge
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

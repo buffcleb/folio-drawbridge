@@ -2,7 +2,7 @@
 /**
  * Dashboard tab — at-a-glance stats and recent activity.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

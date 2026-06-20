@@ -1,6 +1,6 @@
 # Administrator Guide
 
-This guide covers the Secure Transfer admin panel, accessible at **Secure Transfer** in the wp-admin sidebar. Access requires `manage_options` (WordPress administrator) or the `sft_admin` capability.
+This guide covers the Folio Drawbridge admin panel, accessible at **Folio Drawbridge** in the wp-admin sidebar. Access requires `manage_options` (WordPress administrator) or the `sft_admin` capability.
 
 ![Admin Dashboard - Full With Menu](/images/AdminDashboard_FullWithMenu.jpg)
 
@@ -149,7 +149,7 @@ All changes are recorded in the audit log.
 
 Quick summary for new installs:
 
-1. Go to **Secure Transfer → Users**.
+1. Go to **Folio Drawbridge → Users**.
 2. Type the user's login name or email in the search box and click **Search**.
 3. Click **Grant Vault Access** (for a standard vault user) or **Grant SFT Admin Access** (for a delegated admin).
 4. The user immediately sees the appropriate menu item in their wp-admin sidebar.

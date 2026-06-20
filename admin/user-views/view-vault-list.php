@@ -5,7 +5,7 @@
  * Shows the current user's vaults with status, file count, and share count.
  * Includes an inline "Create Vault" form at the bottom.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

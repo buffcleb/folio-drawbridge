@@ -1,6 +1,6 @@
 # Configuration Guide
 
-All plugin settings live under **Secure Transfer → Settings**. Settings are organized into eleven sections.
+All plugin settings live under **Folio Drawbridge → Settings**. Settings are organized into eleven sections.
 
 ---
 
@@ -20,7 +20,7 @@ When the constant is defined, the key is never stored in the database and the Se
 
 ### Generating a key
 
-1. Go to **Secure Transfer → Settings → Encryption Key**.
+1. Go to **Folio Drawbridge → Settings → Encryption Key**.
 2. Click **Generate New Key**.
 3. Read the warning, check the acknowledgement checkbox, then click **Show Key**.
 4. Copy the 64-character key immediately — the plugin never stores it.

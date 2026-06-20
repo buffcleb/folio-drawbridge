@@ -1,6 +1,6 @@
 <?php
 /**
- * Cryptographic primitives for WP Secure File Transfer Pro.
+ * Cryptographic primitives for Folio Drawbridge.
  *
  * Key derivation:
  *   Master key  — 32 random bytes stored as hex in wp_options (autoload=false),
@@ -22,7 +22,7 @@
  *   Hashing     — wp_hash_password (bcrypt) so brute-force of the hash is slow.
  *   Verification — wp_check_password; caller must enforce attempt limits.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -43,7 +43,7 @@ function sft_get_master_key(): string {
 			return hex2bin( $hex );
 		}
 		// Misconfigured constant — log and fall through to DB key.
-		error_log( 'WP Secure File Transfer Pro: SFT_MASTER_KEY is defined but is not a valid 64-character hex string. Falling back to database key.' );
+		error_log( 'Folio Drawbridge: SFT_MASTER_KEY is defined but is not a valid 64-character hex string. Falling back to database key.' );
 	}
 
 	$hex = get_option( 'sft_master_key' );

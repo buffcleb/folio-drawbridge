@@ -22,7 +22,7 @@ var_dump( extension_loaded('openssl'), extension_loaded('mbstring') );
 ## Installing the Plugin
 
 1. Upload the `wp-secure-file-transfer-pro` directory to `/wp-content/plugins/`.
-2. In wp-admin navigate to **Plugins → Installed Plugins** and activate **WP Secure File Transfer Pro**.
+2. In wp-admin navigate to **Plugins → Installed Plugins** and activate **Folio Drawbridge**.
 
 On first activation the plugin automatically:
 - Creates five database tables (`sft_vaults`, `sft_files`, `sft_shares`, `sft_otps`, `sft_audit`).
@@ -37,9 +37,9 @@ On first activation the plugin automatically:
 After activation, complete these steps before accepting uploads:
 
 - [ ] **Generate or configure the master encryption key** — see [Encryption Key Setup](configuration.md#encryption-key).
-- [ ] **Confirm file storage is writable** — **Secure Transfer → Dashboard → Security Status** shows a green checkmark if the upload directory exists and is writable.
+- [ ] **Confirm file storage is writable** — **Folio Drawbridge → Dashboard → Security Status** shows a green checkmark if the upload directory exists and is writable.
 - [ ] **Verify cron is running** — Security Status also confirms the lifecycle cron is scheduled. If it shows missing, deactivate and reactivate the plugin.
-- [ ] **Configure share limits** — **Secure Transfer → Settings** lets you set defaults and maximums for download counts and link expiration windows.
+- [ ] **Configure share limits** — **Folio Drawbridge → Settings** lets you set defaults and maximums for download counts and link expiration windows.
 - [ ] **Grant user access** — by default only WordPress administrators can use vault features. See [Granting User Access](admin-guide.md#granting-user-access) to enable non-admin users.
 
 ![Admin Dashboard - Full](/images/AdminDashboard_Full.jpg)
@@ -64,7 +64,7 @@ If email delivery is unreliable, configure an SMTP plugin (WP Mail SMTP, FluentS
 
 ## Uninstalling
 
-1. In **Secure Transfer → Settings → Data & Privacy**, enable **Delete all plugin data on uninstall** if you want data removed.
+1. In **Folio Drawbridge → Settings → Data & Privacy**, enable **Delete all plugin data on uninstall** if you want data removed.
 2. Deactivate the plugin in **Plugins → Installed Plugins**.
 3. Click **Delete**.
 

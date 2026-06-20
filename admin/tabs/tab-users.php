@@ -4,14 +4,14 @@
  *
  * Two user types exist within the plugin:
  *   SFT Admin — non-WordPress-admin users granted the sft_admin capability.
- *                They get full access to the Secure Transfer admin panel.
+ *                They get full access to the Folio Drawbridge admin panel.
  *   User       — users granted the use_sft_vaults capability.
  *                They can create vaults, upload files, and share them.
  *
  * WordPress administrators (manage_options) always have full access to both
  * the admin panel and vault features and are not listed here.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -122,7 +122,7 @@ function sft_render_tab_users(): void {
 
 			<!-- SFT Admins -->
 			<h3 style="margin-top:0;">SFT Admins (<?php echo count( $sft_admin_users ); ?>)</h3>
-			<p style="font-size:13px;color:#555;margin-top:-8px;margin-bottom:12px;">Full access to the Secure Transfer admin panel. Does not require WordPress administrator privileges.</p>
+			<p style="font-size:13px;color:#555;margin-top:-8px;margin-bottom:12px;">Full access to the Folio Drawbridge admin panel. Does not require WordPress administrator privileges.</p>
 
 			<?php if ( ! $sft_admin_users ) : ?>
 				<p style="color:#888;font-size:13px;margin-bottom:20px;">No SFT admins designated yet.</p>

@@ -1,6 +1,6 @@
 <?php
 /**
- * WordPress dashboard widgets for WP Secure File Transfer Pro.
+ * WordPress dashboard widgets for Folio Drawbridge.
  *
  * Two widgets:
  *   - Admin overview  (requires sft_is_admin())
@@ -109,7 +109,7 @@ function sft_render_admin_overview_widget(): void {
 		</div>
 	</div>
 	<div class="sft-dw-footer">
-		<a href="<?php echo esc_url( $panel_url ); ?>">Open Secure Transfer panel →</a>
+		<a href="<?php echo esc_url( $panel_url ); ?>">Open Folio Drawbridge panel →</a>
 	</div>
 	<?php
 }

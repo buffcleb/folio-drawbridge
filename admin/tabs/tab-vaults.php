@@ -8,7 +8,7 @@
  *   - Shares list with revoke action
  *   - Vault-specific audit log
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

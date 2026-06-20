@@ -1,6 +1,6 @@
 <?php
 /**
- * Vault and file management for WP Secure File Transfer Pro.
+ * Vault and file management for Folio Drawbridge.
  *
  * A "vault" is a named container owned by a WordPress user. Files uploaded
  * to a vault are AES-256-CBC encrypted before being written to disk.
@@ -9,7 +9,7 @@
  *
  * Vault statuses: active | expired | revoked | archived
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

@@ -2,7 +2,7 @@
 /**
  * Settings tab — plugin configuration.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

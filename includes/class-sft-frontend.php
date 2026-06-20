@@ -10,7 +10,7 @@
  *   [sft_my_vaults]  —  lists the current user's vaults; allows vault creation,
  *                       file upload, share creation, and share revocation via AJAX.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -281,7 +281,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 function sft_share_page_footer(): void {
 	?>
-<div class="sft-footer">Secured by WP Secure File Transfer Pro &mdash; <a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a></div>
+<div class="sft-footer">Secured by Folio Drawbridge &mdash; <a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a></div>
 </div>
 <?php wp_footer(); ?>
 </body></html>
@@ -486,10 +486,10 @@ add_shortcode( 'sft_my_vaults', 'sft_render_my_vaults_shortcode' );
 function sft_render_my_vaults_shortcode(): string {
 	if ( ! sft_user_can_use() ) {
 		if ( ! is_user_logged_in() ) {
-			return '<p>' . esc_html__( 'You must be logged in to manage your secure file vaults.', 'wp-sft-pro' ) . ' '
+			return '<p>' . esc_html__( 'You must be logged in to manage your secure file vaults.', 'folio-drawbridge' ) . ' '
 				. '<a href="' . esc_url( wp_login_url( get_permalink() ) ) . '">Log in</a></p>';
 		}
-		return '<p>' . esc_html__( 'You do not have permission to access the secure file vault.', 'wp-sft-pro' ) . '</p>';
+		return '<p>' . esc_html__( 'You do not have permission to access the secure file vault.', 'folio-drawbridge' ) . '</p>';
 	}
 
 	$user_id  = get_current_user_id();

@@ -6,7 +6,7 @@
  * vault and this owner). Provides forms to upload files, create shares, and
  * revoke shares. File deletion and vault deletion are also available.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

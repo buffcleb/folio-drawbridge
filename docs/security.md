@@ -1,6 +1,6 @@
 # Security Reference
 
-This document describes the security architecture of WP Secure File Transfer Pro and the results of its internal security review.
+This document describes the security architecture of Folio Drawbridge and the results of its internal security review.
 
 ---
 

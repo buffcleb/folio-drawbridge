@@ -15,7 +15,7 @@
  * When disabled (default), deactivation/deletion leaves all data intact so
  * it survives a reinstall.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 // WordPress requires this guard — uninstall.php must only be called by WP.

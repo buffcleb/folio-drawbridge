@@ -147,7 +147,7 @@ The **Activity Log** section shows the 20 most recent events for this vault — 
 
 The log is read-only. Click any column header to sort.
 
-Administrators can see the full unfiltered audit log across all vaults at **Secure Transfer → Audit Log**.
+Administrators can see the full unfiltered audit log across all vaults at **Folio Drawbridge → Audit Log**.
 
 ---
 

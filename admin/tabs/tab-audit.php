@@ -5,7 +5,7 @@
  * Filters: event type, vault ID, date range.
  * Export: CSV of the filtered result set.
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

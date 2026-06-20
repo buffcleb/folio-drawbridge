@@ -1,6 +1,6 @@
 <?php
 /**
- * Audit logging for WP Secure File Transfer Pro.
+ * Audit logging for Folio Drawbridge.
  *
  * Every security-relevant action — vault creation, file upload, share creation,
  * OTP request/failure/success, file download, admin vault access, share
@@ -16,7 +16,7 @@
  *   DOWNLOAD_NOTIFIED    EXPIRY_WARNING_SENT
  *   ADMIN_VAULT_ACCESS   SETTINGS_SAVED
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

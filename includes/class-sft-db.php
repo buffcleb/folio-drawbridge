@@ -12,7 +12,7 @@
  *   sft_otps        — 2FA one-time passwords for share access verification
  *   sft_audit       — immutable audit log for all plugin events
  *
- * @package WPSecureFileTransferPro
+ * @package FolioDrawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
