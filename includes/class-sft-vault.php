@@ -138,7 +138,13 @@ function sft_count_all_vaults( array $args = [] ): int {
 		: $wpdb->get_var( $sql ) );
 }
 
-/** @internal */
+/**
+ * Builds shared WHERE / ORDER / LIMIT fragments used by sft_get_all_vaults() and
+ * sft_count_all_vaults() so the filtering logic lives in one place.
+ *
+ * @internal
+ * @return array{ string, array, string, string, string } [where_sql, values, limit_sql, orderby, order]
+ */
 function sft_vaults_query_parts( array $args ): array {
 	$where  = [];
 	$values = [];
@@ -364,6 +370,26 @@ function sft_encrypt_and_store_file(
 	$max_bytes = $max_mb * 1024 * 1024;
 	if ( $file_size > $max_bytes ) {
 		return new WP_Error( 'file_too_large', "File exceeds the {$max_mb} MB limit." );
+	}
+
+	// File type restriction — admins are exempt.
+	if ( ! sft_is_admin( $uploader_id ) ) {
+		$ext = strtolower( pathinfo( $original_name, PATHINFO_EXTENSION ) );
+		if ( ! sft_is_allowed_file_type( $ext ) ) {
+			return new WP_Error( 'file_type_not_allowed', "File type '.{$ext}' is not permitted." );
+		}
+	}
+
+	// Per-user storage quota — admins and a quota of 0 (unlimited) are exempt.
+	if ( ! sft_is_admin( $uploader_id ) ) {
+		$quota_mb = (int) get_option( 'sft_storage_quota_mb', 0 );
+		if ( $quota_mb > 0 ) {
+			$used_bytes  = sft_get_user_storage_used( $uploader_id );
+			$quota_bytes = $quota_mb * 1024 * 1024;
+			if ( $used_bytes + $file_size > $quota_bytes ) {
+				return new WP_Error( 'quota_exceeded', "Upload would exceed your {$quota_mb} MB storage quota." );
+			}
+		}
 	}
 
 	$vault_subdir = sft_ensure_vault_subdir( $vault_id );

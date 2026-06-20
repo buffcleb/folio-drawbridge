@@ -31,7 +31,7 @@ if ( $delete !== '1' ) {
 	return; // Data preserved — nothing to do.
 }
 
-// ─── Delete encrypted vault files from disk ───────────────────────────────────
+// ─── Delete encrypted vault files and chunk staging area from disk ───────────
 
 $vault_dir = WP_CONTENT_DIR . '/uploads/sft-vaults/';
 
@@ -52,6 +52,23 @@ if ( is_dir( $vault_dir ) ) {
 	rmdir( $vault_dir );
 }
 
+// Delete orphaned chunk upload staging area.
+$chunks_dir = WP_CONTENT_DIR . '/uploads/sft-chunks/';
+if ( is_dir( $chunks_dir ) ) {
+	$chunk_files = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator( $chunks_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
+		RecursiveIteratorIterator::CHILD_FIRST
+	);
+	foreach ( $chunk_files as $entry ) {
+		if ( $entry->isFile() ) {
+			unlink( $entry->getPathname() );
+		} elseif ( $entry->isDir() ) {
+			rmdir( $entry->getPathname() );
+		}
+	}
+	rmdir( $chunks_dir );
+}
+
 // ─── Drop all plugin database tables ─────────────────────────────────────────
 
 $tables = [
@@ -69,11 +86,45 @@ foreach ( $tables as $table ) {
 // ─── Remove all plugin options ────────────────────────────────────────────────
 
 $options = [
+	// Encryption.
 	'sft_master_key',
+	'sft_db_version',
+	// Two-factor OTP.
 	'sft_otp_ttl_minutes',
+	'sft_otp_max_attempts',
+	'sft_otp_cooldown_seconds',
+	// File uploads.
 	'sft_max_file_mb',
+	'sft_allowed_file_extensions',
+	'sft_storage_quota_mb',
+	// Download limits.
+	'sft_allow_unlimited_downloads',
+	'sft_default_max_downloads',
+	'sft_max_download_limit',
+	// Link expiration.
+	'sft_allow_no_expiry',
+	'sft_default_expiry_days',
+	'sft_max_expiry_days',
+	// Notifications.
+	'sft_notify_on_download',
+	'sft_expiry_warning_days',
+	// Audit log retention.
 	'sft_audit_prune_enabled',
 	'sft_audit_prune_days',
+	// SIEM logging.
+	'sft_siem_enabled',
+	'sft_siem_log_path',
+	'sft_siem_format',
+	// Email templates.
+	'sft_email_invite_subject',
+	'sft_email_invite_body',
+	'sft_email_otp_subject',
+	'sft_email_otp_body',
+	'sft_email_download_notification_subject',
+	'sft_email_download_notification_body',
+	'sft_email_expiry_warning_subject',
+	'sft_email_expiry_warning_body',
+	// Data & privacy.
 	'sft_delete_on_uninstall',
 ];
 

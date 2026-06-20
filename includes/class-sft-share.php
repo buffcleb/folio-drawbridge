@@ -232,11 +232,10 @@ function sft_update_share( int $share_id, int $max_downloads, string $expires_at
 
 	if ( $result !== false ) {
 		sft_log(
-			SFT_EVT_SHARE_CREATED,
+			SFT_EVT_SHARE_UPDATED,
 			(int) $share->vault_id,
 			$share_id,
 			[
-				'action'        => 'updated',
 				'max_downloads' => $max_downloads,
 				'expires_at'    => $expires_at ?: 'never',
 			],

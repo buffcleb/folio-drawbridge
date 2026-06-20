@@ -5,8 +5,10 @@
  * A WP-Cron event ('sft_lifecycle_cron') runs hourly and:
  *   1. Marks vaults past their expires_at as 'expired'.
  *   2. Marks shares past their expires_at as 'expired'.
- *   3. Deletes OTP records older than 24 hours (used or expired).
- *   4. Optionally auto-prunes audit log entries beyond the retention window.
+ *   3. Sends expiry-warning emails to vault owners for shares expiring soon.
+ *   4. Deletes OTP records that have been used or are older than 24 hours.
+ *   5. Optionally auto-prunes audit log entries beyond the retention window.
+ *   6. Removes orphaned chunk upload directories older than 24 hours.
  *
  * All expiry actions write audit events so the record is complete.
  *

@@ -9,9 +9,9 @@
  * Event type constants (use these everywhere; never raw strings):
  *
  *   VAULT_CREATED        VAULT_DELETED        VAULT_EXPIRED         VAULT_STATUS_CHANGED
- *   VAULT_TRANSFERRED
+ *   VAULT_UPDATED        VAULT_TRANSFERRED
  *   FILE_UPLOADED        FILE_DELETED         FILE_DOWNLOADED       FILE_SERVED_ADMIN
- *   SHARE_CREATED        SHARE_REVOKED        SHARE_EXPIRED         SHARE_RESENT
+ *   SHARE_CREATED        SHARE_UPDATED        SHARE_REVOKED         SHARE_EXPIRED        SHARE_RESENT
  *   OTP_REQUESTED        OTP_FAILED           OTP_SUCCESS           OTP_EXPIRED
  *   DOWNLOAD_NOTIFIED    EXPIRY_WARNING_SENT
  *   ADMIN_VAULT_ACCESS   SETTINGS_SAVED
@@ -35,6 +35,7 @@ define( 'SFT_EVT_FILE_DOWNLOADED',     'file_downloaded' );
 define( 'SFT_EVT_FILE_SERVED_ADMIN',   'file_served_admin' );
 define( 'SFT_EVT_SHARE_CREATED',       'share_created' );
 define( 'SFT_EVT_SHARE_RESENT',        'share_resent' );
+define( 'SFT_EVT_SHARE_UPDATED',       'share_updated' );
 define( 'SFT_EVT_SHARE_REVOKED',       'share_revoked' );
 define( 'SFT_EVT_SHARE_EXPIRED',       'share_expired' );
 define( 'SFT_EVT_OTP_REQUESTED',       'otp_requested' );

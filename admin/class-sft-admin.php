@@ -352,7 +352,6 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: edit vault name/description ──────────────────────────────────
 	if ( isset( $_POST['sft_admin_edit_vault_meta'] ) ) {
-		check_admin_referer( 'sft_admin_action', 'sft_nonce' );
 		$vault_id    = (int) ( $_POST['vault_id'] ?? 0 );
 		$name        = sanitize_text_field( $_POST['vault_new_name'] ?? '' );
 		$description = sanitize_textarea_field( $_POST['vault_new_description'] ?? '' );
@@ -389,17 +388,20 @@ function sft_handle_admin_post(): void {
 add_action( 'admin_menu', 'sft_register_admin_menu' );
 
 function sft_register_admin_menu(): void {
-	$hook = add_menu_page(
+	Folio_Drawbridge_Hub::ensure_parent();
+
+	$hook = add_submenu_page(
+		Folio_Drawbridge_Hub::SLUG,
 		'Folio Drawbridge',
-		'Folio Drawbridge',
-		'sft_admin',
+		'Drawbridge',
+		'manage_options',
 		'sft-pro',
-		'sft_admin_page',
-		'dashicons-lock',
-		80
+		'sft_admin_page'
 	);
 
-	add_action( "load-{$hook}", 'sft_register_admin_help_tabs' );
+	if ( $hook ) {
+		add_action( "load-{$hook}", 'sft_register_admin_help_tabs' );
+	}
 }
 
 // ─── Contextual help ──────────────────────────────────────────────────────────
