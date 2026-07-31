@@ -388,12 +388,17 @@ function sft_handle_file_download( int $file_id ): void {
 		wp_die( 'Download session expired or invalid. Please verify your identity again.', 403 );
 	}
 
-	// sft_share_is_live(), not sft_share_is_accessible(): the download limit was
-	// already claimed when this session was issued, so a spent limit must not
-	// block the rest of the files this recipient is entitled to.
+	// sft_share_is_live(), not sft_share_is_accessible(): once this session has
+	// claimed its download, the spent limit must not strand the recipient
+	// partway through collecting the vault.
 	$share = sft_get_share( (int) $session['share_id'] );
 	if ( ! $share || ! sft_share_is_live( $share ) ) {
 		wp_die( 'This share link is no longer available.', 403 );
+	}
+
+	// Claim on the first file of the session; later files reuse that claim.
+	if ( ! sft_session_claim_once( $token, $session ) ) {
+		wp_die( 'This share link has reached its download limit.', 403 );
 	}
 
 	$file = sft_get_file( $file_id );
@@ -448,6 +453,12 @@ function sft_handle_zip_download(): void {
 	$files = sft_get_vault_files( (int) $vault->id );
 	if ( empty( $files ) ) {
 		wp_die( 'This vault has no files to download.', 404 );
+	}
+
+	// Claim before the expensive decrypt-and-archive work, so a refused request
+	// costs no CPU. Reuses this session's existing claim if it already has one.
+	if ( ! sft_session_claim_once( $token, $session ) ) {
+		wp_die( 'This share link has reached its download limit.', 403 );
 	}
 
 	// Build ZIP in a temp file.
@@ -569,13 +580,8 @@ function sft_ajax_verify_otp(): void {
 		wp_send_json_error( $result->get_error_message() );
 	}
 
-	// One verified access = one download against the share's limit, claimed
-	// atomically here. Every file in the vault is then retrievable for the life
-	// of the session this issues.
-	if ( ! sft_claim_share_access( $share_id ) ) {
-		wp_send_json_error( 'This share link has reached its download limit.' );
-	}
-
+	// No claim here: the limit is spent on the first file actually downloaded,
+	// so verifying and then downloading nothing costs the recipient nothing.
 	$dl_token = sft_create_download_session( $share_id );
 
 	// The file manifest is returned only here, after the one-time code has been

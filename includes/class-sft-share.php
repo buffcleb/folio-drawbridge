@@ -530,6 +530,9 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 
 // ─── Download session ─────────────────────────────────────────────────────────
 
+/** How long a verified recipient may keep downloading, in seconds. */
+define( 'SFT_DL_SESSION_TTL', 1800 ); // 30 minutes
+
 /**
  * Issues a short-lived download session token (WordPress transient, 30 min).
  *
@@ -540,11 +543,46 @@ function sft_create_download_session( int $share_id ): string {
 
 	set_transient(
 		'sft_dl_' . hash( 'sha256', $token ),
-		[ 'share_id' => $share_id, 'created' => time() ],
-		1800 // 30 minutes
+		[ 'share_id' => $share_id, 'created' => time(), 'claimed' => false ],
+		SFT_DL_SESSION_TTL
 	);
 
 	return $token;
+}
+
+/**
+ * Ensures this session has claimed exactly one download against the share limit.
+ *
+ * The claim happens on the first file actually retrieved, not at verification.
+ * Counting at verification punished recipients who proved their identity and
+ * then downloaded nothing — a closed tab or an expired session meant the next
+ * attempt authenticated successfully and was refused at a limit they had never
+ * used. Claiming on first download also keeps the whole vault available for one
+ * count, since later files in the same session find the claim already made.
+ *
+ * @param string $token   Raw session token from the request.
+ * @param array  $session Session data from sft_get_download_session().
+ * @return bool True when the download may proceed.
+ */
+function sft_session_claim_once( string $token, array $session ): bool {
+	if ( ! empty( $session['claimed'] ) ) {
+		return true;
+	}
+
+	if ( ! sft_claim_share_access( (int) $session['share_id'] ) ) {
+		return false;
+	}
+
+	$session['claimed'] = true;
+
+	// Preserve the session's original lifetime rather than extending it on every
+	// first download.
+	$elapsed   = time() - (int) ( $session['created'] ?? time() );
+	$remaining = max( 60, SFT_DL_SESSION_TTL - $elapsed );
+
+	set_transient( 'sft_dl_' . hash( 'sha256', $token ), $session, $remaining );
+
+	return true;
 }
 
 /**
