@@ -517,6 +517,35 @@ function sft_delete_file( int $file_id, int $actor_id ): bool {
 // ─── File serving ─────────────────────────────────────────────────────────────
 
 /**
+ * Builds an RFC 6266 Content-Disposition header value for a download.
+ *
+ * Two filename forms are emitted. The quoted `filename` is a plain-ASCII
+ * fallback for older clients; `filename*` carries the real UTF-8 name so
+ * accents and non-Latin scripts survive. Percent-encoding the whole name in the
+ * plain parameter (as a bare rawurlencode does) is wrong — clients treat it
+ * literally, so "Q3 Report.pdf" would save as "Q3%20Report.pdf".
+ *
+ * Quotes, backslashes, and control characters are stripped from the fallback so
+ * the header cannot be broken out of or split.
+ *
+ * @param string $filename Original filename.
+ * @return string Complete header value, e.g. attachment; filename="a.pdf"; filename*=UTF-8''a.pdf
+ */
+function sft_content_disposition( string $filename ): string {
+	// ASCII fallback: drop anything outside printable ASCII, then the characters
+	// that would terminate or inject into the quoted string.
+	$fallback = preg_replace( '/[^\x20-\x7E]/', '_', $filename );
+	$fallback = str_replace( [ '"', '\\', ';' ], '_', (string) $fallback );
+	$fallback = trim( $fallback ) ?: 'download';
+
+	return sprintf(
+		"attachment; filename=\"%s\"; filename*=UTF-8''%s",
+		$fallback,
+		rawurlencode( $filename )
+	);
+}
+
+/**
  * Decrypts and streams a file to the browser, then exits.
  *
  * Logs either FILE_DOWNLOADED (external recipient) or FILE_SERVED_ADMIN (admin).
@@ -547,7 +576,7 @@ function sft_serve_file( object $file, object $vault, ?int $share_id = null, boo
 	);
 
 	header( 'Content-Type: ' . $file->mime_type );
-	header( 'Content-Disposition: attachment; filename="' . rawurlencode( $file->original_name ) . '"' );
+	header( 'Content-Disposition: ' . sft_content_disposition( $file->original_name ) );
 	header( 'Content-Length: ' . (int) $file->file_size );
 	header( 'Cache-Control: private, no-cache, no-store, must-revalidate' );
 	header( 'Pragma: no-cache' );

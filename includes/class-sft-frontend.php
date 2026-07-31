@@ -32,6 +32,38 @@ function sft_user_can_use(): bool {
 		( sft_is_admin() || current_user_can( 'use_sft_vaults' ) );
 }
 
+// ─── URL helper ───────────────────────────────────────────────────────────────
+
+/**
+ * Converts a WordPress URL into a root-relative one (path + query).
+ *
+ * Browsers resolve root-relative URLs against the scheme and host of the page
+ * currently loaded. Emitting absolute URLs from home_url()/admin_url() breaks
+ * whenever WordPress's stored scheme differs from how the visitor actually
+ * reached the site — the normal situation behind a TLS-terminating proxy, load
+ * balancer, or CDN, where is_ssl() reports false while the browser is on HTTPS.
+ * The resulting http:// request from an https:// page is mixed content, which
+ * browsers block: downloads fail and the browser falls back to naming files
+ * after the URL path ("download", "admin-ajax") instead of honouring
+ * Content-Disposition.
+ *
+ * Keeping the path intact (rather than hardcoding '/') preserves subdirectory
+ * installations.
+ *
+ * @param string $url Absolute WordPress URL.
+ * @return string Root-relative URL beginning with '/'.
+ */
+function sft_root_relative_url( string $url ): string {
+	$parts = wp_parse_url( $url );
+	$path  = $parts['path'] ?? '/';
+
+	if ( ! empty( $parts['query'] ) ) {
+		$path .= '?' . $parts['query'];
+	}
+
+	return strpos( $path, '/' ) === 0 ? $path : '/' . $path;
+}
+
 // ─── Query vars ───────────────────────────────────────────────────────────────
 
 add_filter( 'query_vars', 'sft_register_query_vars' );
@@ -97,9 +129,13 @@ function sft_render_share_page( string $token ): void {
 
 	// Note: vault files are intentionally NOT loaded here. The manifest is
 	// served by sft_ajax_verify_otp() only after successful OTP verification.
-	$ajax_url = esc_url( admin_url( 'admin-ajax.php' ) );
-	$nonce    = wp_create_nonce( 'sft_public_nonce' );
-	$share_id = (int) $share->id;
+	//
+	// URLs are root-relative so they inherit the scheme and host of the page the
+	// recipient is actually on — see sft_root_relative_url().
+	$ajax_url  = sft_root_relative_url( admin_url( 'admin-ajax.php' ) );
+	$home_base = sft_root_relative_url( home_url( '/' ) );
+	$nonce     = wp_create_nonce( 'sft_public_nonce' );
+	$share_id  = (int) $share->id;
 	?>
 	<div class="sft-card">
 		<h2><?php echo esc_html( $vault->name ); ?></h2>
@@ -147,10 +183,11 @@ function sft_render_share_page( string $token ): void {
 
 	<script>
 	var sftData = {
-		ajaxUrl: <?php echo wp_json_encode( $ajax_url ); ?>,
-		nonce:   <?php echo wp_json_encode( $nonce ); ?>,
-		shareId: <?php echo (int) $share_id; ?>,
-		dlToken: null
+		ajaxUrl:  <?php echo wp_json_encode( $ajax_url ); ?>,
+		homeBase: <?php echo wp_json_encode( $home_base ); ?>,
+		nonce:    <?php echo wp_json_encode( $nonce ); ?>,
+		shareId:  <?php echo (int) $share_id; ?>,
+		dlToken:  null
 	};
 
 	function sftRequestOtp() {
@@ -219,7 +256,7 @@ function sft_render_share_page( string $token ): void {
 			btn.href = '#';
 			btn.id = 'sft-dl-' + f.id;
 			btn.textContent = 'Download';
-			btn.onclick = function() { sftDownload(f.id); return false; };
+			btn.onclick = function() { sftDownload(f.id, f.name); return false; };
 
 			li.appendChild(nameEl);
 			li.appendChild(sizeEl);
@@ -227,6 +264,7 @@ function sft_render_share_page( string $token ): void {
 			ul.appendChild(li);
 		});
 
+		sftData.zipName = data.zip_name || '';
 		document.getElementById('sft-zip-wrap').style.display = data.zip_available ? '' : 'none';
 	}
 
@@ -237,21 +275,30 @@ function sft_render_share_page( string $token ): void {
 		sftHideError('sft-otp-error');
 	}
 
-	function sftDownload(fileId) {
-		if (!sftData.dlToken) return;
-		var url = <?php echo wp_json_encode( home_url( '/' ) ); ?> + '?sft_download=' + fileId + '&dt=' + encodeURIComponent(sftData.dlToken);
+	function sftTriggerDownload(url, fileName) {
 		var a = document.createElement('a');
-		a.href = url; a.download = ''; a.style.display = 'none';
+		a.href = url;
+		// An explicit name beats an empty download attribute, which makes the
+		// browser guess from the URL path (giving "download" / "admin-ajax").
+		if (fileName) { a.download = fileName; }
+		a.style.display = 'none';
 		document.body.appendChild(a); a.click(); document.body.removeChild(a);
+	}
+
+	function sftDownload(fileId, fileName) {
+		if (!sftData.dlToken) return;
+		sftTriggerDownload(
+			sftData.homeBase + '?sft_download=' + fileId + '&dt=' + encodeURIComponent(sftData.dlToken),
+			fileName
+		);
 	}
 
 	function sftDownloadZip() {
 		if (!sftData.dlToken) return;
-		var url = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>
-			+ '?action=sft_zip_download&dt=' + encodeURIComponent(sftData.dlToken);
-		var a = document.createElement('a');
-		a.href = url; a.download = ''; a.style.display = 'none';
-		document.body.appendChild(a); a.click(); document.body.removeChild(a);
+		sftTriggerDownload(
+			sftData.ajaxUrl + '?action=sft_zip_download&dt=' + encodeURIComponent(sftData.dlToken),
+			sftData.zipName
+		);
 	}
 
 	function sftPost(data) {
@@ -465,7 +512,7 @@ function sft_handle_zip_download(): void {
 
 	$safe_name = sanitize_file_name( $vault->name ) ?: 'vault';
 	header( 'Content-Type: application/zip' );
-	header( 'Content-Disposition: attachment; filename="' . $safe_name . '.zip"' );
+	header( 'Content-Disposition: ' . sft_content_disposition( $safe_name . '.zip' ) );
 	header( 'Content-Length: ' . filesize( $tmp_zip ) );
 	header( 'Cache-Control: no-store' );
 
@@ -549,10 +596,13 @@ function sft_ajax_verify_otp(): void {
 		);
 	}
 
+	$vault = sft_get_vault( (int) $share->vault_id );
+
 	wp_send_json_success( [
 		'download_token' => $dl_token,
 		'files'          => $manifest,
 		'zip_available'  => count( $manifest ) > 1 && class_exists( 'ZipArchive' ),
+		'zip_name'       => ( $vault ? sanitize_file_name( $vault->name ) : '' ) . '.zip',
 		'limit_note'     => $limit_note,
 	] );
 }
@@ -573,7 +623,9 @@ function sft_render_my_vaults_shortcode(): string {
 	$user_id  = get_current_user_id();
 	$vaults   = sft_get_user_vaults( $user_id );
 	$nonce    = wp_create_nonce( 'sft_user_nonce' );
-	$ajax_url = admin_url( 'admin-ajax.php' );
+	// Root-relative so chunked uploads are not blocked as mixed content when the
+	// site is reached over HTTPS but WordPress has an http:// URL stored.
+	$ajax_url = sft_root_relative_url( admin_url( 'admin-ajax.php' ) );
 
 	// Share form global limits (admins are exempt).
 	$sc_is_admin        = sft_is_admin();
