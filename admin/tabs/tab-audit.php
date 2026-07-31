@@ -63,8 +63,8 @@ function sft_render_tab_audit(): void {
 	$args        = sft_audit_filter_args_from_get();
 	$per_page    = 25;
 	$paged       = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
-	$a_orderby   = sanitize_key( $_GET['orderby'] ?? 'created_at' );
-	$a_order     = strtoupper( sanitize_key( $_GET['order'] ?? 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
+	$a_orderby   = sanitize_key( wp_unslash( $_GET['orderby'] ?? 'created_at' ) );
+	$a_order     = strtoupper( sanitize_key( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$args['per_page'] = $per_page;
 	$args['paged']    = $paged;
 	$args['orderby']  = $a_orderby;
@@ -74,11 +74,11 @@ function sft_render_tab_audit(): void {
 	$total       = sft_count_audit_logs( $args );
 	$total_pages = (int) ceil( $total / $per_page );
 
-	$f_event    = sanitize_key( $_GET['f_event'] ?? '' );
+	$f_event    = sanitize_key( wp_unslash( $_GET['f_event'] ?? '' ) );
 	$f_vault_id = (int) ( $_GET['f_vault_id'] ?? 0 );
-	$f_from     = sanitize_text_field( $_GET['f_from'] ?? '' );
-	$f_to       = sanitize_text_field( $_GET['f_to'] ?? '' );
-	$f_details  = sanitize_text_field( $_GET['f_details'] ?? '' );
+	$f_from     = sanitize_text_field( wp_unslash( $_GET['f_from'] ?? '' ) );
+	$f_to       = sanitize_text_field( wp_unslash( $_GET['f_to'] ?? '' ) );
+	$f_details  = sanitize_text_field( wp_unslash( $_GET['f_details'] ?? '' ) );
 
 	$filter_args = array_filter( [
 		'f_event'    => $f_event,
@@ -216,12 +216,12 @@ function sft_render_tab_audit(): void {
 // ─── Helper: extract filter args from $_GET ───────────────────────────────────
 
 function sft_audit_filter_args_from_get(): array {
-	$f_from    = sanitize_text_field( $_GET['f_from'] ?? '' );
-	$f_to      = sanitize_text_field( $_GET['f_to'] ?? '' );
-	$f_details = sanitize_text_field( $_GET['f_details'] ?? '' );
+	$f_from    = sanitize_text_field( wp_unslash( $_GET['f_from'] ?? '' ) );
+	$f_to      = sanitize_text_field( wp_unslash( $_GET['f_to'] ?? '' ) );
+	$f_details = sanitize_text_field( wp_unslash( $_GET['f_details'] ?? '' ) );
 
 	return [
-		'event_type'     => sanitize_key( $_GET['f_event'] ?? '' ),
+		'event_type'     => sanitize_key( wp_unslash( $_GET['f_event'] ?? '' ) ),
 		'vault_id'       => (int) ( $_GET['f_vault_id'] ?? 0 ) ?: null,
 		'date_from'      => $f_from ? $f_from . ' 00:00:00' : '',
 		'date_to'        => $f_to   ? $f_to   . ' 23:59:59' : '',
