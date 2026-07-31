@@ -511,10 +511,21 @@ function sft_handle_zip_download(): void {
 		[ 'zip' => true, 'file_count' => $added ] );
 
 	$safe_name = sanitize_file_name( $vault->name ) ?: 'vault';
+
+	sft_prepare_binary_response();
+
+	// Read the size after the archive is finalised and the stat cache is cleared,
+	// so Content-Length can never disagree with the bytes actually sent.
+	clearstatcache( true, $tmp_zip );
+	$zip_bytes = (int) filesize( $tmp_zip );
+
 	header( 'Content-Type: application/zip' );
 	header( 'Content-Disposition: ' . sft_content_disposition( $safe_name . '.zip' ) );
-	header( 'Content-Length: ' . filesize( $tmp_zip ) );
+	header( 'Content-Length: ' . $zip_bytes );
 	header( 'Cache-Control: no-store' );
+	header( 'X-Content-Type-Options: nosniff' );
+	// Regenerated per request and no range support — see sft_serve_file().
+	header( 'Accept-Ranges: none' );
 
 	readfile( $tmp_zip );
 	@unlink( $tmp_zip );

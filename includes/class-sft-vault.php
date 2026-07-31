@@ -517,6 +517,31 @@ function sft_delete_file( int $file_id, int $actor_id ): bool {
 // ─── File serving ─────────────────────────────────────────────────────────────
 
 /**
+ * Prepares the response for a raw binary body.
+ *
+ * Discards every active output buffer first. WordPress, themes, and other
+ * plugins commonly leave a buffer open, and any notice or stray whitespace
+ * already sitting in one would be flushed ahead of the file — corrupting the
+ * archive and making the delivered byte count disagree with Content-Length,
+ * which browsers report as a generic network failure. This is easy to miss
+ * because it only shows up in contexts where the extra output occurs (often
+ * admin-ajax with a logged-in user) and not from a plain CLI request.
+ *
+ * Also disables compression: an encoded body would no longer match the
+ * Content-Length we declare.
+ */
+function sft_prepare_binary_response(): void {
+	while ( ob_get_level() > 0 ) {
+		ob_end_clean();
+	}
+
+	if ( function_exists( 'apache_setenv' ) ) {
+		@apache_setenv( 'no-gzip', '1' );
+	}
+	@ini_set( 'zlib.output_compression', 'Off' );
+}
+
+/**
  * Builds an RFC 6266 Content-Disposition header value for a download.
  *
  * Two filename forms are emitted. The quoted `filename` is a plain-ASCII
@@ -575,12 +600,19 @@ function sft_serve_file( object $file, object $vault, ?int $share_id = null, boo
 		]
 	);
 
+	sft_prepare_binary_response();
+
 	header( 'Content-Type: ' . $file->mime_type );
 	header( 'Content-Disposition: ' . sft_content_disposition( $file->original_name ) );
 	header( 'Content-Length: ' . (int) $file->file_size );
 	header( 'Cache-Control: private, no-cache, no-store, must-revalidate' );
 	header( 'Pragma: no-cache' );
 	header( 'X-Content-Type-Options: nosniff' );
+	// The body is generated per request and range requests are not honoured, so
+	// advertise that: otherwise a browser may offer "Resume" on an interrupted
+	// download, send a Range header, receive the whole file again with a 200,
+	// and append it to what it already has — producing a corrupt file.
+	header( 'Accept-Ranges: none' );
 
 	sft_stream_decrypt_file( $path, $vault->vault_salt, $file->iv, (int) $file->file_size );
 	exit;
