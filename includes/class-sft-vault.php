@@ -743,7 +743,157 @@ function sft_upload_error_message( int $code ): string {
 }
 
 /**
+ * Returns the vaults owned by each of the given users, keyed by owner ID.
+ *
+ * One query for a whole user list rather than one per user.
+ *
+ * @param int[] $owner_ids WordPress user IDs.
+ * @return array<int,object[]> Owner ID → vault rows (id, name, status), newest first.
+ */
+function sft_get_vaults_by_owner( array $owner_ids ): array {
+	global $wpdb;
+
+	$owner_ids = array_values( array_unique( array_map( 'intval', $owner_ids ) ) );
+
+	$by_owner = [];
+	foreach ( $owner_ids as $id ) {
+		$by_owner[ $id ] = [];
+	}
+
+	if ( ! $owner_ids ) {
+		return $by_owner;
+	}
+
+	// Safe interpolation: every element was cast to int above.
+	$in = implode( ',', $owner_ids );
+
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	$rows = $wpdb->get_results(
+		"SELECT id, name, status, owner_id FROM {$wpdb->prefix}sft_vaults
+		  WHERE owner_id IN ({$in}) ORDER BY created_at DESC"
+	) ?: [];
+
+	foreach ( $rows as $row ) {
+		$by_owner[ (int) $row->owner_id ][] = $row;
+	}
+
+	return $by_owner;
+}
+
+/**
+ * Returns all file rows for the given vaults, keyed by vault ID.
+ *
+ * @param int[] $vault_ids
+ * @return array<int,object[]>
+ */
+function sft_get_files_by_vault( array $vault_ids ): array {
+	return sft_group_rows_by_vault( $vault_ids, 'sft_files', 'uploaded_at' );
+}
+
+/**
+ * Returns all share rows for the given vaults, keyed by vault ID.
+ *
+ * @param int[] $vault_ids
+ * @return array<int,object[]>
+ */
+function sft_get_shares_by_vault( array $vault_ids ): array {
+	return sft_group_rows_by_vault( $vault_ids, 'sft_shares', 'created_at' );
+}
+
+/**
+ * Fetches rows for many vaults in one query and groups them by vault_id.
+ *
+ * @internal Shared by sft_get_files_by_vault() and sft_get_shares_by_vault().
+ * @param int[]  $vault_ids
+ * @param string $table    Unprefixed plugin table name (internal literal, never request data).
+ * @param string $order_by Column to sort within each vault, newest first (likewise internal).
+ * @return array<int,object[]>
+ */
+function sft_group_rows_by_vault( array $vault_ids, string $table, string $order_by ): array {
+	global $wpdb;
+
+	$vault_ids = array_values( array_unique( array_map( 'intval', $vault_ids ) ) );
+
+	$grouped = [];
+	foreach ( $vault_ids as $id ) {
+		$grouped[ $id ] = [];
+	}
+
+	if ( ! $vault_ids ) {
+		return $grouped;
+	}
+
+	// Safe interpolation: IDs are int-cast above; $table and $order_by come from
+	// the two wrappers as literals and never carry request data.
+	$in = implode( ',', $vault_ids );
+
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	$rows = $wpdb->get_results(
+		"SELECT * FROM {$wpdb->prefix}{$table} WHERE vault_id IN ({$in}) ORDER BY {$order_by} DESC"
+	) ?: [];
+
+	foreach ( $rows as $row ) {
+		$grouped[ (int) $row->vault_id ][] = $row;
+	}
+
+	return $grouped;
+}
+
+/**
+ * Returns file and share counts (plus total bytes) for many vaults at once.
+ *
+ * List screens previously issued two COUNT queries per row, so a 25-row page
+ * cost 50 round trips. Two grouped queries answer the whole page instead.
+ *
+ * @param int[] $vault_ids Vault IDs on the current page.
+ * @return array<int,array{files:int,bytes:int,shares:int}> Keyed by vault ID;
+ *         every requested ID is present, zero-filled when it has no rows.
+ */
+function sft_get_vault_counts( array $vault_ids ): array {
+	global $wpdb;
+
+	$vault_ids = array_values( array_unique( array_map( 'intval', $vault_ids ) ) );
+
+	$counts = [];
+	foreach ( $vault_ids as $id ) {
+		$counts[ $id ] = [ 'files' => 0, 'bytes' => 0, 'shares' => 0 ];
+	}
+
+	if ( ! $vault_ids ) {
+		return $counts;
+	}
+
+	// Safe interpolation: every element was cast to int above.
+	$in = implode( ',', $vault_ids );
+
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	$files = $wpdb->get_results(
+		"SELECT vault_id, COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b
+		   FROM {$wpdb->prefix}sft_files WHERE vault_id IN ({$in}) GROUP BY vault_id"
+	) ?: [];
+
+	$shares = $wpdb->get_results(
+		"SELECT vault_id, COUNT(*) AS c
+		   FROM {$wpdb->prefix}sft_shares WHERE vault_id IN ({$in}) GROUP BY vault_id"
+	) ?: [];
+	// phpcs:enable
+
+	foreach ( $files as $row ) {
+		$counts[ (int) $row->vault_id ]['files'] = (int) $row->c;
+		$counts[ (int) $row->vault_id ]['bytes'] = (int) $row->b;
+	}
+	foreach ( $shares as $row ) {
+		$counts[ (int) $row->vault_id ]['shares'] = (int) $row->c;
+	}
+
+	return $counts;
+}
+
+/**
  * Returns count of files in a vault.
+ *
+ * Prefer sft_get_vault_counts() when rendering a list — this issues one query
+ * per call.
  */
 function sft_get_vault_file_count( int $vault_id ): int {
 	global $wpdb;

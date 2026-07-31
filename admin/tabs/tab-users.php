@@ -84,6 +84,13 @@ function sft_render_tab_users(): void {
 	$vault_users = array_filter( $vault_users, fn( $u ) => ! $u->has_cap( 'manage_options' ) && ! $u->has_cap( 'sft_admin' ) );
 
 	$tab_url = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) );
+
+	// One query for every listed user's vaults rather than one per user.
+	$listed_ids      = array_map( 'intval', array_merge(
+		wp_list_pluck( $sft_admin_users, 'ID' ),
+		wp_list_pluck( $vault_users, 'ID' )
+	) );
+	$vaults_by_owner = sft_get_vaults_by_owner( $listed_ids );
 	?>
 
 	<div style="display:flex; gap:24px; align-items:flex-start; margin-top:20px; flex-wrap:wrap;">
@@ -168,9 +175,7 @@ function sft_render_tab_users(): void {
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $sft_admin_users as $u ) :
-						$user_vaults = $wpdb->get_results( $wpdb->prepare(
-							"SELECT id, name, status FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d ORDER BY created_at DESC", $u->ID
-						) ) ?: [];
+						$user_vaults = $vaults_by_owner[ (int) $u->ID ] ?? [];
 					?>
 						<tr>
 							<td>
@@ -220,9 +225,7 @@ function sft_render_tab_users(): void {
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $vault_users as $u ) :
-						$user_vaults = $wpdb->get_results( $wpdb->prepare(
-							"SELECT id, name, status FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d ORDER BY created_at DESC", $u->ID
-						) ) ?: [];
+						$user_vaults = $vaults_by_owner[ (int) $u->ID ] ?? [];
 					?>
 						<tr>
 							<td>

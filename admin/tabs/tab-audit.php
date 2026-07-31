@@ -42,6 +42,9 @@ function sft_maybe_export_audit_csv(): void {
 	$fh = fopen( 'php://output', 'w' );
 	fputcsv( $fh, [ 'ID', 'Event', 'Vault ID', 'Share ID', 'Actor', 'IP', 'Details', 'Date/Time (Site Timezone)' ] );
 
+	// One query for every actor in the export rather than one per row.
+	cache_users( array_filter( wp_list_pluck( $rows, 'actor_id' ) ) );
+
 	foreach ( $rows as $row ) {
 		$actor  = $row->actor_id ? ( get_userdata( (int) $row->actor_id )->user_login ?? $row->actor_id ) : 'system';
 		$detail = $row->details ? str_replace( [ "\r", "\n" ], ' ', $row->details ) : '';
@@ -188,7 +191,10 @@ function sft_render_tab_audit(): void {
 				<tbody>
 				<?php if ( ! $rows ) : ?>
 					<tr><td colspan="7" style="text-align:center;color:#888;padding:24px;">No audit events match the current filters.</td></tr>
-				<?php else : foreach ( $rows as $row ) :
+				<?php else :
+					// One query for every actor on this page, not one per row.
+					cache_users( array_filter( wp_list_pluck( $rows, 'actor_id' ) ) );
+					foreach ( $rows as $row ) :
 					$actor  = $row->actor_id ? get_userdata( (int) $row->actor_id ) : null;
 					$detail = $row->details ? json_decode( $row->details, true ) : [];
 					$detail_str = $detail

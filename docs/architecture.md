@@ -121,7 +121,7 @@ CREATE TABLE {prefix}sft_audit (
     details     text         DEFAULT NULL,            -- JSON key→value context
     created_at  datetime     NOT NULL,
     PRIMARY KEY (id),
-    KEY event_type (event_type),
+    KEY event_created (event_type, created_at),   -- composite: serves filtered + date-bounded counts
     KEY vault_id   (vault_id),
     KEY actor_id   (actor_id),
     KEY created_at (created_at)

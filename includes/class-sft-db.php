@@ -128,7 +128,7 @@ function sft_create_tables() {
 		details     text,
 		created_at  datetime            NOT NULL,
 		PRIMARY KEY (id),
-		KEY event_type (event_type),
+		KEY event_created (event_type, created_at),
 		KEY vault_id (vault_id),
 		KEY share_id (share_id),
 		KEY created_at (created_at)
@@ -187,9 +187,35 @@ add_action( 'plugins_loaded', 'sft_maybe_upgrade_db' );
  * Safe to call on every page load — dbDelta does nothing when the schema matches.
  */
 function sft_maybe_upgrade_db(): void {
-	if ( get_option( 'sft_db_version' ) !== SFT_DB_VERSION ) {
-		sft_create_tables();
-		update_option( 'sft_db_version', SFT_DB_VERSION );
+	if ( get_option( 'sft_db_version' ) === SFT_DB_VERSION ) {
+		return;
+	}
+
+	sft_create_tables();
+	sft_drop_superseded_indexes();
+
+	update_option( 'sft_db_version', SFT_DB_VERSION );
+}
+
+/**
+ * Removes indexes that a newer composite index has made redundant.
+ *
+ * dbDelta only ever adds keys, so a single-column index left behind after its
+ * columns become the leftmost prefix of a composite one would keep costing
+ * write time and space for nothing.
+ *
+ * sft_audit.event_type is covered by event_created (event_type, created_at).
+ */
+function sft_drop_superseded_indexes(): void {
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'sft_audit';
+
+	$has_composite = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_created' ) );
+	$has_old       = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_type' ) );
+
+	if ( $has_composite && $has_old ) {
+		$wpdb->query( "ALTER TABLE `{$table}` DROP INDEX event_type" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name from $wpdb->prefix, index name is a literal.
 	}
 }
 

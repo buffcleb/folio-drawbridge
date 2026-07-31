@@ -715,9 +715,13 @@ function sft_render_my_vaults_shortcode(): string {
 <?php if ( ! $vaults ) : ?>
 	<p class="sft-mv-empty">You have no vaults yet. Click <strong>New Vault</strong> to create one.</p>
 <?php else : ?>
-	<?php foreach ( $vaults as $vault ) :
-		$files      = sft_get_vault_files( (int) $vault->id );
-		$shares     = sft_get_vault_shares( (int) $vault->id );
+	<?php
+	// Two grouped queries covering every vault shown, not two per vault.
+	$sc_files_by_vault  = sft_get_files_by_vault( wp_list_pluck( $vaults, 'id' ) );
+	$sc_shares_by_vault = sft_get_shares_by_vault( wp_list_pluck( $vaults, 'id' ) );
+	foreach ( $vaults as $vault ) :
+		$files      = $sc_files_by_vault[ (int) $vault->id ] ?? [];
+		$shares     = $sc_shares_by_vault[ (int) $vault->id ] ?? [];
 	?>
 	<div class="sft-mv-vault" id="sft-vault-<?php echo (int) $vault->id; ?>">
 		<div class="sft-mv-vault-head">
