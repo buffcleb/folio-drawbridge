@@ -677,7 +677,10 @@ function sft_register_admin_help_tabs(): void {
 add_action( 'admin_enqueue_scripts', 'sft_enqueue_admin_assets' );
 
 function sft_enqueue_admin_assets( string $hook ): void {
-	if ( $hook !== 'toplevel_page_sft-pro' ) {
+	// The page lives under the shared Folio parent menu, so the hook is
+	// '{parent}_page_sft-pro' (e.g. 'folio_page_sft-pro') rather than
+	// 'toplevel_page_sft-pro'. Match on the suffix so the parent can vary.
+	if ( substr( $hook, -13 ) !== '_page_sft-pro' ) {
 		return;
 	}
 
