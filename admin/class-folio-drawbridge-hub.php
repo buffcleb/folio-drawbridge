@@ -49,12 +49,18 @@ class Folio_Drawbridge_Hub {
 			'dashicons-shield-alt',
 			80
 		);
-		// Rename the auto-created first submenu (mirrors the parent slug) to "Dashboard".
+		// Rename the auto-created first submenu (mirrors the parent slug) to
+		// "Dashboard". This one keeps manage_options regardless of the parent's
+		// capability, because that is what render() itself enforces — registering
+		// it lower would show the entry to users who then get a blank screen.
+		// WordPress drops submenu entries the user cannot access and points the
+		// parent at the first remaining one, so a delegated admin lands on their
+		// own plugin's page instead.
 		add_submenu_page(
 			self::SLUG,
 			__( 'Folio', 'folio-drawbridge' ),
 			__( 'Dashboard', 'folio-drawbridge' ),
-			$capability,
+			'manage_options',
 			self::SLUG,
 			array( __CLASS__, 'render' )
 		);

@@ -324,12 +324,14 @@ function sft_render_vault_inspector( int $vault_id ): void {
 							? (int) $s->download_count . ' / ' . (int) $s->max_downloads
 							: (int) $s->download_count . ' / ∞';
 						$editable = in_array( $s->status, [ 'pending', 'active' ], true );
+						$state    = sft_share_display_state( $s );
+						$usable   = sft_share_is_accessible( $s );
 						$edit_id  = 'sft-adm-share-edit-' . (int) $s->id;
 						$cur_exp  = $s->expires_at ? sft_format_date( $s->expires_at, 'Y-m-d' ) : '';
 					?>
 						<tr>
 							<td><?php echo esc_html( $s->recipient_email ); ?></td>
-							<td><span class="sft-badge sft-badge-<?php echo esc_attr( $s->status ); ?>"><?php echo esc_html( $s->status ); ?></span></td>
+							<td><span class="sft-badge sft-badge-<?php echo esc_attr( $state ); ?>"><?php echo esc_html( sft_share_state_label( $state ) ); ?></span></td>
 							<td><?php echo $creator ? esc_html( $creator->user_login ) : '—'; ?></td>
 							<td><?php echo esc_html( $dl_info ); ?></td>
 							<td style="color:#888;"><?php echo $s->expires_at ? esc_html( sft_format_date( $s->expires_at, 'M j, Y' ) ) : '—'; ?></td>
@@ -337,13 +339,20 @@ function sft_render_vault_inspector( int $vault_id ): void {
 							<td style="white-space:nowrap;">
 								<?php if ( $editable ) : ?>
 									<button type="button" class="sft-btn" onclick="sftAdmToggle('<?php echo esc_js( $edit_id ); ?>')" style="margin-right:4px;">Edit</button>
-									<form method="post" style="display:inline;margin-right:4px;">
-										<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
-										<input type="hidden" name="share_id" value="<?php echo (int) $s->id; ?>">
-										<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
-										<input type="submit" name="sft_admin_resend_share" value="Resend" class="sft-btn"
-										       title="Resend the invite email to <?php echo esc_attr( $s->recipient_email ); ?>">
-									</form>
+									<?php if ( $usable ) : ?>
+										<form method="post" style="display:inline;margin-right:4px;">
+											<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
+											<input type="hidden" name="share_id" value="<?php echo (int) $s->id; ?>">
+											<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
+											<input type="submit" name="sft_admin_resend_share" value="Resend" class="sft-btn"
+											       title="Resend the invite email to <?php echo esc_attr( $s->recipient_email ); ?>">
+										</form>
+									<?php else : ?>
+										<button type="button" class="sft-btn" disabled style="margin-right:4px;opacity:.5;cursor:not-allowed;"
+										        title="<?php echo esc_attr( 'limit_reached' === $state
+											        ? 'Download limit reached — resending the invite will not restore access. Raise the limit with Edit first.'
+											        : 'This share has expired — resending the invite will not restore access. Extend the expiry with Edit first.' ); ?>">Resend</button>
+									<?php endif; ?>
 									<form method="post" style="display:inline;"
 									      onsubmit="return confirm('Revoke this share? The recipient loses access immediately.');">
 										<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>

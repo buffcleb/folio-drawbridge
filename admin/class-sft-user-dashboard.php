@@ -149,7 +149,7 @@ function sft_enqueue_user_dashboard_assets( string $hook ): void {
 		.sft-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
 		.sft-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
 		.sft-badge-active  { background:#d1e7dd; color:#0a3622; }
-		.sft-badge-expired,.sft-badge-revoked { background:#f8d7da; color:#58151c; }
+		.sft-badge-expired,.sft-badge-revoked,.sft-badge-limit_reached { background:#f8d7da; color:#58151c; }
 		.sft-badge-archived,.sft-badge-pending { background:#e2e3e5; color:#41464b; }
 		.sft-table { width:100%; border-collapse:collapse; }
 		.sft-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }

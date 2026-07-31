@@ -686,6 +686,51 @@ function sft_enforce_share_limits(): int {
 }
 
 /**
+ * Returns the state to show for a share, which is not always its stored status.
+ *
+ * A share stays 'active' in the database after it passes its expiry date or
+ * exhausts its download limit — the hourly cron flips expiry eventually, and
+ * nothing flips the limit at all. Showing the raw status therefore tells an
+ * owner a link is "active" when recipients are being turned away, and makes
+ * actions like Resend look reasonable when they cannot help.
+ *
+ * @param object $share Share row.
+ * @return string One of: pending | active | limit_reached | expired | revoked
+ */
+function sft_share_display_state( object $share ): string {
+	if ( $share->status === 'revoked' ) {
+		return 'revoked';
+	}
+
+	if ( $share->status === 'expired'
+		|| ( $share->expires_at && strtotime( $share->expires_at ) < time() ) ) {
+		return 'expired';
+	}
+
+	if ( (int) $share->max_downloads > 0
+		&& (int) $share->download_count >= (int) $share->max_downloads ) {
+		return 'limit_reached';
+	}
+
+	return $share->status;
+}
+
+/**
+ * Human-readable label for a state from sft_share_display_state().
+ */
+function sft_share_state_label( string $state ): string {
+	$labels = [
+		'pending'       => 'Pending',
+		'active'        => 'Active',
+		'limit_reached' => 'Limit reached',
+		'expired'       => 'Expired',
+		'revoked'       => 'Revoked',
+	];
+
+	return $labels[ $state ] ?? ucfirst( $state );
+}
+
+/**
  * Returns true if the share is accessible (active, not expired, not over download limit).
  */
 function sft_share_is_accessible( object $share ): bool {
