@@ -23,7 +23,7 @@ function sft_maybe_export_audit_csv(): void {
 	if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'sft-pro' ) {
 		return;
 	}
-	if ( ( $_GET['tab'] ?? '' ) !== 'audit' || ! isset( $_GET['sft_export_audit'] ) ) {
+	if ( sanitize_key( wp_unslash( $_GET['tab'] ?? '' ) ) !== 'audit' || ! isset( $_GET['sft_export_audit'] ) ) {
 		return;
 	}
 	if ( ! sft_is_admin() ) {

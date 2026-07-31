@@ -89,7 +89,7 @@ function sft_log(
 			'share_id'   => $share_id,
 			'actor_id'   => $actor_id,
 			'ip_address' => $ip,
-			'user_agent' => substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ),
+			'user_agent' => substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ), 0, 500 ),
 			'details'    => $details ? wp_json_encode( $details ) : null,
 			'created_at' => $created_at,
 		],
@@ -192,7 +192,7 @@ function sft_get_client_ip(): string {
 	foreach ( $candidates as $key ) {
 		if ( ! empty( $_SERVER[ $key ] ) ) {
 			// X-Forwarded-For may be a comma-separated list; take the first.
-			$ip = trim( explode( ',', $_SERVER[ $key ] )[0] );
+			$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) ) )[0] );
 			if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
 				return $ip;
 			}
