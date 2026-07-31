@@ -104,9 +104,11 @@ function sft_get_user_vaults( int $owner_id, array $args = [] ): array {
 	$where_sql = 'WHERE ' . implode( ' AND ', $where );
 	$limit_sql = $per_page > 0 ? $wpdb->prepare( 'LIMIT %d OFFSET %d', $per_page, ( $paged - 1 ) * $per_page ) : '';
 
-	return $wpdb->get_results(
-		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values )
-	) ?: [];
+	// Interpolated fragments are safe: $orderby/$order come from the whitelists
+	// above, $where_sql holds only literal "%d"/"%s" placeholder clauses whose
+	// values are in $values, and $limit_sql is pre-prepared.
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values ) ) ?: [];
 }
 
 /**
@@ -121,9 +123,13 @@ function sft_get_all_vaults( array $args = [] ): array {
 	        LEFT JOIN {$wpdb->users} u ON u.ID = v.owner_id
 	        {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}";
 
+	// Safe interpolation: whitelisted orderby/order, placeholder-only WHERE with
+	// values in $values, integer-cast LIMIT (see sft_vaults_query_parts()).
+	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return $values
 		? ( $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [] )
 		: ( $wpdb->get_results( $sql ) ?: [] );
+	// phpcs:enable
 }
 
 function sft_count_all_vaults( array $args = [] ): int {
@@ -133,9 +139,12 @@ function sft_count_all_vaults( array $args = [] ): int {
 
 	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults v {$where_sql}";
 
+	// Safe interpolation: placeholder-only WHERE, values in $values (see above).
+	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return (int) ( $values
 		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
 		: $wpdb->get_var( $sql ) );
+	// phpcs:enable
 }
 
 /**

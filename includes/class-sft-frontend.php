@@ -956,7 +956,14 @@ function sft_ajax_upload_chunk_handler(): void {
 		wp_mkdir_p( $upload_dir );
 	}
 
-	if ( ! move_uploaded_file( $_FILES['chunk']['tmp_name'], $upload_dir . $chunk_index . '.part' ) ) {
+	// wp_handle_upload() cannot be used here: each POST carries one raw chunk of a
+	// larger file, which must land in the chunk staging area under its sequence
+	// number — not in the media library. is_uploaded_file() guarantees the source
+	// really came through this HTTP POST before we move it.
+	$chunk_tmp = $_FILES['chunk']['tmp_name'];
+	if ( ! is_uploaded_file( $chunk_tmp )
+		|| ! move_uploaded_file( $chunk_tmp, $upload_dir . $chunk_index . '.part' ) // phpcs:ignore Generic.PHP.ForbiddenFunctions.Found -- chunked upload staging; see comment above.
+	) {
 		wp_send_json_error( 'Failed to save chunk to disk.' );
 	}
 

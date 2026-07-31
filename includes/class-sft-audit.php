@@ -243,6 +243,9 @@ function sft_get_audit_logs( array $args = [] ): array {
 	$sql = "SELECT * FROM {$wpdb->prefix}sft_audit {$where_sql} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
 	array_push( $values, $per_page, $offset );
 
+	// Safe interpolation: $orderby/$order come from the whitelists above and
+	// $where_sql holds only placeholder clauses whose values are in $values.
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [];
 }
 
@@ -256,9 +259,12 @@ function sft_count_audit_logs( array $args = [] ): int {
 
 	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit {$where_sql}";
 
+	// Safe interpolation: placeholder-only WHERE, values in $values (see sft_audit_build_where()).
+	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return (int) ( $values
 		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
 		: $wpdb->get_var( $sql ) );
+	// phpcs:enable
 }
 
 /**
