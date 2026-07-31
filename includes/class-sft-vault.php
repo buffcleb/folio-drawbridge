@@ -111,7 +111,7 @@ function sft_get_user_vaults( int $owner_id, array $args = [] ): array {
 	// Interpolated fragments are safe: $orderby/$order come from the whitelists
 	// above, $where_sql holds only literal "%d"/"%s" placeholder clauses whose
 	// values are in $values, and $limit_sql is pre-prepared.
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values ) ) ?: [];
 }
 
@@ -133,7 +133,7 @@ function sft_get_all_vaults( array $args = [] ): array {
 	return $values
 		? ( $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [] )
 		: ( $wpdb->get_results( $sql ) ?: [] );
-	// phpcs:enable
+	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 }
 
 function sft_count_all_vaults( array $args = [] ): int {
@@ -148,7 +148,7 @@ function sft_count_all_vaults( array $args = [] ): int {
 	return (int) ( $values
 		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
 		: $wpdb->get_var( $sql ) );
-	// phpcs:enable
+	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 }
 
 /**

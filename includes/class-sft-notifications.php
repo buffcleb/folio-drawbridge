@@ -34,6 +34,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- updates the expiry_warning_sent flag in this plugin's custom shares table.
+
 // ─── Template engine ──────────────────────────────────────────────────────────
 
 /**
