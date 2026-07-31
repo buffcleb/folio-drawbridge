@@ -16,6 +16,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- streams encrypted files in fixed-size chunks and manages its own protected storage directory; WP_Filesystem cannot stream and buffers whole files in memory.
+
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+
 // ─── Vault CRUD ───────────────────────────────────────────────────────────────
 
 /**

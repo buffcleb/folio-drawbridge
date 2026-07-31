@@ -755,7 +755,7 @@ function sft_admin_inline_js(): void {
 	function sftAdminDownload(fileId) {
 		var url = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>'
 			+ '?action=sft_admin_download&file_id=' + fileId
-			+ '&_wpnonce=' + encodeURIComponent('<?php echo wp_create_nonce( 'sft_admin_download' ); ?>');
+			+ '&_wpnonce=' + encodeURIComponent('<?php echo esc_js( wp_create_nonce( 'sft_admin_download' ) ); ?>');
 		window.location.href = url;
 	}
 
@@ -892,7 +892,7 @@ function sft_show_notice(): void {
 	printf(
 		'<div class="notice %s is-dismissible" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $class ),
-		$notice['message'] // pre-escaped at set time
+		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by sft_set_notice() callers before storage.
 	);
 }
 
@@ -950,10 +950,10 @@ function sft_render_pagination( int $current, int $total_pages, array $extra_arg
 			continue;
 		}
 		if ( $p === $current ) {
-			echo '<span class="current">' . $p . '</span>';
+			echo '<span class="current">' . (int) $p . '</span>';
 		} else {
 			$url = add_query_arg( array_merge( $base, [ 'paged' => $p ] ), admin_url( 'admin.php' ) );
-			echo '<a href="' . esc_url( $url ) . '">' . $p . '</a>';
+			echo '<a href="' . esc_url( $url ) . '">' . (int) $p . '</a>';
 		}
 	}
 

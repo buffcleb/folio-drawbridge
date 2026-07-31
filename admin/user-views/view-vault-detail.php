@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
+
 function sft_render_user_vault_detail( int $vault_id ): void {
 	$user_id  = get_current_user_id();
 	$vault    = sft_get_vault( $vault_id );
@@ -82,7 +85,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 			<form method="post" action="<?php echo esc_url( $form_url ); ?>"
 			      onsubmit="return confirm('Permanently delete vault &quot;<?php echo esc_js( $vault->name ); ?>&quot; and all its files?');">
 				<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-				<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+				<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 				<input type="submit" name="sft_ud_delete_vault" value="Delete Vault" class="button sft-danger">
 			</form>
 			<?php endif; ?>
@@ -94,7 +97,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<div class="sft-card" style="margin-top:0; padding:16px;">
 			<form method="post" action="<?php echo esc_url( $form_url ); ?>">
 				<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-				<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+				<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 				<div style="margin-bottom:12px;">
 					<label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;" for="sft-vault-new-name">Vault Name <span style="color:#d63638;">*</span></label>
 					<input type="text" id="sft-vault-new-name" name="vault_new_name"
@@ -117,7 +120,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<div class="sft-card" style="margin-top:0; padding:16px;">
 			<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
 				<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-				<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+				<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 				<div class="sft-form-row" style="margin:0; flex:1; min-width:160px;">
 					<label for="sft-vault-new-expires" style="margin-bottom:4px;">Expiry Date <span style="font-weight:400;color:#888;">(leave blank to remove)</span></label>
 					<input type="date" id="sft-vault-new-expires" name="vault_new_expires"
@@ -134,10 +137,10 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 
 	<!-- ── Files ──────────────────────────────────────────────────────────── -->
 	<div class="sft-card">
-		<h3 style="margin-top:0;">Files (<?php echo count( $files ); ?>)</h3>
+		<h3 style="margin-top:0;">Files (<?php echo (int) count( $files ); ?>)</h3>
 
 		<?php if ( $files ) : ?>
-			<table id="sft-ud-files-<?php echo $vault_id; ?>" class="sft-table widefat" style="margin-bottom:20px;">
+			<table id="sft-ud-files-<?php echo (int) $vault_id; ?>" class="sft-table widefat" style="margin-bottom:20px;">
 				<thead><tr>
 					<th>Filename</th><th>Size</th><th>Uploaded</th><th data-nosort></th>
 				</tr></thead>
@@ -151,7 +154,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 							<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:inline;"
 							      onsubmit="return confirm('Delete <?php echo esc_js( $f->original_name ); ?>?');">
 								<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-								<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+								<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 								<input type="hidden" name="file_id"  value="<?php echo (int) $f->id; ?>">
 								<input type="submit" name="sft_ud_delete_file" value="Delete" class="sft-btn sft-danger">
 							</form>
@@ -171,7 +174,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 			<div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
 				<div style="flex:1; min-width:200px;">
 					<label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">
-						Files <span style="font-weight:400; color:#888;">(max <?php echo $max_file_mb; ?> MB each — hold Ctrl/Cmd to select multiple)</span>
+						Files <span style="font-weight:400; color:#888;">(max <?php echo (int) $max_file_mb; ?> MB each — hold Ctrl/Cmd to select multiple)</span>
 					</label>
 					<input type="file" id="sft-ud-file-input" multiple style="width:100%; padding:6px;">
 				</div>
@@ -189,7 +192,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 			ajaxUrl:  <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,
 			nonce:    <?php echo wp_json_encode( wp_create_nonce( 'sft_user_nonce' ) ); ?>,
 			vaultId:  <?php echo (int) $vault_id; ?>,
-			chunkSize:<?php echo sft_chunk_size_bytes(); ?>
+			chunkSize:<?php echo (int) sft_chunk_size_bytes(); ?>
 		};
 		function sftUdGenId() {
 			return Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -283,10 +286,10 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 
 	<!-- ── Shares ─────────────────────────────────────────────────────────── -->
 	<div class="sft-card">
-		<h3 style="margin-top:0;">Shares (<?php echo count( $shares ); ?>)</h3>
+		<h3 style="margin-top:0;">Shares (<?php echo (int) count( $shares ); ?>)</h3>
 
 		<?php if ( $shares ) : ?>
-			<table id="sft-ud-shares-<?php echo $vault_id; ?>" class="sft-table widefat" style="margin-bottom:20px;">
+			<table id="sft-ud-shares-<?php echo (int) $vault_id; ?>" class="sft-table widefat" style="margin-bottom:20px;">
 				<thead><tr>
 					<th>Recipient</th><th>Status</th><th>Downloads</th><th>Expires</th><th>Last Access</th><th data-nosort></th>
 				</tr></thead>
@@ -310,7 +313,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 								<button type="button" class="sft-btn" onclick="sftUdToggle('<?php echo esc_js( $edit_id ); ?>')" style="margin-right:4px;">Edit</button>
 								<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:inline;margin-right:4px;">
 									<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-									<input type="hidden" name="vault_id"  value="<?php echo $vault_id; ?>">
+									<input type="hidden" name="vault_id"  value="<?php echo (int) $vault_id; ?>">
 									<input type="hidden" name="share_id"  value="<?php echo (int) $s->id; ?>">
 									<input type="submit" name="sft_ud_resend_share" value="Resend"
 									       class="sft-btn" title="Resend invite to <?php echo esc_attr( $s->recipient_email ); ?>">
@@ -318,7 +321,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 								<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:inline;"
 								      onsubmit="return confirm('Revoke access for <?php echo esc_js( $s->recipient_email ); ?>?');">
 									<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-									<input type="hidden" name="vault_id"  value="<?php echo $vault_id; ?>">
+									<input type="hidden" name="vault_id"  value="<?php echo (int) $vault_id; ?>">
 									<input type="hidden" name="share_id"  value="<?php echo (int) $s->id; ?>">
 									<input type="submit" name="sft_ud_revoke_share" value="Revoke" class="sft-btn sft-danger">
 								</form>
@@ -332,7 +335,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 						<td colspan="6" style="padding:12px 10px;">
 							<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
 								<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-								<input type="hidden" name="vault_id"  value="<?php echo $vault_id; ?>">
+								<input type="hidden" name="vault_id"  value="<?php echo (int) $vault_id; ?>">
 								<input type="hidden" name="share_id"  value="<?php echo (int) $s->id; ?>">
 								<div class="sft-form-row" style="margin:0; min-width:120px;">
 									<label style="font-size:12px;">
@@ -343,8 +346,8 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 									</label>
 									<input type="number" name="share_max_downloads"
 									       value="<?php echo (int) $s->max_downloads; ?>"
-									       min="<?php echo $share_dl_min; ?>"
-									       <?php if ( $share_dl_max_attr !== '' ) : ?>max="<?php echo $share_dl_max_attr; ?>"<?php endif; ?>
+									       min="<?php echo (int) $share_dl_min; ?>"
+									       <?php if ( $share_dl_max_attr !== '' ) : ?>max="<?php echo (int) $share_dl_max_attr; ?>"<?php endif; ?>
 									       style="width:90px; padding:5px 8px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px;">
 								</div>
 								<div class="sft-form-row" style="margin:0; min-width:160px;">
@@ -383,7 +386,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<h4 style="margin:0 0 10px; font-size:13px; font-weight:700; text-transform:uppercase; color:#888; letter-spacing:.5px;">Create New Share</h4>
 		<form method="post" action="<?php echo esc_url( $form_url ); ?>">
 			<?php wp_nonce_field( 'sft_user_dashboard_action', 'sft_user_nonce' ); ?>
-			<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+			<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 			<div style="display:flex; gap:16px; flex-wrap:wrap;">
 				<div style="flex:2; min-width:200px;">
 					<div class="sft-form-row">
@@ -400,9 +403,9 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 							<?php endif; ?>
 						</label>
 						<input type="number" id="sft-share-maxdl" name="share_max_downloads"
-						       value="<?php echo $share_default_dl; ?>"
-						       min="<?php echo $share_dl_min; ?>"
-						       <?php if ( $share_dl_max_attr !== '' ) : ?>max="<?php echo $share_dl_max_attr; ?>"<?php endif; ?>>
+						       value="<?php echo (int) $share_default_dl; ?>"
+						       min="<?php echo (int) $share_dl_min; ?>"
+						       <?php if ( $share_dl_max_attr !== '' ) : ?>max="<?php echo (int) $share_dl_max_attr; ?>"<?php endif; ?>>
 					</div>
 				</div>
 				<div style="flex:1; min-width:160px;">
@@ -436,7 +439,7 @@ function sft_render_user_vault_detail( int $vault_id ): void {
 		<?php if ( ! $audit ) : ?>
 			<p style="color:#888; font-size:13px;">No activity recorded for this vault yet.</p>
 		<?php else : ?>
-			<table id="sft-ud-audit-<?php echo $vault_id; ?>" class="sft-table widefat striped">
+			<table id="sft-ud-audit-<?php echo (int) $vault_id; ?>" class="sft-table widefat striped">
 				<thead><tr>
 					<th>Event</th><th data-nosort>Details</th><th>IP</th><th>Date/Time</th>
 				</tr></thead>

@@ -23,6 +23,8 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions, WordPress.DB.DirectDatabaseQuery -- uninstall removes this plugin's own tables, options, and protected storage directory; WP_Filesystem credentials are unavailable in the uninstall context.
+
 global $wpdb;
 
 $delete = get_option( 'sft_delete_on_uninstall', '0' );

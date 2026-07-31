@@ -17,6 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- streams encrypted files in fixed-size chunks and manages its own protected storage directory; WP_Filesystem cannot stream and buffers whole files in memory.
+
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+
 // ─── Capability helper ────────────────────────────────────────────────────────
 
 /**
@@ -159,7 +163,7 @@ function sft_render_share_page( string $token ): void {
 	var sftData = {
 		ajaxUrl: <?php echo wp_json_encode( $ajax_url ); ?>,
 		nonce:   <?php echo wp_json_encode( $nonce ); ?>,
-		shareId: <?php echo $share_id; ?>,
+		shareId: <?php echo (int) $share_id; ?>,
 		dlToken: null
 	};
 
@@ -240,7 +244,7 @@ function sft_share_page_header( string $site_name, string $home_url ): void {
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Secure File Access &mdash; <?php echo $site_name; ?></title>
+<title>Secure File Access &mdash; <?php echo esc_html( $site_name ); ?></title>
 <?php wp_head(); ?>
 <style>
 *{box-sizing:border-box}
@@ -275,7 +279,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 <div class="sft-wrap">
-<div class="sft-logo"><a href="<?php echo $home_url; ?>"><?php echo $site_name; ?></a></div>
+<div class="sft-logo"><a href="<?php echo esc_url( $home_url ); ?>"><?php echo esc_html( $site_name ); ?></a></div>
 <?php
 }
 
@@ -574,14 +578,13 @@ function sft_render_my_vaults_shortcode(): string {
 	<?php foreach ( $vaults as $vault ) :
 		$files      = sft_get_vault_files( (int) $vault->id );
 		$shares     = sft_get_vault_shares( (int) $vault->id );
-		$badge_class = 'sft-badge-' . esc_attr( $vault->status );
 	?>
 	<div class="sft-mv-vault" id="sft-vault-<?php echo (int) $vault->id; ?>">
 		<div class="sft-mv-vault-head">
 			<div>
 				<div class="sft-mv-vault-title">
 					<?php echo esc_html( $vault->name ); ?>
-					<span class="sft-mv-badge <?php echo $badge_class; ?>"><?php echo esc_html( $vault->status ); ?></span>
+					<span class="sft-mv-badge sft-badge-<?php echo esc_attr( $vault->status ); ?>"><?php echo esc_html( $vault->status ); ?></span>
 				</div>
 				<p class="sft-mv-meta">
 					Created <?php echo esc_html( gmdate( 'M j, Y', strtotime( $vault->created_at ) ) ); ?>
@@ -685,16 +688,16 @@ function sft_render_my_vaults_shortcode(): string {
 			Download Limit
 			<?php echo ( $sc_is_admin || $sc_allow_unlim_dl ) ? '(0 = unlimited)' : ''; ?>
 		</label>
-		<input type="number" id="sft-share-maxdl" value="<?php echo $sc_default_dl; ?>"
-		       min="<?php echo $sc_dl_min; ?>"
-		       <?php echo $sc_dl_max > 0 ? 'max="' . $sc_dl_max . '"' : ''; ?>>
+		<input type="number" id="sft-share-maxdl" value="<?php echo (int) $sc_default_dl; ?>"
+		       min="<?php echo (int) $sc_dl_min; ?>"
+		       <?php echo $sc_dl_max > 0 ? 'max="' . (int) $sc_dl_max . '"' : ''; ?>>
 		<label>
 			Link Expires
 			<?php echo $sc_expiry_required ? '<span style="color:#d63638;">*</span>' : '(optional)'; ?>
 		</label>
 		<input type="date" id="sft-share-expires"
 		       min="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>"
-		       <?php echo $sc_expiry_required; ?>>
+		       <?php echo esc_attr( $sc_expiry_required ); ?>>
 		<div class="sft-mv-actions">
 			<button class="sft-mv-btn sft-mv-btn-primary" onclick="sftCreateShare()">Send Invite</button>
 			<button class="sft-mv-btn" style="background:#f0f2f5;color:#333" onclick="sftCloseModal('sft-modal-share')">Cancel</button>
@@ -706,9 +709,9 @@ function sft_render_my_vaults_shortcode(): string {
 var sftUserData = {
 	ajaxUrl:    <?php echo wp_json_encode( $ajax_url ); ?>,
 	nonce:      <?php echo wp_json_encode( $nonce ); ?>,
-	chunkSize:  <?php echo sft_chunk_size_bytes(); ?>,
+	chunkSize:  <?php echo (int) sft_chunk_size_bytes(); ?>,
 	activeVaultId: null,
-	shareLimits: <?php echo $sc_js_defaults; ?>
+	shareLimits: <?php echo $sc_js_defaults; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_json_encode() output. ?>
 };
 
 function sftOpenNewVaultModal() {

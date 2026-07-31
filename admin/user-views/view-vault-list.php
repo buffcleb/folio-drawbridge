@@ -12,6 +12,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
+
 function sft_render_user_vault_list(): void {
 	global $wpdb;
 
@@ -38,7 +41,7 @@ function sft_render_user_vault_list(): void {
 	<div class="sft-card" style="margin-top:20px;">
 		<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
 			<h2 style="margin:0; font-size:18px;">Your Vaults
-				<span style="font-size:14px; font-weight:400; color:#888;">(<?php echo number_format( $total ); ?>)</span>
+				<span style="font-size:14px; font-weight:400; color:#888;">(<?php echo esc_html( number_format( $total ) ); ?>)</span>
 			</h2>
 		</div>
 
@@ -47,12 +50,12 @@ function sft_render_user_vault_list(): void {
 		<?php else : ?>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<?php echo sft_sortable_th( 'Vault Name', 'name',       $vl_orderby, $vl_order, $vl_sort_base ); ?>
-					<?php echo sft_sortable_th( 'Status',     'status',     $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Vault Name', 'name',       $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo sft_sortable_th( 'Status',     'status',     $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort>Files</th>
 					<th data-nosort>Shares</th>
-					<?php echo sft_sortable_th( 'Created',    'created_at', $vl_orderby, $vl_order, $vl_sort_base ); ?>
-					<?php echo sft_sortable_th( 'Expires',    'expires_at', $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Created',    'created_at', $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo sft_sortable_th( 'Expires',    'expires_at', $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort></th>
 				</tr></thead>
 				<tbody>
@@ -95,8 +98,8 @@ function sft_render_user_vault_list(): void {
 							: 'background:#fff;color:#2271b1;';
 					?>
 						<a href="<?php echo esc_url( $url ); ?>"
-						   style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border:1px solid #ccd0d4;border-radius:6px;font-size:13px;text-decoration:none;<?php echo $style; ?>">
-							<?php echo $p; ?>
+						   style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border:1px solid #ccd0d4;border-radius:6px;font-size:13px;text-decoration:none;<?php echo esc_attr( $style ); ?>">
+							<?php echo (int) $p; ?>
 						</a>
 					<?php endfor; ?>
 				</div>

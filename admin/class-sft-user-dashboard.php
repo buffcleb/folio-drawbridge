@@ -482,7 +482,7 @@ function sft_ud_show_notice(): void {
 	printf(
 		'<div class="sft-notice-%s" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $notice['type'] ),
-		$notice['message'] // pre-escaped at set time
+		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by sft_set_notice() callers before storage.
 	);
 }
 
