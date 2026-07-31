@@ -141,6 +141,12 @@ From the Vault Users table:
 
 Both tables are sortable by clicking column headers.
 
+### Navigating to a user's vaults
+
+Click the number in the **Vaults** column to expand an inline list of that user's vaults, each with its status badge. Clicking a vault name opens it directly in the vault inspector on the Vaults tab.
+
+[[SCREENSHOT: Users tab with a user's vault list expanded beneath their row, showing vault names and status badges]]
+
 All changes are recorded in the audit log.
 
 ---

@@ -512,7 +512,7 @@ function sft_register_admin_help_tabs(): void {
 					'<li><strong>Vault User</strong> — access to <strong>My Vaults</strong> only. Can create vaults, upload and delete files, create and revoke share links, and view their own activity log. Has no visibility into other users\' vaults or any admin panel tabs.</li>' .
 					'</ul>' .
 					'<p>WordPress administrators (<em>manage_options</em>) always have full SFT Admin access implicitly and do not appear in either list.</p>' .
-					'<p>Columns in both tables are sortable by clicking the column header.</p>',
+					'<p>Columns in both tables are sortable by clicking the column header. Click the number in the <strong>Vaults</strong> column to expand a list of that user\'s vaults — each links straight to the vault inspector.</p>',
 			] );
 			$screen->add_help_tab( [
 				'id'      => 'sft-users-grant',

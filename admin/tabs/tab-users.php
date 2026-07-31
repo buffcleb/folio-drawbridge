@@ -18,6 +18,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Renders the expandable vault-count cell content and the hidden sub-row
+ * listing a user's vaults, each linking to the vault inspector.
+ *
+ * Echoes nothing when the user owns no vaults (plain "0" is printed by the caller).
+ *
+ * @param array $vaults  Vault rows (id, name, status) owned by the user.
+ * @param int   $user_id Owner user ID — used to build unique element IDs.
+ */
+function sft_render_user_vaults_subrow( array $vaults, int $user_id ): void {
+	?>
+	<tr data-subrow id="sft-user-vaults-<?php echo (int) $user_id; ?>" style="display:none;">
+		<td colspan="4" style="background:#f6f7f7;padding:10px 14px 10px 28px;">
+			<?php foreach ( $vaults as $v ) :
+				$inspect_url = add_query_arg(
+					[ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => (int) $v->id ],
+					admin_url( 'admin.php' )
+				);
+			?>
+				<div style="padding:3px 0;font-size:13px;">
+					<a href="<?php echo esc_url( $inspect_url ); ?>"><?php echo esc_html( $v->name ); ?></a>
+					<span class="sft-badge sft-badge-<?php echo esc_attr( $v->status ); ?>" style="margin-left:8px;"><?php echo esc_html( $v->status ); ?></span>
+				</div>
+			<?php endforeach; ?>
+		</td>
+	</tr>
+	<?php
+}
+
 function sft_render_tab_users(): void {
 	global $wpdb;
 
@@ -136,9 +165,9 @@ function sft_render_tab_users(): void {
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $sft_admin_users as $u ) :
-						$vault_count = (int) $wpdb->get_var( $wpdb->prepare(
-							"SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d", $u->ID
-						) );
+						$user_vaults = $wpdb->get_results( $wpdb->prepare(
+							"SELECT id, name, status FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d ORDER BY created_at DESC", $u->ID
+						) ) ?: [];
 					?>
 						<tr>
 							<td>
@@ -146,7 +175,13 @@ function sft_render_tab_users(): void {
 								<span style="font-size:11px;color:#888;"><?php echo esc_html( $u->user_login ); ?></span>
 							</td>
 							<td style="font-size:13px;"><?php echo esc_html( $u->user_email ); ?></td>
-							<td style="font-size:13px;"><?php echo $vault_count; ?></td>
+							<td style="font-size:13px;">
+								<?php if ( $user_vaults ) : ?>
+									<a href="#" onclick="return sftToggleUserVaults(<?php echo (int) $u->ID; ?>, this);" style="text-decoration:none;"><?php echo count( $user_vaults ); ?> <span style="font-size:10px;">▸</span></a>
+								<?php else : ?>
+									0
+								<?php endif; ?>
+							</td>
 							<td>
 								<form method="post" action="<?php echo esc_url( $tab_url ); ?>" style="display:inline;">
 									<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
@@ -158,6 +193,9 @@ function sft_render_tab_users(): void {
 								</form>
 							</td>
 						</tr>
+						<?php if ( $user_vaults ) {
+							sft_render_user_vaults_subrow( $user_vaults, (int) $u->ID );
+						} ?>
 					<?php endforeach; ?>
 					</tbody>
 				</table>
@@ -179,9 +217,9 @@ function sft_render_tab_users(): void {
 					</tr></thead>
 					<tbody>
 					<?php foreach ( $vault_users as $u ) :
-						$vault_count = (int) $wpdb->get_var( $wpdb->prepare(
-							"SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d", $u->ID
-						) );
+						$user_vaults = $wpdb->get_results( $wpdb->prepare(
+							"SELECT id, name, status FROM {$wpdb->prefix}sft_vaults WHERE owner_id = %d ORDER BY created_at DESC", $u->ID
+						) ) ?: [];
 					?>
 						<tr>
 							<td>
@@ -189,7 +227,13 @@ function sft_render_tab_users(): void {
 								<span style="font-size:11px;color:#888;"><?php echo esc_html( $u->user_login ); ?></span>
 							</td>
 							<td style="font-size:13px;"><?php echo esc_html( $u->user_email ); ?></td>
-							<td style="font-size:13px;"><?php echo $vault_count; ?></td>
+							<td style="font-size:13px;">
+								<?php if ( $user_vaults ) : ?>
+									<a href="#" onclick="return sftToggleUserVaults(<?php echo (int) $u->ID; ?>, this);" style="text-decoration:none;"><?php echo count( $user_vaults ); ?> <span style="font-size:10px;">▸</span></a>
+								<?php else : ?>
+									0
+								<?php endif; ?>
+							</td>
 							<td>
 								<form method="post" action="<?php echo esc_url( $tab_url ); ?>" style="display:inline;">
 									<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
@@ -200,6 +244,9 @@ function sft_render_tab_users(): void {
 								</form>
 							</td>
 						</tr>
+						<?php if ( $user_vaults ) {
+							sft_render_user_vaults_subrow( $user_vaults, (int) $u->ID );
+						} ?>
 					<?php endforeach; ?>
 					</tbody>
 				</table>
@@ -211,6 +258,17 @@ function sft_render_tab_users(): void {
 		sftSortTable('sft-admins-table');
 		sftSortTable('sft-vault-users-table');
 	});
+
+	// Expand/collapse the vault list sub-row beneath a user row.
+	function sftToggleUserVaults(userId, link) {
+		var row = document.getElementById('sft-user-vaults-' + userId);
+		if (!row) return false;
+		var open = row.style.display !== 'none';
+		row.style.display = open ? 'none' : '';
+		var arrow = link.querySelector('span');
+		if (arrow) arrow.textContent = open ? '▸' : '▾';
+		return false;
+	}
 	</script>
 	<?php
 }
