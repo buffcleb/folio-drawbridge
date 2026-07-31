@@ -54,6 +54,8 @@ Shorter OTP validity reduces the exposure window if email is delayed or intercep
 
 ## Download Limits
 
+**What counts as one download:** one successful recipient verification, not one file. After entering their one-time code the recipient may retrieve every file in the vault — individually or as a ZIP — for the life of that download session (30 minutes). A limit of 1 on a ten-file vault therefore delivers all ten files, once.
+
 Caps how many times a single share link can be used to download files. Administrators are always exempt.
 
 | Setting | Description | Default |

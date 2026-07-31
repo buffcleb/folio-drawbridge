@@ -517,6 +517,60 @@ function sft_delete_file( int $file_id, int $actor_id ): bool {
 // ─── File serving ─────────────────────────────────────────────────────────────
 
 /**
+ * Prepares the response for a raw binary body.
+ *
+ * Discards every active output buffer first. WordPress, themes, and other
+ * plugins commonly leave a buffer open, and any notice or stray whitespace
+ * already sitting in one would be flushed ahead of the file — corrupting the
+ * archive and making the delivered byte count disagree with Content-Length,
+ * which browsers report as a generic network failure. This is easy to miss
+ * because it only shows up in contexts where the extra output occurs (often
+ * admin-ajax with a logged-in user) and not from a plain CLI request.
+ *
+ * Also disables compression: an encoded body would no longer match the
+ * Content-Length we declare.
+ */
+function sft_prepare_binary_response(): void {
+	while ( ob_get_level() > 0 ) {
+		ob_end_clean();
+	}
+
+	if ( function_exists( 'apache_setenv' ) ) {
+		@apache_setenv( 'no-gzip', '1' );
+	}
+	@ini_set( 'zlib.output_compression', 'Off' );
+}
+
+/**
+ * Builds an RFC 6266 Content-Disposition header value for a download.
+ *
+ * Two filename forms are emitted. The quoted `filename` is a plain-ASCII
+ * fallback for older clients; `filename*` carries the real UTF-8 name so
+ * accents and non-Latin scripts survive. Percent-encoding the whole name in the
+ * plain parameter (as a bare rawurlencode does) is wrong — clients treat it
+ * literally, so "Q3 Report.pdf" would save as "Q3%20Report.pdf".
+ *
+ * Quotes, backslashes, and control characters are stripped from the fallback so
+ * the header cannot be broken out of or split.
+ *
+ * @param string $filename Original filename.
+ * @return string Complete header value, e.g. attachment; filename="a.pdf"; filename*=UTF-8''a.pdf
+ */
+function sft_content_disposition( string $filename ): string {
+	// ASCII fallback: drop anything outside printable ASCII, then the characters
+	// that would terminate or inject into the quoted string.
+	$fallback = preg_replace( '/[^\x20-\x7E]/', '_', $filename );
+	$fallback = str_replace( [ '"', '\\', ';' ], '_', (string) $fallback );
+	$fallback = trim( $fallback ) ?: 'download';
+
+	return sprintf(
+		"attachment; filename=\"%s\"; filename*=UTF-8''%s",
+		$fallback,
+		rawurlencode( $filename )
+	);
+}
+
+/**
  * Decrypts and streams a file to the browser, then exits.
  *
  * Logs either FILE_DOWNLOADED (external recipient) or FILE_SERVED_ADMIN (admin).
@@ -546,12 +600,19 @@ function sft_serve_file( object $file, object $vault, ?int $share_id = null, boo
 		]
 	);
 
+	sft_prepare_binary_response();
+
 	header( 'Content-Type: ' . $file->mime_type );
-	header( 'Content-Disposition: attachment; filename="' . rawurlencode( $file->original_name ) . '"' );
+	header( 'Content-Disposition: ' . sft_content_disposition( $file->original_name ) );
 	header( 'Content-Length: ' . (int) $file->file_size );
 	header( 'Cache-Control: private, no-cache, no-store, must-revalidate' );
 	header( 'Pragma: no-cache' );
 	header( 'X-Content-Type-Options: nosniff' );
+	// The body is generated per request and range requests are not honoured, so
+	// advertise that: otherwise a browser may offer "Resume" on an interrupted
+	// download, send a Range header, receive the whole file again with a 200,
+	// and append it to what it already has — producing a corrupt file.
+	header( 'Accept-Ranges: none' );
 
 	sft_stream_decrypt_file( $path, $vault->vault_salt, $file->iv, (int) $file->file_size );
 	exit;

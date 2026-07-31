@@ -32,6 +32,38 @@ function sft_user_can_use(): bool {
 		( sft_is_admin() || current_user_can( 'use_sft_vaults' ) );
 }
 
+// ─── URL helper ───────────────────────────────────────────────────────────────
+
+/**
+ * Converts a WordPress URL into a root-relative one (path + query).
+ *
+ * Browsers resolve root-relative URLs against the scheme and host of the page
+ * currently loaded. Emitting absolute URLs from home_url()/admin_url() breaks
+ * whenever WordPress's stored scheme differs from how the visitor actually
+ * reached the site — the normal situation behind a TLS-terminating proxy, load
+ * balancer, or CDN, where is_ssl() reports false while the browser is on HTTPS.
+ * The resulting http:// request from an https:// page is mixed content, which
+ * browsers block: downloads fail and the browser falls back to naming files
+ * after the URL path ("download", "admin-ajax") instead of honouring
+ * Content-Disposition.
+ *
+ * Keeping the path intact (rather than hardcoding '/') preserves subdirectory
+ * installations.
+ *
+ * @param string $url Absolute WordPress URL.
+ * @return string Root-relative URL beginning with '/'.
+ */
+function sft_root_relative_url( string $url ): string {
+	$parts = wp_parse_url( $url );
+	$path  = $parts['path'] ?? '/';
+
+	if ( ! empty( $parts['query'] ) ) {
+		$path .= '?' . $parts['query'];
+	}
+
+	return strpos( $path, '/' ) === 0 ? $path : '/' . $path;
+}
+
 // ─── Query vars ───────────────────────────────────────────────────────────────
 
 add_filter( 'query_vars', 'sft_register_query_vars' );
@@ -95,10 +127,15 @@ function sft_render_share_page( string $token ): void {
 		return;
 	}
 
-	$files    = sft_get_vault_files( (int) $vault->id );
-	$ajax_url = esc_url( admin_url( 'admin-ajax.php' ) );
-	$nonce    = wp_create_nonce( 'sft_public_nonce' );
-	$share_id = (int) $share->id;
+	// Note: vault files are intentionally NOT loaded here. The manifest is
+	// served by sft_ajax_verify_otp() only after successful OTP verification.
+	//
+	// URLs are root-relative so they inherit the scheme and host of the page the
+	// recipient is actually on — see sft_root_relative_url().
+	$ajax_url  = sft_root_relative_url( admin_url( 'admin-ajax.php' ) );
+	$home_base = sft_root_relative_url( home_url( '/' ) );
+	$nonce     = wp_create_nonce( 'sft_public_nonce' );
+	$share_id  = (int) $share->id;
 	?>
 	<div class="sft-card">
 		<h2><?php echo esc_html( $vault->name ); ?></h2>
@@ -125,46 +162,32 @@ function sft_render_share_page( string $token ): void {
 			<button class="sft-btn sft-btn-secondary" onclick="sftBackToEmail()" style="margin-top:8px;">← Change Email</button>
 		</div>
 
-		<!-- Step 3: File list (hidden until OTP verified) -->
+		<!--
+		Step 3: File list. Deliberately empty in the server response — file names
+		and sizes are sensitive and must not reach anyone who merely holds the
+		share link. The manifest arrives in the sft_verify_otp AJAX response,
+		which only returns it once the one-time code has been verified.
+		-->
 		<div id="sft-step-files" class="sft-step" style="display:none;">
 			<p class="sft-success-note">✓ Identity verified. You can now download the shared files.</p>
-			<?php if ( $share->max_downloads > 0 ) : ?>
-				<p class="sft-note">Download limit: <?php echo (int) $share->download_count; ?> / <?php echo (int) $share->max_downloads; ?> used.</p>
-			<?php endif; ?>
-			<?php if ( ! $files ) : ?>
-				<p>This vault contains no files.</p>
-			<?php else : ?>
-				<ul class="sft-file-list">
-					<?php foreach ( $files as $file ) : ?>
-						<li>
-							<span class="sft-file-name"><?php echo esc_html( $file->original_name ); ?></span>
-							<span class="sft-file-size"><?php echo esc_html( size_format( $file->file_size ) ); ?></span>
-							<a class="sft-btn sft-btn-sm"
-							   id="sft-dl-<?php echo (int) $file->id; ?>"
-							   href="#"
-							   onclick="sftDownload(<?php echo (int) $file->id; ?>); return false;">
-								Download
-							</a>
-						</li>
-					<?php endforeach; ?>
-				</ul>
-				<?php if ( count( $files ) > 1 && class_exists( 'ZipArchive' ) ) : ?>
-					<div style="margin-top:14px;">
-						<a class="sft-btn sft-btn-secondary" href="#" onclick="sftDownloadZip(); return false;">
-							Download All as ZIP
-						</a>
-					</div>
-				<?php endif; ?>
-			<?php endif; ?>
+			<p class="sft-note" id="sft-dl-limit" style="display:none;"></p>
+			<p id="sft-no-files" style="display:none;">This vault contains no files.</p>
+			<ul class="sft-file-list" id="sft-file-list"></ul>
+			<div id="sft-zip-wrap" style="margin-top:14px;display:none;">
+				<a class="sft-btn sft-btn-secondary" href="#" onclick="sftDownloadZip(); return false;">
+					Download All as ZIP
+				</a>
+			</div>
 		</div>
 	</div>
 
 	<script>
 	var sftData = {
-		ajaxUrl: <?php echo wp_json_encode( $ajax_url ); ?>,
-		nonce:   <?php echo wp_json_encode( $nonce ); ?>,
-		shareId: <?php echo (int) $share_id; ?>,
-		dlToken: null
+		ajaxUrl:  <?php echo wp_json_encode( $ajax_url ); ?>,
+		homeBase: <?php echo wp_json_encode( $home_base ); ?>,
+		nonce:    <?php echo wp_json_encode( $nonce ); ?>,
+		shareId:  <?php echo (int) $share_id; ?>,
+		dlToken:  null
 	};
 
 	function sftRequestOtp() {
@@ -191,12 +214,58 @@ function sft_render_share_page( string $token ): void {
 			.then(function(r) {
 				if (r.success) {
 					sftData.dlToken = r.data.download_token;
+					sftRenderFiles(r.data);
 					document.getElementById('sft-step-otp').style.display   = 'none';
 					document.getElementById('sft-step-files').style.display  = '';
 				} else {
 					sftShowError('sft-otp-error', r.data || 'Verification failed.');
 				}
 			});
+	}
+
+	/**
+	 * Builds the file list from the verified-OTP response.
+	 * Uses textContent throughout so a filename can never inject markup.
+	 */
+	function sftRenderFiles(data) {
+		var ul = document.getElementById('sft-file-list');
+		ul.innerHTML = '';
+
+		var files = data.files || [];
+		document.getElementById('sft-no-files').style.display = files.length ? 'none' : '';
+
+		if (data.limit_note) {
+			var note = document.getElementById('sft-dl-limit');
+			note.textContent = data.limit_note;
+			note.style.display = '';
+		}
+
+		files.forEach(function(f) {
+			var li = document.createElement('li');
+
+			var nameEl = document.createElement('span');
+			nameEl.className = 'sft-file-name';
+			nameEl.textContent = f.name;
+
+			var sizeEl = document.createElement('span');
+			sizeEl.className = 'sft-file-size';
+			sizeEl.textContent = f.size;
+
+			var btn = document.createElement('a');
+			btn.className = 'sft-btn sft-btn-sm';
+			btn.href = '#';
+			btn.id = 'sft-dl-' + f.id;
+			btn.textContent = 'Download';
+			btn.onclick = function() { sftDownload(f.id, f.name); return false; };
+
+			li.appendChild(nameEl);
+			li.appendChild(sizeEl);
+			li.appendChild(btn);
+			ul.appendChild(li);
+		});
+
+		sftData.zipName = data.zip_name || '';
+		document.getElementById('sft-zip-wrap').style.display = data.zip_available ? '' : 'none';
 	}
 
 	function sftBackToEmail() {
@@ -206,21 +275,30 @@ function sft_render_share_page( string $token ): void {
 		sftHideError('sft-otp-error');
 	}
 
-	function sftDownload(fileId) {
-		if (!sftData.dlToken) return;
-		var url = <?php echo wp_json_encode( home_url( '/' ) ); ?> + '?sft_download=' + fileId + '&dt=' + encodeURIComponent(sftData.dlToken);
+	function sftTriggerDownload(url, fileName) {
 		var a = document.createElement('a');
-		a.href = url; a.download = ''; a.style.display = 'none';
+		a.href = url;
+		// An explicit name beats an empty download attribute, which makes the
+		// browser guess from the URL path (giving "download" / "admin-ajax").
+		if (fileName) { a.download = fileName; }
+		a.style.display = 'none';
 		document.body.appendChild(a); a.click(); document.body.removeChild(a);
+	}
+
+	function sftDownload(fileId, fileName) {
+		if (!sftData.dlToken) return;
+		sftTriggerDownload(
+			sftData.homeBase + '?sft_download=' + fileId + '&dt=' + encodeURIComponent(sftData.dlToken),
+			fileName
+		);
 	}
 
 	function sftDownloadZip() {
 		if (!sftData.dlToken) return;
-		var url = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>
-			+ '?action=sft_zip_download&dt=' + encodeURIComponent(sftData.dlToken);
-		var a = document.createElement('a');
-		a.href = url; a.download = ''; a.style.display = 'none';
-		document.body.appendChild(a); a.click(); document.body.removeChild(a);
+		sftTriggerDownload(
+			sftData.ajaxUrl + '?action=sft_zip_download&dt=' + encodeURIComponent(sftData.dlToken),
+			sftData.zipName
+		);
 	}
 
 	function sftPost(data) {
@@ -310,9 +388,17 @@ function sft_handle_file_download( int $file_id ): void {
 		wp_die( 'Download session expired or invalid. Please verify your identity again.', 403 );
 	}
 
+	// sft_share_is_live(), not sft_share_is_accessible(): once this session has
+	// claimed its download, the spent limit must not strand the recipient
+	// partway through collecting the vault.
 	$share = sft_get_share( (int) $session['share_id'] );
-	if ( ! $share || ! sft_share_is_accessible( $share ) ) {
+	if ( ! $share || ! sft_share_is_live( $share ) ) {
 		wp_die( 'This share link is no longer available.', 403 );
+	}
+
+	// Claim on the first file of the session; later files reuse that claim.
+	if ( ! sft_session_claim_once( $token, $session ) ) {
+		wp_die( 'This share link has reached its download limit.', 403 );
 	}
 
 	$file = sft_get_file( $file_id );
@@ -325,7 +411,6 @@ function sft_handle_file_download( int $file_id ): void {
 		wp_die( 'Vault not found.', 404 );
 	}
 
-	sft_increment_download_count( (int) $share->id );
 	sft_send_download_notification( (int) $share->id, $file_id, sft_get_client_ip() );
 	sft_serve_file( $file, $vault, (int) $share->id, false );
 }
@@ -354,8 +439,9 @@ function sft_handle_zip_download(): void {
 		wp_die( 'Download session expired or invalid. Please verify your identity again.', 403 );
 	}
 
+	// See sft_handle_file_download(): the limit was claimed at session issue.
 	$share = sft_get_share( (int) $session['share_id'] );
-	if ( ! $share || ! sft_share_is_accessible( $share ) ) {
+	if ( ! $share || ! sft_share_is_live( $share ) ) {
 		wp_die( 'This share link is no longer available.', 403 );
 	}
 
@@ -367,6 +453,12 @@ function sft_handle_zip_download(): void {
 	$files = sft_get_vault_files( (int) $vault->id );
 	if ( empty( $files ) ) {
 		wp_die( 'This vault has no files to download.', 404 );
+	}
+
+	// Claim before the expensive decrypt-and-archive work, so a refused request
+	// costs no CPU. Reuses this session's existing claim if it already has one.
+	if ( ! sft_session_claim_once( $token, $session ) ) {
+		wp_die( 'This share link has reached its download limit.', 403 );
 	}
 
 	// Build ZIP in a temp file.
@@ -415,16 +507,26 @@ function sft_handle_zip_download(): void {
 		wp_die( 'No files could be decrypted.', 500 );
 	}
 
-	// Log and send.
-	sft_increment_download_count( (int) $share->id );
+	// Log and send. The download slot was already claimed above.
 	sft_log( SFT_EVT_FILE_DOWNLOADED, (int) $vault->id, (int) $share->id,
 		[ 'zip' => true, 'file_count' => $added ] );
 
 	$safe_name = sanitize_file_name( $vault->name ) ?: 'vault';
+
+	sft_prepare_binary_response();
+
+	// Read the size after the archive is finalised and the stat cache is cleared,
+	// so Content-Length can never disagree with the bytes actually sent.
+	clearstatcache( true, $tmp_zip );
+	$zip_bytes = (int) filesize( $tmp_zip );
+
 	header( 'Content-Type: application/zip' );
-	header( 'Content-Disposition: attachment; filename="' . $safe_name . '.zip"' );
-	header( 'Content-Length: ' . filesize( $tmp_zip ) );
+	header( 'Content-Disposition: ' . sft_content_disposition( $safe_name . '.zip' ) );
+	header( 'Content-Length: ' . $zip_bytes );
 	header( 'Cache-Control: no-store' );
+	header( 'X-Content-Type-Options: nosniff' );
+	// Regenerated per request and no range support — see sft_serve_file().
+	header( 'Accept-Ranges: none' );
 
 	readfile( $tmp_zip );
 	@unlink( $tmp_zip );
@@ -478,9 +580,45 @@ function sft_ajax_verify_otp(): void {
 		wp_send_json_error( $result->get_error_message() );
 	}
 
+	// No claim here: the limit is spent on the first file actually downloaded,
+	// so verifying and then downloading nothing costs the recipient nothing.
 	$dl_token = sft_create_download_session( $share_id );
 
-	wp_send_json_success( [ 'download_token' => $dl_token ] );
+	// The file manifest is returned only here, after the one-time code has been
+	// verified — it is deliberately absent from the share page's HTML so that
+	// holding the link alone never reveals what the vault contains.
+	$share = sft_get_share( $share_id );
+	$files = sft_get_vault_files( (int) $share->vault_id );
+
+	$manifest = array_map(
+		static function ( $file ) {
+			return [
+				'id'   => (int) $file->id,
+				'name' => $file->original_name,
+				'size' => size_format( $file->file_size ),
+			];
+		},
+		$files
+	);
+
+	$limit_note = '';
+	if ( (int) $share->max_downloads > 0 ) {
+		$limit_note = sprintf(
+			'Download limit: %d / %d used.',
+			(int) $share->download_count,
+			(int) $share->max_downloads
+		);
+	}
+
+	$vault = sft_get_vault( (int) $share->vault_id );
+
+	wp_send_json_success( [
+		'download_token' => $dl_token,
+		'files'          => $manifest,
+		'zip_available'  => count( $manifest ) > 1 && class_exists( 'ZipArchive' ),
+		'zip_name'       => ( $vault ? sanitize_file_name( $vault->name ) : '' ) . '.zip',
+		'limit_note'     => $limit_note,
+	] );
 }
 
 // ─── Shortcode: [sft_my_vaults] ───────────────────────────────────────────────
@@ -499,7 +637,9 @@ function sft_render_my_vaults_shortcode(): string {
 	$user_id  = get_current_user_id();
 	$vaults   = sft_get_user_vaults( $user_id );
 	$nonce    = wp_create_nonce( 'sft_user_nonce' );
-	$ajax_url = admin_url( 'admin-ajax.php' );
+	// Root-relative so chunked uploads are not blocked as mixed content when the
+	// site is reached over HTTPS but WordPress has an http:// URL stored.
+	$ajax_url = sft_root_relative_url( admin_url( 'admin-ajax.php' ) );
 
 	// Share form global limits (admins are exempt).
 	$sc_is_admin        = sft_is_admin();

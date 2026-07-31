@@ -530,6 +530,9 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 
 // ─── Download session ─────────────────────────────────────────────────────────
 
+/** How long a verified recipient may keep downloading, in seconds. */
+define( 'SFT_DL_SESSION_TTL', 1800 ); // 30 minutes
+
 /**
  * Issues a short-lived download session token (WordPress transient, 30 min).
  *
@@ -540,11 +543,46 @@ function sft_create_download_session( int $share_id ): string {
 
 	set_transient(
 		'sft_dl_' . hash( 'sha256', $token ),
-		[ 'share_id' => $share_id, 'created' => time() ],
-		1800 // 30 minutes
+		[ 'share_id' => $share_id, 'created' => time(), 'claimed' => false ],
+		SFT_DL_SESSION_TTL
 	);
 
 	return $token;
+}
+
+/**
+ * Ensures this session has claimed exactly one download against the share limit.
+ *
+ * The claim happens on the first file actually retrieved, not at verification.
+ * Counting at verification punished recipients who proved their identity and
+ * then downloaded nothing — a closed tab or an expired session meant the next
+ * attempt authenticated successfully and was refused at a limit they had never
+ * used. Claiming on first download also keeps the whole vault available for one
+ * count, since later files in the same session find the claim already made.
+ *
+ * @param string $token   Raw session token from the request.
+ * @param array  $session Session data from sft_get_download_session().
+ * @return bool True when the download may proceed.
+ */
+function sft_session_claim_once( string $token, array $session ): bool {
+	if ( ! empty( $session['claimed'] ) ) {
+		return true;
+	}
+
+	if ( ! sft_claim_share_access( (int) $session['share_id'] ) ) {
+		return false;
+	}
+
+	$session['claimed'] = true;
+
+	// Preserve the session's original lifetime rather than extending it on every
+	// first download.
+	$elapsed   = time() - (int) ( $session['created'] ?? time() );
+	$remaining = max( 60, SFT_DL_SESSION_TTL - $elapsed );
+
+	set_transient( 'sft_dl_' . hash( 'sha256', $token ), $session, $remaining );
+
+	return true;
 }
 
 /**
@@ -559,21 +597,42 @@ function sft_get_download_session( string $token ): ?array {
 }
 
 /**
- * Increments the download counter for a share and returns the updated count.
+ * Atomically claims one access against a share's download limit.
+ *
+ * One "download" is one verified access, not one file. A recipient who passes
+ * OTP verification claims a single slot and may then retrieve every file in the
+ * vault — individually or as a ZIP — for the life of that download session.
+ * Counting per file would mean a three-file vault shared with a limit of one
+ * handed over a single file and then locked the recipient out, while the ZIP
+ * button delivered all three for the same cost.
+ *
+ * The conditions are evaluated inside the UPDATE so the database serialises
+ * concurrent claims: checking first and incrementing after would let parallel
+ * verifications all pass before any of them wrote.
+ *
+ * Callers must treat a false return as "refuse access".
+ *
+ * @param int $share_id Share to claim an access against.
+ * @return bool True when a slot was claimed.
  */
-function sft_increment_download_count( int $share_id ): int {
+function sft_claim_share_access( int $share_id ): bool {
 	global $wpdb;
 
-	$wpdb->query(
+	$claimed = $wpdb->query(
 		$wpdb->prepare(
-			"UPDATE {$wpdb->prefix}sft_shares SET download_count = download_count + 1 WHERE id = %d",
+			"UPDATE {$wpdb->prefix}sft_shares
+			    SET download_count = download_count + 1,
+			        last_accessed  = %s
+			  WHERE id = %d
+			    AND status IN ('pending','active')
+			    AND ( expires_at IS NULL OR expires_at > UTC_TIMESTAMP() )
+			    AND ( max_downloads = 0 OR download_count < max_downloads )",
+			current_time( 'mysql', true ),
 			$share_id
 		)
 	);
 
-	return (int) $wpdb->get_var(
-		$wpdb->prepare( "SELECT download_count FROM {$wpdb->prefix}sft_shares WHERE id = %d", $share_id )
-	);
+	return $claimed === 1;
 }
 
 /**
@@ -648,14 +707,80 @@ function sft_enforce_share_limits(): int {
 }
 
 /**
- * Returns true if the share is accessible (active, not expired, not over download limit).
+ * Returns the state to show for a share, which is not always its stored status.
+ *
+ * A share stays 'active' in the database after it passes its expiry date or
+ * exhausts its download limit — the hourly cron flips expiry eventually, and
+ * nothing flips the limit at all. Showing the raw status therefore tells an
+ * owner a link is "active" when recipients are being turned away, and makes
+ * actions like Resend look reasonable when they cannot help.
+ *
+ * @param object $share Share row.
+ * @return string One of: pending | active | limit_reached | expired | revoked
  */
-function sft_share_is_accessible( object $share ): bool {
+function sft_share_display_state( object $share ): string {
+	if ( $share->status === 'revoked' ) {
+		return 'revoked';
+	}
+
+	if ( $share->status === 'expired'
+		|| ( $share->expires_at && strtotime( $share->expires_at ) < time() ) ) {
+		return 'expired';
+	}
+
+	if ( (int) $share->max_downloads > 0
+		&& (int) $share->download_count >= (int) $share->max_downloads ) {
+		return 'limit_reached';
+	}
+
+	return $share->status;
+}
+
+/**
+ * Human-readable label for a state from sft_share_display_state().
+ */
+function sft_share_state_label( string $state ): string {
+	$labels = [
+		'pending'       => 'Pending',
+		'active'        => 'Active',
+		'limit_reached' => 'Limit reached',
+		'expired'       => 'Expired',
+		'revoked'       => 'Revoked',
+	];
+
+	return $labels[ $state ] ?? ucfirst( $state );
+}
+
+/**
+ * Returns true if the share itself is still valid — not revoked, not expired.
+ *
+ * Deliberately ignores the download limit. Once a recipient has verified and
+ * claimed an access, they are entitled to finish collecting the vault's files
+ * within that session even though the limit is now spent; the file and ZIP
+ * endpoints use this check for exactly that reason.
+ */
+function sft_share_is_live( object $share ): bool {
 	if ( ! in_array( $share->status, [ 'pending', 'active' ], true ) ) {
 		return false;
 	}
 
 	if ( $share->expires_at && strtotime( $share->expires_at ) < time() ) {
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Returns true if a *new* access may be granted: the share is live and its
+ * download limit has not been reached.
+ *
+ * Use this to decide whether someone may start a session (share page, OTP
+ * request, OTP verification). Use sft_share_is_live() for requests that carry
+ * an already-issued download session.
+ */
+function sft_share_is_accessible( object $share ): bool {
+	if ( ! sft_share_is_live( $share ) ) {
 		return false;
 	}
 

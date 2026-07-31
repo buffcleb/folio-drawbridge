@@ -99,6 +99,33 @@ function sft_log(
 	sft_siem_write( $event_type, $vault_id, $share_id, $actor_id, $ip, $details, $created_at );
 }
 
+// ─── CSV safety ───────────────────────────────────────────────────────────────
+
+/**
+ * Neutralises spreadsheet formula injection in an exported CSV cell.
+ *
+ * Excel, LibreOffice, and Google Sheets evaluate any cell whose first character
+ * is = + - @ (or a tab/CR) as a formula, which can reach out to the network or
+ * trigger DDE execution. Audit rows contain attacker-influenced text — a
+ * recipient's typed email is recorded on OTP mismatch, and filenames come from
+ * uploads — so exports must force every cell to be read as literal text.
+ *
+ * Prefixing with an apostrophe is the standard neutralisation: spreadsheet apps
+ * strip it on display, so the value still reads normally.
+ *
+ * @param mixed $value Raw cell value.
+ * @return string Value safe to write into a CSV.
+ */
+function sft_csv_safe( $value ): string {
+	$value = (string) $value;
+
+	if ( $value !== '' && strpbrk( $value[0], "=+-@\t\r" ) !== false ) {
+		return "'" . $value;
+	}
+
+	return $value;
+}
+
 // ─── SIEM file logger ─────────────────────────────────────────────────────────
 
 /**
@@ -141,7 +168,7 @@ function sft_siem_write(
 			$header = stream_get_contents( $fh );
 			rewind( $fh );
 		}
-		fputcsv( $fh, [
+		fputcsv( $fh, array_map( 'sft_csv_safe', [
 			$created_at,
 			$event_type,
 			$vault_id  ?? '',
@@ -150,7 +177,7 @@ function sft_siem_write(
 			$ip,
 			$details ? wp_json_encode( $details ) : '',
 			get_site_url(),
-		] );
+		] ) );
 		rewind( $fh );
 		$line = stream_get_contents( $fh );
 		fclose( $fh );
