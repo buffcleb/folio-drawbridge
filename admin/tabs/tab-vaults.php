@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
 
 function sft_render_tab_vaults(): void {
-	$vault_id = (int) ( $_GET['vault_id'] ?? 0 );
+	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? 0 ) );
 
 	if ( $vault_id > 0 ) {
 		sft_render_vault_inspector( $vault_id );
@@ -38,7 +38,7 @@ function sft_render_vault_list(): void {
 	$f_orderby = sanitize_key( wp_unslash( $_GET['orderby'] ?? 'created_at' ) );
 	$f_order   = strtoupper( sanitize_key( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$per_page  = 25;
-	$paged     = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+	$paged     = max( 1, absint( wp_unslash( $_GET['paged'] ?? 1 ) ) );
 
 	$query_args = [
 		'status'   => $f_status,

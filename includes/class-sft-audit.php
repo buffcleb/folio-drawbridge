@@ -23,6 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- appends audit events to the operator-configured SIEM log file; WP_Filesystem does not support append-mode streaming.
+
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
 
 // ─── Event type constants ─────────────────────────────────────────────────────
@@ -266,7 +268,7 @@ function sft_count_audit_logs( array $args = [] ): int {
 	return (int) ( $values
 		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
 		: $wpdb->get_var( $sql ) );
-	// phpcs:enable
+	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 }
 
 /**

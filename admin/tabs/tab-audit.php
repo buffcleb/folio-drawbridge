@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
 // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
+// phpcs:disable WordPress.WP.AlternativeFunctions -- CSV export streams rows to php://output; WP_Filesystem has no output-stream support.
 
 // ─── CSV export (must run before any output — hooked via admin_init in admin class) ──
 add_action( 'admin_init', 'sft_maybe_export_audit_csv' );
@@ -65,7 +66,7 @@ function sft_maybe_export_audit_csv(): void {
 function sft_render_tab_audit(): void {
 	$args        = sft_audit_filter_args_from_get();
 	$per_page    = 25;
-	$paged       = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+	$paged       = max( 1, absint( wp_unslash( $_GET['paged'] ?? 1 ) ) );
 	$a_orderby   = sanitize_key( wp_unslash( $_GET['orderby'] ?? 'created_at' ) );
 	$a_order     = strtoupper( sanitize_key( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$args['per_page'] = $per_page;
@@ -78,7 +79,7 @@ function sft_render_tab_audit(): void {
 	$total_pages = (int) ceil( $total / $per_page );
 
 	$f_event    = sanitize_key( wp_unslash( $_GET['f_event'] ?? '' ) );
-	$f_vault_id = (int) ( $_GET['f_vault_id'] ?? 0 );
+	$f_vault_id = absint( wp_unslash( $_GET['f_vault_id'] ?? 0 ) );
 	$f_from     = sanitize_text_field( wp_unslash( $_GET['f_from'] ?? '' ) );
 	$f_to       = sanitize_text_field( wp_unslash( $_GET['f_to'] ?? '' ) );
 	$f_details  = sanitize_text_field( wp_unslash( $_GET['f_details'] ?? '' ) );
@@ -225,7 +226,7 @@ function sft_audit_filter_args_from_get(): array {
 
 	return [
 		'event_type'     => sanitize_key( wp_unslash( $_GET['f_event'] ?? '' ) ),
-		'vault_id'       => (int) ( $_GET['f_vault_id'] ?? 0 ) ?: null,
+		'vault_id'       => absint( wp_unslash( $_GET['f_vault_id'] ?? 0 ) ) ?: null,
 		'date_from'      => $f_from ? $f_from . ' 00:00:00' : '',
 		'date_to'        => $f_to   ? $f_to   . ' 23:59:59' : '',
 		'details_search' => $f_details,

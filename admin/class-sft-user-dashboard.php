@@ -50,7 +50,7 @@ function sft_register_user_dashboard_menu(): void {
 
 function sft_register_user_dashboard_help_tabs(): void {
 	$screen   = get_current_screen();
-	$vault_id = (int) ( $_GET['vault_id'] ?? 0 );
+	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view selector.
 
 	if ( $vault_id > 0 ) {
 		// Vault detail view.
@@ -188,7 +188,7 @@ function sft_enqueue_user_dashboard_assets( string $hook ): void {
 }
 
 function sft_user_dashboard_inline_js(): void {
-	if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== 'sft-my-vaults' ) {
+	if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== 'sft-my-vaults' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page gate for inline JS.
 		return;
 	}
 	?>
@@ -265,7 +265,7 @@ function sft_handle_user_dashboard_post(): void {
 	check_admin_referer( 'sft_user_dashboard_action', 'sft_user_nonce' );
 
 	$user_id  = get_current_user_id();
-	$vault_id = (int) ( $_GET['vault_id'] ?? $_POST['vault_id'] ?? 0 );
+	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? $_POST['vault_id'] ?? 0 ) );
 
 	// Helper: verify the vault belongs to this user (or user is admin).
 	$assert_vault_owner = function( int $vid ) use ( $user_id ): object {
@@ -345,7 +345,7 @@ function sft_handle_user_dashboard_post(): void {
 
 	// ── Delete file ───────────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_ud_delete_file'] ) ) {
-		$file_id = (int) ( $_POST['file_id'] ?? 0 );
+		$file_id = absint( wp_unslash( $_POST['file_id'] ?? 0 ) );
 		$file    = sft_get_file( $file_id );
 		if ( $file ) {
 			$assert_vault_owner( (int) $file->vault_id );
@@ -361,7 +361,7 @@ function sft_handle_user_dashboard_post(): void {
 		$assert_vault_owner( $vault_id );
 
 		$email        = sanitize_email( wp_unslash( $_POST['share_email'] ?? '' ) );
-		$max_dl       = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
+		$max_dl       = max( 0, absint( wp_unslash( $_POST['share_max_downloads'] ?? 0 ) ) );
 		$expires       = sanitize_text_field( wp_unslash( $_POST['share_expires'] ?? '' ) );
 		$expires_mysql = '';
 		if ( $expires ) {
@@ -384,7 +384,7 @@ function sft_handle_user_dashboard_post(): void {
 
 	// ── Revoke share ──────────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_ud_revoke_share'] ) ) {
-		$share_id = (int) ( $_POST['share_id'] ?? 0 );
+		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		$share    = sft_get_share( $share_id );
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
@@ -397,7 +397,7 @@ function sft_handle_user_dashboard_post(): void {
 
 	// ── Resend share invite ───────────────────────────────────────────────────
 	if ( isset( $_POST['sft_ud_resend_share'] ) ) {
-		$share_id = (int) ( $_POST['share_id'] ?? 0 );
+		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		$share    = sft_get_share( $share_id );
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
@@ -414,11 +414,11 @@ function sft_handle_user_dashboard_post(): void {
 
 	// ── Edit share (download limit + expiry) ──────────────────────────────────
 	if ( isset( $_POST['sft_ud_edit_share'] ) ) {
-		$share_id = (int) ( $_POST['share_id'] ?? 0 );
+		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		$share    = sft_get_share( $share_id );
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
-			$max_dl  = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
+			$max_dl  = max( 0, absint( wp_unslash( $_POST['share_max_downloads'] ?? 0 ) ) );
 			$expires = sanitize_text_field( wp_unslash( $_POST['share_new_expires'] ?? '' ) );
 			$expires_mysql = '';
 			if ( $expires ) {
@@ -493,7 +493,7 @@ function sft_user_dashboard_page(): void {
 		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
-	$vault_id = (int) ( $_GET['vault_id'] ?? 0 );
+	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view selector.
 
 	echo '<div class="wrap"><h1>My Vaults</h1>';
 

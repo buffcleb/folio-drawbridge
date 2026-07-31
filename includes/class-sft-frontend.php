@@ -299,7 +299,7 @@ function sft_share_page_error( string $title, string $message ): void {
 // ─── File download endpoint ───────────────────────────────────────────────────
 
 function sft_handle_file_download( int $file_id ): void {
-	$token = sanitize_text_field( wp_unslash( $_GET['dt'] ?? '' ) );
+	$token = sanitize_text_field( wp_unslash( $_GET['dt'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public recipients authenticate via the one-time download-session token itself; nonces require a logged-in session.
 
 	if ( ! $token ) {
 		wp_die( 'Invalid download request.', 403 );
@@ -344,7 +344,7 @@ function sft_handle_zip_download(): void {
 		wp_die( 'ZIP download is not available on this server (ZipArchive extension required).', 500 );
 	}
 
-	$token = sanitize_text_field( wp_unslash( $_GET['dt'] ?? '' ) );
+	$token = sanitize_text_field( wp_unslash( $_GET['dt'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public recipients authenticate via the one-time download-session token itself; nonces require a logged-in session.
 	if ( ! $token ) {
 		wp_die( 'Invalid download request.', 403 );
 	}
@@ -440,7 +440,7 @@ add_action( 'wp_ajax_sft_request_otp',        'sft_ajax_request_otp' );
 function sft_ajax_request_otp(): void {
 	check_ajax_referer( 'sft_public_nonce', '_wpnonce' );
 
-	$share_id = (int) ( $_POST['share_id'] ?? 0 );
+	$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 	$email    = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 
 	if ( ! $share_id || ! $email ) {
@@ -464,7 +464,7 @@ add_action( 'wp_ajax_sft_verify_otp',        'sft_ajax_verify_otp' );
 function sft_ajax_verify_otp(): void {
 	check_ajax_referer( 'sft_public_nonce', '_wpnonce' );
 
-	$share_id = (int) ( $_POST['share_id'] ?? 0 );
+	$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 	$email    = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 	$otp      = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['otp'] ?? '' ) ) );
 
@@ -920,12 +920,12 @@ function sft_ajax_upload_chunk_handler(): void {
 		wp_send_json_error( 'Access denied.' );
 	}
 
-	$vault_id      = (int) ( $_POST['vault_id']     ?? 0 );
+	$vault_id      = absint( wp_unslash( $_POST['vault_id']     ?? 0 ) );
 	$upload_id     = preg_replace( '/[^a-f0-9]/', '', $_POST['upload_id'] ?? '' );
-	$chunk_index   = (int) ( $_POST['chunk_index']  ?? 0 );
-	$total_chunks  = (int) ( $_POST['total_chunks'] ?? 0 );
+	$chunk_index   = absint( wp_unslash( $_POST['chunk_index']  ?? 0 ) );
+	$total_chunks  = absint( wp_unslash( $_POST['total_chunks'] ?? 0 ) );
 	$original_name = sanitize_file_name( $_POST['file_name']   ?? '' );
-	$total_size    = (int) ( $_POST['total_size']   ?? 0 );
+	$total_size    = absint( wp_unslash( $_POST['total_size']   ?? 0 ) );
 
 	if ( ! $upload_id || strlen( $upload_id ) < 8 || ! $original_name
 		|| $total_chunks < 1 || $chunk_index < 0 || $chunk_index >= $total_chunks ) {
@@ -948,7 +948,7 @@ function sft_ajax_upload_chunk_handler(): void {
 		wp_send_json_error( "File exceeds the {$max_mb} MB limit." );
 	}
 
-	if ( empty( $_FILES['chunk'] ) || (int) $_FILES['chunk']['error'] !== UPLOAD_ERR_OK ) {
+	if ( empty( $_FILES['chunk'] ) || (int) $_FILES['chunk']['error'] !== UPLOAD_ERR_OK ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- PHP-populated upload metadata; error code is strictly compared.
 		wp_send_json_error( 'Chunk upload failed — check server upload limits.' );
 	}
 
@@ -963,7 +963,7 @@ function sft_ajax_upload_chunk_handler(): void {
 	// larger file, which must land in the chunk staging area under its sequence
 	// number — not in the media library. is_uploaded_file() guarantees the source
 	// really came through this HTTP POST before we move it.
-	$chunk_tmp = $_FILES['chunk']['tmp_name'];
+	$chunk_tmp = $_FILES['chunk']['tmp_name']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- PHP-populated temp path, verified by is_uploaded_file() below.
 	if ( ! is_uploaded_file( $chunk_tmp )
 		|| ! move_uploaded_file( $chunk_tmp, $upload_dir . $chunk_index . '.part' ) // phpcs:ignore Generic.PHP.ForbiddenFunctions.Found -- chunked upload staging; see comment above.
 	) {
@@ -1080,7 +1080,7 @@ function sft_ajax_upload_file_handler(): void {
 	}
 
 	$user_id  = get_current_user_id();
-	$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
+	$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 	$vault    = sft_get_vault( $vault_id );
 
 	if ( ! $vault || (int) $vault->owner_id !== $user_id ) {
@@ -1111,9 +1111,9 @@ function sft_ajax_create_share_handler(): void {
 	}
 
 	$user_id       = get_current_user_id();
-	$vault_id      = (int) ( $_POST['vault_id'] ?? 0 );
+	$vault_id      = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 	$email         = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
-	$max_downloads = max( 0, (int) ( $_POST['max_downloads'] ?? 0 ) );
+	$max_downloads = max( 0, absint( wp_unslash( $_POST['max_downloads'] ?? 0 ) ) );
 	$expires_at    = sanitize_text_field( wp_unslash( $_POST['expires_at'] ?? '' ) );
 
 	$vault = sft_get_vault( $vault_id );
@@ -1148,7 +1148,7 @@ function sft_ajax_delete_file_handler(): void {
 	}
 
 	$user_id  = get_current_user_id();
-	$file_id  = (int) ( $_POST['file_id'] ?? 0 );
+	$file_id  = absint( wp_unslash( $_POST['file_id'] ?? 0 ) );
 	$file     = sft_get_file( $file_id );
 
 	if ( ! $file ) {
@@ -1172,7 +1172,7 @@ function sft_ajax_delete_vault_handler(): void {
 	}
 
 	$user_id  = get_current_user_id();
-	$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
+	$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 	$vault    = sft_get_vault( $vault_id );
 
 	if ( ! $vault || ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) ) {
@@ -1191,7 +1191,7 @@ function sft_ajax_revoke_share_handler(): void {
 	}
 
 	$user_id  = get_current_user_id();
-	$share_id = (int) ( $_POST['share_id'] ?? 0 );
+	$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 	$share    = sft_get_share( $share_id );
 
 	if ( ! $share ) {

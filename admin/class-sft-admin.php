@@ -41,44 +41,44 @@ function sft_handle_admin_post(): void {
 
 	check_admin_referer( 'sft_admin_action', 'sft_nonce' );
 
-	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) );
+	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector for rendering.
 
 	// ── Settings save ────────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_save_settings'] ) ) {
 		// Two-factor.
-		$otp_ttl          = max( 5, min( 60, (int) ( $_POST['sft_otp_ttl_minutes'] ?? 15 ) ) );
-		$otp_max_attempts = max( 1, min( 20, (int) ( $_POST['sft_otp_max_attempts'] ?? 5 ) ) );
-		$otp_cooldown     = max( 0, min( 300, (int) ( $_POST['sft_otp_cooldown_seconds'] ?? 60 ) ) );
+		$otp_ttl          = max( 5, min( 60, absint( wp_unslash( $_POST['sft_otp_ttl_minutes'] ?? 15 ) ) ) );
+		$otp_max_attempts = max( 1, min( 20, absint( wp_unslash( $_POST['sft_otp_max_attempts'] ?? 5 ) ) ) );
+		$otp_cooldown     = max( 0, min( 300, absint( wp_unslash( $_POST['sft_otp_cooldown_seconds'] ?? 60 ) ) ) );
 
 		// Download limits.
 		$allow_unlimited_downloads = isset( $_POST['sft_allow_unlimited_downloads'] ) ? '1' : '0';
-		$default_max_downloads     = max( 0, (int) ( $_POST['sft_default_max_downloads'] ?? 0 ) );
-		$max_download_limit        = max( 0, (int) ( $_POST['sft_max_download_limit'] ?? 0 ) );
+		$default_max_downloads     = max( 0, absint( wp_unslash( $_POST['sft_default_max_downloads'] ?? 0 ) ) );
+		$max_download_limit        = max( 0, absint( wp_unslash( $_POST['sft_max_download_limit'] ?? 0 ) ) );
 
 		// Link expiration.
 		$allow_no_expiry     = isset( $_POST['sft_allow_no_expiry'] ) ? '1' : '0';
-		$default_expiry_days = max( 0, (int) ( $_POST['sft_default_expiry_days'] ?? 0 ) );
-		$max_expiry_days     = max( 0, (int) ( $_POST['sft_max_expiry_days'] ?? 0 ) );
+		$default_expiry_days = max( 0, absint( wp_unslash( $_POST['sft_default_expiry_days'] ?? 0 ) ) );
+		$max_expiry_days     = max( 0, absint( wp_unslash( $_POST['sft_max_expiry_days'] ?? 0 ) ) );
 
 		// File uploads.
-		$max_file_mb = max( 1, (int) ( $_POST['sft_max_file_mb'] ?? 50 ) );
+		$max_file_mb = max( 1, absint( wp_unslash( $_POST['sft_max_file_mb'] ?? 50 ) ) );
 
 		// Audit log retention.
 		$prune_enabled       = isset( $_POST['sft_audit_prune_enabled'] ) ? '1' : '0';
-		$prune_days          = max( 30, (int) ( $_POST['sft_audit_prune_days'] ?? 365 ) );
+		$prune_days          = max( 30, absint( wp_unslash( $_POST['sft_audit_prune_days'] ?? 365 ) ) );
 
 		// Data & privacy.
 		$delete_on_uninstall = isset( $_POST['sft_delete_on_uninstall'] ) ? '1' : '0';
 
 		// Notifications.
 		$notify_on_download  = isset( $_POST['sft_notify_on_download'] ) ? '1' : '0';
-		$expiry_warning_days = max( 0, (int) ( $_POST['sft_expiry_warning_days'] ?? 0 ) );
+		$expiry_warning_days = max( 0, absint( wp_unslash( $_POST['sft_expiry_warning_days'] ?? 0 ) ) );
 
 		// File type restrictions.
 		$allowed_extensions = sanitize_text_field( wp_unslash( $_POST['sft_allowed_file_extensions'] ?? '' ) );
 
 		// Storage quotas.
-		$storage_quota_mb = max( 0, (int) ( $_POST['sft_storage_quota_mb'] ?? 0 ) );
+		$storage_quota_mb = max( 0, absint( wp_unslash( $_POST['sft_storage_quota_mb'] ?? 0 ) ) );
 
 		// Email templates.
 		$email_template_types = [ 'invite', 'otp', 'download_notification', 'expiry_warning' ];
@@ -167,7 +167,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Manual audit prune ───────────────────────────────────────────────────
 	if ( isset( $_POST['sft_manual_prune'] ) ) {
-		$days    = max( 1, (int) ( $_POST['sft_prune_days_manual'] ?? 365 ) );
+		$days    = max( 1, absint( wp_unslash( $_POST['sft_prune_days_manual'] ?? 365 ) ) );
 		$deleted = sft_prune_audit_log( $days );
 		sft_set_notice( sprintf( 'Pruned <strong>%d</strong> audit log entr%s older than %d days.', $deleted, $deleted === 1 ? 'y' : 'ies', $days ), 'success' );
 		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) );
@@ -176,20 +176,20 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: revoke share ──────────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_revoke_share'] ) ) {
-		$share_id = (int) ( $_POST['share_id'] ?? 0 );
+		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		if ( $share_id ) {
 			sft_revoke_share( $share_id, get_current_user_id() );
 			sft_set_notice( 'Share revoked.', 'success' );
 		}
-		$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
+		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: resend share invite ────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_resend_share'] ) ) {
-		$share_id = (int) ( $_POST['share_id'] ?? 0 );
-		$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
+		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
+		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		if ( $share_id ) {
 			$result = sft_resend_share_invite( $share_id, get_current_user_id() );
 			if ( is_wp_error( $result ) ) {
@@ -204,7 +204,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: change vault status ───────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_vault_status'] ) ) {
-		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
+		$vault_id   = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$new_status = sanitize_key( wp_unslash( $_POST['new_status'] ?? '' ) );
 		if ( $vault_id && $new_status ) {
 			sft_update_vault_status( $vault_id, $new_status, get_current_user_id() );
@@ -216,7 +216,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: delete vault ───────────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_delete_vault'] ) ) {
-		$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
+		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		if ( $vault_id ) {
 			sft_delete_vault( $vault_id );
 			sft_set_notice( 'Vault permanently deleted.', 'success' );
@@ -227,7 +227,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: transfer vault ownership ──────────────────────────────────────
 	if ( isset( $_POST['sft_admin_transfer_vault'] ) ) {
-		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
+		$vault_id   = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$new_login  = sanitize_text_field( wp_unslash( $_POST['new_owner_login'] ?? '' ) );
 		$new_user   = $new_login ? ( get_user_by( 'login', $new_login ) ?: get_user_by( 'email', $new_login ) ) : null;
 		$redirect   = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) );
@@ -249,8 +249,8 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: delete file ────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_delete_file'] ) ) {
-		$file_id  = (int) ( $_POST['file_id'] ?? 0 );
-		$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
+		$file_id  = absint( wp_unslash( $_POST['file_id'] ?? 0 ) );
+		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		if ( $file_id ) {
 			sft_delete_file( $file_id, get_current_user_id() );
 			sft_set_notice( 'File deleted.', 'success' );
@@ -261,7 +261,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Grant vault (User) access ────────────────────────────────────────────
 	if ( isset( $_POST['sft_grant_user'] ) ) {
-		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
 			$user->add_cap( 'use_sft_vaults', true );
@@ -276,7 +276,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Grant SFT Admin access ───────────────────────────────────────────────
 	if ( isset( $_POST['sft_grant_sft_admin'] ) ) {
-		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
 			$user->add_cap( 'sft_admin', true );
@@ -292,7 +292,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Promote vault user to SFT Admin ─────────────────────────────────────
 	if ( isset( $_POST['sft_promote_sft_admin'] ) ) {
-		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
 			$user->add_cap( 'sft_admin', true );
@@ -307,7 +307,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Demote SFT Admin to vault user ──────────────────────────────────────
 	if ( isset( $_POST['sft_demote_sft_admin'] ) ) {
-		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
 			$user->remove_cap( 'sft_admin' );
@@ -322,7 +322,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Revoke all SFT access from a user ────────────────────────────────────
 	if ( isset( $_POST['sft_revoke_user'] ) ) {
-		$user_id = (int) ( $_POST['sft_user_id'] ?? 0 );
+		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
 			$user->remove_cap( 'use_sft_vaults' );
@@ -338,7 +338,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: edit vault expiry ─────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_edit_vault_expiry'] ) ) {
-		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
+		$vault_id   = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$raw_date   = sanitize_text_field( wp_unslash( $_POST['vault_new_expires'] ?? '' ) );
 		$expires_at = $raw_date ? $raw_date . ' 23:59:59' : '';
 		if ( $vault_id ) {
@@ -351,7 +351,7 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: edit vault name/description ──────────────────────────────────
 	if ( isset( $_POST['sft_admin_edit_vault_meta'] ) ) {
-		$vault_id    = (int) ( $_POST['vault_id'] ?? 0 );
+		$vault_id    = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$name        = sanitize_text_field( wp_unslash( $_POST['vault_new_name'] ?? '' ) );
 		$description = sanitize_textarea_field( wp_unslash( $_POST['vault_new_description'] ?? '' ) );
 		if ( $vault_id ) {
@@ -368,9 +368,9 @@ function sft_handle_admin_post(): void {
 
 	// ── Admin: edit share ────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_edit_share'] ) ) {
-		$share_id      = (int) ( $_POST['share_id'] ?? 0 );
-		$vault_id      = (int) ( $_POST['vault_id'] ?? 0 );
-		$max_downloads = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
+		$share_id      = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
+		$vault_id      = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
+		$max_downloads = max( 0, absint( wp_unslash( $_POST['share_max_downloads'] ?? 0 ) ) );
 		$raw_date      = sanitize_text_field( wp_unslash( $_POST['share_new_expires'] ?? '' ) );
 		$expires_at    = $raw_date ? $raw_date . ' 23:59:59' : '';
 		if ( $share_id ) {
@@ -407,7 +407,7 @@ function sft_register_admin_menu(): void {
 
 function sft_register_admin_help_tabs(): void {
 	$screen = get_current_screen();
-	$tab    = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) );
+	$tab    = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector for contextual help.
 
 	switch ( $tab ) {
 
@@ -832,7 +832,7 @@ function sft_ajax_admin_download(): void {
 
 	check_ajax_referer( 'sft_admin_download', '_wpnonce' );
 
-	$file_id = (int) ( $_GET['file_id'] ?? 0 );
+	$file_id = absint( wp_unslash( $_GET['file_id'] ?? 0 ) );
 	$file    = sft_get_file( $file_id );
 
 	if ( ! $file ) {
@@ -974,7 +974,7 @@ function sft_admin_page(): void {
 		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
-	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) );
+	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector for rendering.
 
 	sft_show_notice();
 

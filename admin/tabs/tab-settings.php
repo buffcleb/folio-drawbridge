@@ -439,7 +439,7 @@ function sft_render_tab_settings(): void {
 				<tr>
 					<th>Directory writable</th>
 					<td>
-						<?php if ( is_writable( SFT_VAULT_DIR ) ) : ?>
+						<?php if ( is_writable( SFT_VAULT_DIR ) ) : // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- read-only status display of the storage directory. ?>
 							<span style="color:#0a3622;">✓ Writable</span>
 						<?php else : ?>
 							<span style="color:#d63638;">✗ Not writable — uploads will fail.</span>
