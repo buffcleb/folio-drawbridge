@@ -73,7 +73,7 @@ function sft_register_user_dashboard_help_tabs(): void {
 				'<li>The recipient opens the link and enters their email address to receive a one-time verification code.</li>' .
 				'<li>They enter the code to confirm their identity and gain access to download the files.</li>' .
 				'</ol>' .
-				'<p><strong>Download Limit</strong> — set to 0 for unlimited, or enter a number to cap how many times the vault can be downloaded through this share.</p>' .
+				'<p><strong>Download Limit</strong> — set to 0 for unlimited, or enter a number to cap how many times the recipient may collect this vault.</p>' .'<p>One download is counted per successful verification, not per file: after entering their code the recipient can retrieve every file in the vault — individually or as a ZIP — for the life of that session. A limit of 1 therefore means they may collect the vault once.</p>' .
 				'<p><strong>Link Expires</strong> — optional date and time after which the share link stops working. Leave blank for no expiry (if your administrator permits it).</p>' .
 				'<p>To remove a recipient\'s access at any time, click <strong>Revoke</strong>. Revocation is immediate.</p>',
 		] );

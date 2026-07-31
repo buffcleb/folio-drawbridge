@@ -60,7 +60,7 @@ No. Recipients verify their identity with their email address and a one-time cod
 
 = Can I limit how many times a share link is used? =
 
-Yes. Each share can have a download limit and an expiry date, and site-wide defaults and maximums can be configured under Settings.
+Yes. Each share can have a download limit and an expiry date, and site-wide defaults and maximums can be configured under Settings. One download means one verified access: the recipient may retrieve every file in the vault during that session, so a limit of 1 lets them collect it once.
 
 == Screenshots ==
 

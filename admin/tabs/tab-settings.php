@@ -96,6 +96,11 @@ function sft_render_tab_settings(): void {
 		<!-- ── Download Limits ──────────────────────────────────────────────── -->
 		<div class="sft-card">
 			<h2 style="margin-top:0;">Download Limits</h2>
+			<p style="font-size:13px;color:#555;margin-top:-6px;margin-bottom:16px;">
+				One download is counted per successful recipient verification, not per file — after entering
+				their code a recipient may retrieve every file in the vault, individually or as a ZIP, for the
+				life of that session. A limit of 1 lets them collect the vault once.
+			</p>
 			<table class="form-table" style="margin-top:0;">
 				<tr>
 					<th>Allow Unlimited Downloads</th>

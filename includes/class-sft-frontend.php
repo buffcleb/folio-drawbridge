@@ -388,8 +388,11 @@ function sft_handle_file_download( int $file_id ): void {
 		wp_die( 'Download session expired or invalid. Please verify your identity again.', 403 );
 	}
 
+	// sft_share_is_live(), not sft_share_is_accessible(): the download limit was
+	// already claimed when this session was issued, so a spent limit must not
+	// block the rest of the files this recipient is entitled to.
 	$share = sft_get_share( (int) $session['share_id'] );
-	if ( ! $share || ! sft_share_is_accessible( $share ) ) {
+	if ( ! $share || ! sft_share_is_live( $share ) ) {
 		wp_die( 'This share link is no longer available.', 403 );
 	}
 
@@ -401,12 +404,6 @@ function sft_handle_file_download( int $file_id ): void {
 	$vault = sft_get_vault( (int) $share->vault_id );
 	if ( ! $vault ) {
 		wp_die( 'Vault not found.', 404 );
-	}
-
-	// Claim the slot before serving. This re-checks status, expiry, and the
-	// download limit atomically, so parallel requests cannot exceed the cap.
-	if ( ! sft_claim_download_slot( (int) $share->id ) ) {
-		wp_die( 'This share link has reached its download limit or is no longer available.', 403 );
 	}
 
 	sft_send_download_notification( (int) $share->id, $file_id, sft_get_client_ip() );
@@ -437,8 +434,9 @@ function sft_handle_zip_download(): void {
 		wp_die( 'Download session expired or invalid. Please verify your identity again.', 403 );
 	}
 
+	// See sft_handle_file_download(): the limit was claimed at session issue.
 	$share = sft_get_share( (int) $session['share_id'] );
-	if ( ! $share || ! sft_share_is_accessible( $share ) ) {
+	if ( ! $share || ! sft_share_is_live( $share ) ) {
 		wp_die( 'This share link is no longer available.', 403 );
 	}
 
@@ -450,14 +448,6 @@ function sft_handle_zip_download(): void {
 	$files = sft_get_vault_files( (int) $vault->id );
 	if ( empty( $files ) ) {
 		wp_die( 'This vault has no files to download.', 404 );
-	}
-
-	// Claim the download slot before the expensive decrypt-and-archive work, so
-	// parallel requests cannot each pass an accessibility check and blow past
-	// the limit. Claiming early also avoids burning CPU on a request that would
-	// be refused at the end.
-	if ( ! sft_claim_download_slot( (int) $share->id ) ) {
-		wp_die( 'This share link has reached its download limit or is no longer available.', 403 );
 	}
 
 	// Build ZIP in a temp file.
@@ -577,6 +567,13 @@ function sft_ajax_verify_otp(): void {
 
 	if ( is_wp_error( $result ) ) {
 		wp_send_json_error( $result->get_error_message() );
+	}
+
+	// One verified access = one download against the share's limit, claimed
+	// atomically here. Every file in the vault is then retrievable for the life
+	// of the session this issues.
+	if ( ! sft_claim_share_access( $share_id ) ) {
+		wp_send_json_error( 'This share link has reached its download limit.' );
 	}
 
 	$dl_token = sft_create_download_session( $share_id );

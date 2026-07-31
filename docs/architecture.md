@@ -160,7 +160,7 @@ Request arrives at download handler (admin or frontend)
 → sft_serve_file():
     vault_key = HMAC-SHA256(master_key, vault_salt)
     read .enc in 1MB blocks → openssl_decrypt → output to browser
-→ Increment download_count on share
+→ (download_count was already claimed when the session was issued)
 → sft_send_download_notification(): email vault owner if notifications enabled
 → Log SFT_EVT_FILE_DOWNLOADED in sft_audit
 ```
@@ -198,12 +198,14 @@ Recipient clicks "Download All as ZIP"
 4. Recipient submits OTP
    → sft_verify_otp_for_share(): verify hash, enforce attempt limit,
      mark OTP used, promote share to 'active'
+   → sft_claim_share_access(): atomically claim one download against
+     max_downloads — one verified access, not one per file
    → sft_create_download_session(): 32-byte token stored as transient
 
 5. Recipient downloads files
    → Validate download session token
    → Decrypt and stream each file
-   → Increment download_count, check against max_downloads
+   → Every file in the vault is retrievable for the life of the session
 ```
 
 ---
@@ -255,6 +257,10 @@ Runs hourly via `sft_lifecycle_tasks()`:
 | `sft_send_otp(int)` | class-sft-share.php | Generate, hash, store, and email OTP (with cooldown check) |
 | `sft_verify_otp_for_share(int, string)` | class-sft-share.php | Validate OTP, enforce attempt limit |
 | `sft_log(string, ...)` | class-sft-audit.php | Insert audit row, optionally write to SIEM file |
+| `sft_claim_share_access(int)` | class-sft-share.php | Atomically claim one download against a share's limit |
+| `sft_share_is_live(object)` | class-sft-share.php | Share not revoked/expired (ignores download limit) |
+| `sft_share_is_accessible(object)` | class-sft-share.php | Live **and** limit not reached — gates new accesses |
+| `sft_share_display_state(object)` | class-sft-share.php | Real state for display: pending/active/limit_reached/expired/revoked |
 | `sft_enforce_share_limits()` | class-sft-share.php | Retroactively apply global limits to existing shares |
 | `sft_get_email_template(string)` | class-sft-notifications.php | Return subject + body from options or built-in defaults |
 | `sft_render_email_template(string, array)` | class-sft-notifications.php | Replace `{token}` placeholders in a template string |

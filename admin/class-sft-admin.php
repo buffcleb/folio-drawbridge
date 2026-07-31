@@ -554,7 +554,7 @@ function sft_register_admin_help_tabs(): void {
 				'id'      => 'sft-settings-dl-limits',
 				'title'   => 'Download Limits',
 				'content' =>
-					'<p>These settings cap how many times a single share link can be used to download files. All limits apply only to non-administrator users — administrators are always exempt.</p>' .
+					'<p>These settings cap how many times a single share link can be used to collect a vault. All limits apply only to non-administrator users — administrators are always exempt.</p>' .'<p><strong>What counts as one download:</strong> one successful verification. After entering their one-time code the recipient may retrieve every file in the vault — individually or as a ZIP — for the life of that download session. Files are not counted separately, so a limit of 1 on a ten-file vault still delivers all ten files, once.</p>' .
 					'<ul>' .
 					'<li><strong>Allow Unlimited Downloads</strong> — when unchecked, every share must be given a finite download count. Users cannot leave this field blank.</li>' .
 					'<li><strong>Default Download Limit</strong> — the value pre-filled in the share creation form. Set to 0 for no pre-fill (useful when unlimited is allowed and most shares are intended to be unlimited).</li>' .

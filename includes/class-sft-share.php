@@ -559,21 +559,25 @@ function sft_get_download_session( string $token ): ?array {
 }
 
 /**
- * Atomically claims one download slot for a share.
+ * Atomically claims one access against a share's download limit.
  *
- * The accessibility conditions (status, expiry, download limit) are evaluated
- * inside the UPDATE itself, so the database serialises concurrent requests and
- * only as many succeed as there are slots remaining. Checking with
- * sft_share_is_accessible() and then incrementing separately would let parallel
- * requests all pass the check before any of them wrote — letting a share
- * capped at one download be retrieved many times.
+ * One "download" is one verified access, not one file. A recipient who passes
+ * OTP verification claims a single slot and may then retrieve every file in the
+ * vault — individually or as a ZIP — for the life of that download session.
+ * Counting per file would mean a three-file vault shared with a limit of one
+ * handed over a single file and then locked the recipient out, while the ZIP
+ * button delivered all three for the same cost.
  *
- * Callers must treat a false return as "refuse the download".
+ * The conditions are evaluated inside the UPDATE so the database serialises
+ * concurrent claims: checking first and incrementing after would let parallel
+ * verifications all pass before any of them wrote.
  *
- * @param int $share_id Share to claim a download against.
- * @return bool True when a slot was claimed and the file may be served.
+ * Callers must treat a false return as "refuse access".
+ *
+ * @param int $share_id Share to claim an access against.
+ * @return bool True when a slot was claimed.
  */
-function sft_claim_download_slot( int $share_id ): bool {
+function sft_claim_share_access( int $share_id ): bool {
 	global $wpdb;
 
 	$claimed = $wpdb->query(
@@ -591,27 +595,6 @@ function sft_claim_download_slot( int $share_id ): bool {
 	);
 
 	return $claimed === 1;
-}
-
-/**
- * Increments the download counter for a share and returns the updated count.
- *
- * Prefer sft_claim_download_slot() on any path that serves a file — this
- * function does not enforce the download limit.
- */
-function sft_increment_download_count( int $share_id ): int {
-	global $wpdb;
-
-	$wpdb->query(
-		$wpdb->prepare(
-			"UPDATE {$wpdb->prefix}sft_shares SET download_count = download_count + 1 WHERE id = %d",
-			$share_id
-		)
-	);
-
-	return (int) $wpdb->get_var(
-		$wpdb->prepare( "SELECT download_count FROM {$wpdb->prefix}sft_shares WHERE id = %d", $share_id )
-	);
 }
 
 /**
@@ -731,14 +714,35 @@ function sft_share_state_label( string $state ): string {
 }
 
 /**
- * Returns true if the share is accessible (active, not expired, not over download limit).
+ * Returns true if the share itself is still valid — not revoked, not expired.
+ *
+ * Deliberately ignores the download limit. Once a recipient has verified and
+ * claimed an access, they are entitled to finish collecting the vault's files
+ * within that session even though the limit is now spent; the file and ZIP
+ * endpoints use this check for exactly that reason.
  */
-function sft_share_is_accessible( object $share ): bool {
+function sft_share_is_live( object $share ): bool {
 	if ( ! in_array( $share->status, [ 'pending', 'active' ], true ) ) {
 		return false;
 	}
 
 	if ( $share->expires_at && strtotime( $share->expires_at ) < time() ) {
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Returns true if a *new* access may be granted: the share is live and its
+ * download limit has not been reached.
+ *
+ * Use this to decide whether someone may start a session (share page, OTP
+ * request, OTP verification). Use sft_share_is_live() for requests that carry
+ * an already-issued download session.
+ */
+function sft_share_is_accessible( object $share ): bool {
+	if ( ! sft_share_is_live( $share ) ) {
 		return false;
 	}
 

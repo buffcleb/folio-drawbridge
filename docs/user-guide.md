@@ -95,7 +95,7 @@ In the **Shares** section, use the **Share this vault** form to invite a recipie
 | Field | Description |
 |---|---|
 | Recipient Email | The email address of the person you want to share with |
-| Download Limit | Maximum number of times the vault can be downloaded (0 = unlimited, if your admin permits) |
+| Download Limit | Maximum number of times the recipient may collect this vault (0 = unlimited, if your admin permits). One verification counts as one download and lets them retrieve every file in the vault, so a limit of 1 means they can collect it once. |
 | Link Expires | Date after which the share link stops working (leave blank for no expiry, if permitted) |
 
 Click **Send Invite**. The recipient receives an email with a unique link.
