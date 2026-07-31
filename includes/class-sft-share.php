@@ -681,58 +681,65 @@ function sft_enforce_share_limits(): int {
 	$default_dl      = (int) get_option( 'sft_default_max_downloads', 10 );
 	$default_expiry  = (int) get_option( 'sft_default_expiry_days', 30 );
 
-	$shares = $wpdb->get_results(
-		"SELECT s.*, v.owner_id FROM {$wpdb->prefix}sft_shares s
-		 JOIN {$wpdb->prefix}sft_vaults v ON v.id = s.vault_id
-		 WHERE s.status IN ('pending','active')"
-	);
+	// Admins are exempt. Capabilities live in usermeta and cannot be expressed in
+	// SQL, so resolve the exempt owners once and exclude them by ID — rather than
+	// pulling every share into PHP and issuing an UPDATE per row, which cost one
+	// query per changed share.
+	$exempt = array_map( 'intval', array_merge(
+		get_users( [ 'capability' => 'manage_options', 'fields' => 'ID' ] ),
+		get_users( [ 'capability' => 'sft_admin', 'fields' => 'ID' ] )
+	) );
+	$exempt = array_values( array_unique( $exempt ) );
+
+	// Values are integers cast above; an empty list needs a never-matching id.
+	$not_exempt = 'v.owner_id NOT IN (' . ( $exempt ? implode( ',', $exempt ) : '0' ) . ')';
+
+	$shares = $wpdb->prefix . 'sft_shares';
+	$vaults = $wpdb->prefix . 'sft_vaults';
+	$base   = "UPDATE {$shares} s JOIN {$vaults} v ON v.id = s.vault_id
+	              SET %%s
+	            WHERE s.status IN ('pending','active') AND {$not_exempt}";
 
 	$updated = 0;
 
-	foreach ( $shares as $share ) {
-		if ( sft_is_admin( (int) $share->owner_id ) ) {
-			continue;
-		}
+	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
-		$new_max_dl  = (int) $share->max_downloads;
-		$new_expires = $share->expires_at;
-		$changed     = false;
-
-		// Enforce download ceiling.
-		if ( ! $allow_unlimited && $new_max_dl === 0 ) {
-			$new_max_dl = $default_dl;
-			$changed    = true;
-		}
-		if ( $ceiling > 0 && ( $new_max_dl === 0 || $new_max_dl > $ceiling ) ) {
-			$new_max_dl = $ceiling;
-			$changed    = true;
-		}
-
-		// Enforce expiry.
-		$max_ts = $max_days > 0 ? strtotime( "+{$max_days} days" ) : 0;
-		if ( ! $allow_no_expiry && ! $new_expires ) {
-			$new_expires = gmdate( 'Y-m-d H:i:s', strtotime( "+{$default_expiry} days" ) );
-			$changed     = true;
-		}
-		if ( $max_ts > 0 && $new_expires && strtotime( $new_expires ) > $max_ts ) {
-			$new_expires = gmdate( 'Y-m-d H:i:s', $max_ts );
-			$changed     = true;
-		}
-
-		if ( $changed ) {
-			$wpdb->update(
-				"{$wpdb->prefix}sft_shares",
-				[
-					'max_downloads' => $new_max_dl,
-					'expires_at'    => $new_expires ?: null,
-				],
-				[ 'id' => (int) $share->id ],
-				[ '%d', '%s' ],
-				[ '%d' ]
-			);
-			++$updated;
-		}
+	// Unlimited no longer permitted: give limitless shares the default.
+	if ( ! $allow_unlimited && $default_dl > 0 ) {
+		$updated += (int) $wpdb->query( $wpdb->prepare(
+			str_replace( '%%s', 's.max_downloads = %d', $base ) . ' AND s.max_downloads = 0',
+			$default_dl
+		) );
 	}
+
+	// Apply the ceiling to anything above it (and to unlimited shares).
+	if ( $ceiling > 0 ) {
+		$updated += (int) $wpdb->query( $wpdb->prepare(
+			str_replace( '%%s', 's.max_downloads = %d', $base ) . ' AND ( s.max_downloads = 0 OR s.max_downloads > %d )',
+			$ceiling,
+			$ceiling
+		) );
+	}
+
+	// No-expiry no longer permitted: give open-ended shares the default window.
+	if ( ! $allow_no_expiry && $default_expiry > 0 ) {
+		$updated += (int) $wpdb->query( $wpdb->prepare(
+			str_replace( '%%s', 's.expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)', $base ) . ' AND s.expires_at IS NULL',
+			$default_expiry
+		) );
+	}
+
+	// Pull anything expiring beyond the maximum window back to it.
+	if ( $max_days > 0 ) {
+		$updated += (int) $wpdb->query( $wpdb->prepare(
+			str_replace( '%%s', 's.expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)', $base )
+				. ' AND s.expires_at IS NOT NULL AND s.expires_at > DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)',
+			$max_days,
+			$max_days
+		) );
+	}
+
+	// phpcs:enable
 
 	return $updated;
 }

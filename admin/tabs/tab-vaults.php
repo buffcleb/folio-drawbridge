@@ -103,9 +103,12 @@ function sft_render_vault_list(): void {
 				<tbody>
 				<?php if ( ! $vaults ) : ?>
 					<tr><td colspan="8" style="text-align:center;color:#888;padding:24px;">No vaults found.</td></tr>
-				<?php else : foreach ( $vaults as $v ) :
-					$file_count  = sft_get_vault_file_count( (int) $v->id );
-					$share_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_shares WHERE vault_id=%d", $v->id ) );
+				<?php else :
+					// Two grouped queries for the whole page instead of two per row.
+					$vault_counts = sft_get_vault_counts( wp_list_pluck( $vaults, 'id' ) );
+					foreach ( $vaults as $v ) :
+					$file_count  = $vault_counts[ (int) $v->id ]['files'];
+					$share_count = $vault_counts[ (int) $v->id ]['shares'];
 					$inspect_url = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => (int) $v->id ], admin_url( 'admin.php' ) );
 				?>
 					<tr>
@@ -281,7 +284,9 @@ function sft_render_vault_inspector( int $vault_id ): void {
 						<th>Filename</th><th>Size</th><th>Uploaded By</th><th>Date</th><th data-nosort>Actions</th>
 					</tr></thead>
 					<tbody>
-					<?php foreach ( $files as $f ) :
+					<?php
+					cache_users( array_filter( wp_list_pluck( $files, 'uploaded_by' ) ) );
+					foreach ( $files as $f ) :
 						$uploader = get_userdata( (int) $f->uploaded_by );
 					?>
 						<tr>
@@ -318,7 +323,9 @@ function sft_render_vault_inspector( int $vault_id ): void {
 						<th>Expires</th><th>Last Access</th><th data-nosort>Actions</th>
 					</tr></thead>
 					<tbody>
-					<?php foreach ( $shares as $s ) :
+					<?php
+					cache_users( array_filter( wp_list_pluck( $shares, 'created_by' ) ) );
+					foreach ( $shares as $s ) :
 						$creator  = get_userdata( (int) $s->created_by );
 						$dl_info  = $s->max_downloads > 0
 							? (int) $s->download_count . ' / ' . (int) $s->max_downloads

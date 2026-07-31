@@ -23,7 +23,7 @@ The Dashboard gives a real-time overview of the entire plugin.
 | OTP Failures (30d) | Failed two-factor attempts in the last 30 days — elevated counts may indicate a brute-force attempt |
 | Audit Events | Total rows in the audit log |
 
-The **7-Day Download Activity** sparkline charts daily download volume. Use it to spot unusual spikes.
+Dashboard totals are cached for up to five minutes, so a figure may lag a very recent change by that much. The **7-Day Download Activity** sparkline charts daily download volume. Use it to spot unusual spikes.
 
 The **Recent Activity** table lists the 10 most recent audit events site-wide.
 

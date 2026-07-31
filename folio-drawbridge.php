@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── Plugin constants ─────────────────────────────────────────────────────────
 define( 'SFT_VERSION',    '1.2.0' );
-define( 'SFT_DB_VERSION', '1.2.0' );
+define( 'SFT_DB_VERSION', '1.2.1' ); // bump to apply the sft_audit composite index
 define( 'SFT_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'SFT_BASENAME',   plugin_basename( __FILE__ ) );
 define( 'SFT_VAULT_DIR',  WP_CONTENT_DIR . '/uploads/sft-vaults/' );

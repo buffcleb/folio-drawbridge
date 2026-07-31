@@ -16,19 +16,63 @@ function sft_render_tab_dashboard(): void {
 	global $wpdb;
 
 	// ── Counts ───────────────────────────────────────────────────────────────
-	$total_vaults   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults" );
-	$active_vaults  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults WHERE status='active'" );
-	$total_files    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_files" );
-	$total_storage  = (int) $wpdb->get_var( "SELECT COALESCE(SUM(file_size),0) FROM {$wpdb->prefix}sft_files" );
-	$active_shares  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_shares WHERE status IN('pending','active')" );
-	$total_shares   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_shares" );
-	$total_dl       = (int) $wpdb->get_var( "SELECT COALESCE(SUM(download_count),0) FROM {$wpdb->prefix}sft_shares" );
-	$total_audit    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit" );
-	$otp_failures   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit WHERE event_type='otp_failed'" );
+	// Cached as one block: on a 250k-row audit table the aggregates below cost
+	// ~45 ms per render, most of it the unfiltered COUNT(*). Dashboard figures
+	// do not need to be second-accurate, so a short transient removes that cost
+	// from every page load while staying fresh enough to be useful.
+	$stats = get_transient( 'sft_dashboard_stats' );
+
+	if ( false === $stats ) {
+		$p = $wpdb->prefix;
+
+		$file_totals  = $wpdb->get_row( "SELECT COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b FROM {$p}sft_files" );
+		$share_totals = $wpdb->get_row(
+			"SELECT COUNT(*) AS total,
+			        SUM(status IN('pending','active')) AS active,
+			        COALESCE(SUM(download_count),0) AS downloads
+			   FROM {$p}sft_shares"
+		);
+		$vault_totals = $wpdb->get_row(
+			"SELECT COUNT(*) AS total, SUM(status='active') AS active FROM {$p}sft_vaults"
+		);
+
+		$stats = [
+			'total_vaults'  => (int) $vault_totals->total,
+			'active_vaults' => (int) $vault_totals->active,
+			'total_files'   => (int) $file_totals->c,
+			'total_storage' => (int) $file_totals->b,
+			'total_shares'  => (int) $share_totals->total,
+			'active_shares' => (int) $share_totals->active,
+			'total_dl'      => (int) $share_totals->downloads,
+			'total_audit'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}sft_audit" ),
+			// Bounded to 30 days to match what the Dashboard help tab describes,
+			// and so the event_created index can serve it instead of counting
+			// every otp_failed row ever recorded.
+			'otp_failures'  => (int) $wpdb->get_var(
+				"SELECT COUNT(*) FROM {$p}sft_audit
+				  WHERE event_type='otp_failed'
+				    AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)"
+			),
+		];
+
+		set_transient( 'sft_dashboard_stats', $stats, 5 * MINUTE_IN_SECONDS );
+	}
+
+	$total_vaults  = $stats['total_vaults'];
+	$active_vaults = $stats['active_vaults'];
+	$total_files   = $stats['total_files'];
+	$total_storage = $stats['total_storage'];
+	$total_shares  = $stats['total_shares'];
+	$active_shares = $stats['active_shares'];
+	$total_dl      = $stats['total_dl'];
+	$total_audit   = $stats['total_audit'];
+	$otp_failures  = $stats['otp_failures'];
 
 	// ── Recent audit events (last 10) ─────────────────────────────────────────
+	// Ordered by id: append-only table, so identical to created_at order but
+	// served straight from the clustered index.
 	$recent = $wpdb->get_results(
-		"SELECT * FROM {$wpdb->prefix}sft_audit ORDER BY created_at DESC LIMIT 10"
+		"SELECT * FROM {$wpdb->prefix}sft_audit ORDER BY id DESC LIMIT 10"
 	) ?: [];
 
 	// ── 7-day download activity ───────────────────────────────────────────────
@@ -50,6 +94,7 @@ function sft_render_tab_dashboard(): void {
 			$spark[ $r['day'] ] = (int) $r['cnt'];
 		}
 	}
+
 	?>
 
 	<!-- ── Stat cards ──────────────────────────────────────────────────────── -->
@@ -72,7 +117,7 @@ function sft_render_tab_dashboard(): void {
 		</div>
 		<div class="sft-stat" style="border-top:3px solid <?php echo $otp_failures > 0 ? '#d63638' : '#ccd0d4'; ?>;">
 			<div class="sft-stat-num" style="color:<?php echo $otp_failures > 0 ? '#d63638' : '#444'; ?>;"><?php echo number_format( $otp_failures ); ?></div>
-			<div class="sft-stat-label">OTP Failures</div>
+			<div class="sft-stat-label">OTP Failures <span style="color:#aaa;">(30 days)</span></div>
 		</div>
 		<div class="sft-stat" style="border-top:3px solid #6c757d;">
 			<div class="sft-stat-num" style="color:#444;"><?php echo number_format( $total_audit ); ?></div>
@@ -121,7 +166,11 @@ function sft_render_tab_dashboard(): void {
 						<th>Event</th><th>Vault</th><th>Actor</th><th>Time</th>
 					</tr></thead>
 					<tbody>
-					<?php foreach ( $recent as $row ) :
+						<?php
+					// Prime the user cache in one query so the per-row get_userdata()
+					// calls below are served from memory.
+					cache_users( array_filter( wp_list_pluck( $recent, 'actor_id' ) ) );
+					foreach ( $recent as $row ) :
 						$actor = $row->actor_id ? get_userdata( (int) $row->actor_id ) : null;
 						$vault_label = $row->vault_id ? '#' . (int) $row->vault_id : '—';
 					?>

@@ -59,11 +59,12 @@ function sft_render_user_vault_list(): void {
 					<th data-nosort></th>
 				</tr></thead>
 				<tbody>
-				<?php foreach ( $vaults as $vault ) :
-					$file_count  = sft_get_vault_file_count( (int) $vault->id );
-					$share_count = (int) $wpdb->get_var( $wpdb->prepare(
-						"SELECT COUNT(*) FROM {$wpdb->prefix}sft_shares WHERE vault_id = %d", $vault->id
-					) );
+				<?php
+				// Two grouped queries for the whole page instead of two per row.
+				$vault_counts = sft_get_vault_counts( wp_list_pluck( $vaults, 'id' ) );
+				foreach ( $vaults as $vault ) :
+					$file_count  = $vault_counts[ (int) $vault->id ]['files'];
+					$share_count = $vault_counts[ (int) $vault->id ]['shares'];
 					$detail_url  = add_query_arg( [ 'page' => 'sft-my-vaults', 'vault_id' => (int) $vault->id ], admin_url( 'admin.php' ) );
 				?>
 					<tr>
