@@ -23,17 +23,16 @@ function sft_render_tab_dashboard(): void {
 	$stats = get_transient( 'sft_dashboard_stats' );
 
 	if ( false === $stats ) {
-		$p = $wpdb->prefix;
 
-		$file_totals  = $wpdb->get_row( "SELECT COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b FROM {$p}sft_files" );
+		$file_totals  = $wpdb->get_row( "SELECT COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b FROM {$wpdb->prefix}sft_files" );
 		$share_totals = $wpdb->get_row(
 			"SELECT COUNT(*) AS total,
 			        SUM(status IN('pending','active')) AS active,
 			        COALESCE(SUM(download_count),0) AS downloads
-			   FROM {$p}sft_shares"
+			   FROM {$wpdb->prefix}sft_shares"
 		);
 		$vault_totals = $wpdb->get_row(
-			"SELECT COUNT(*) AS total, SUM(status='active') AS active FROM {$p}sft_vaults"
+			"SELECT COUNT(*) AS total, SUM(status='active') AS active FROM {$wpdb->prefix}sft_vaults"
 		);
 
 		$stats = [
@@ -44,12 +43,12 @@ function sft_render_tab_dashboard(): void {
 			'total_shares'  => (int) $share_totals->total,
 			'active_shares' => (int) $share_totals->active,
 			'total_dl'      => (int) $share_totals->downloads,
-			'total_audit'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}sft_audit" ),
+			'total_audit'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit" ),
 			// Bounded to 30 days to match what the Dashboard help tab describes,
 			// and so the event_created index can serve it instead of counting
 			// every otp_failed row ever recorded.
 			'otp_failures'  => (int) $wpdb->get_var(
-				"SELECT COUNT(*) FROM {$p}sft_audit
+				"SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit
 				  WHERE event_type='otp_failed'
 				    AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)"
 			),

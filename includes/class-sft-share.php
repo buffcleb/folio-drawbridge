@@ -696,26 +696,30 @@ function sft_enforce_share_limits(): int {
 
 	$shares = $wpdb->prefix . 'sft_shares';
 	$vaults = $wpdb->prefix . 'sft_vaults';
-	$base   = "UPDATE {$shares} s JOIN {$vaults} v ON v.id = s.vault_id
-	              SET %%s
-	            WHERE s.status IN ('pending','active') AND {$not_exempt}";
+
+	// Every statement below targets the same rows: non-admin-owned shares that
+	// are still pending or active. Written out in full rather than assembled
+	// from a template — a placeholder-bearing string built by str_replace() is
+	// hard to read and hard to verify against $wpdb->prepare()'s argument list.
+	$join  = "JOIN {$vaults} v ON v.id = s.vault_id";
+	$where = "WHERE s.status IN ('pending','active') AND {$not_exempt}";
 
 	$updated = 0;
 
-	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $join/$where are built from $wpdb->prefix and an int-only ID list; all values are prepared.
 
 	// Unlimited no longer permitted: give limitless shares the default.
 	if ( ! $allow_unlimited && $default_dl > 0 ) {
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			str_replace( '%%s', 's.max_downloads = %d', $base ) . ' AND s.max_downloads = 0',
+			"UPDATE {$shares} s {$join} SET s.max_downloads = %d {$where} AND s.max_downloads = 0",
 			$default_dl
 		) );
 	}
 
-	// Apply the ceiling to anything above it (and to unlimited shares).
+	// Apply the ceiling to anything above it, and to unlimited shares.
 	if ( $ceiling > 0 ) {
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			str_replace( '%%s', 's.max_downloads = %d', $base ) . ' AND ( s.max_downloads = 0 OR s.max_downloads > %d )',
+			"UPDATE {$shares} s {$join} SET s.max_downloads = %d {$where} AND ( s.max_downloads = 0 OR s.max_downloads > %d )",
 			$ceiling,
 			$ceiling
 		) );
@@ -724,7 +728,9 @@ function sft_enforce_share_limits(): int {
 	// No-expiry no longer permitted: give open-ended shares the default window.
 	if ( ! $allow_no_expiry && $default_expiry > 0 ) {
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			str_replace( '%%s', 's.expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)', $base ) . ' AND s.expires_at IS NULL',
+			"UPDATE {$shares} s {$join}
+			    SET s.expires_at = DATE_ADD( UTC_TIMESTAMP(), INTERVAL %d DAY )
+			  {$where} AND s.expires_at IS NULL",
 			$default_expiry
 		) );
 	}
@@ -732,14 +738,16 @@ function sft_enforce_share_limits(): int {
 	// Pull anything expiring beyond the maximum window back to it.
 	if ( $max_days > 0 ) {
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			str_replace( '%%s', 's.expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)', $base )
-				. ' AND s.expires_at IS NOT NULL AND s.expires_at > DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d DAY)',
+			"UPDATE {$shares} s {$join}
+			    SET s.expires_at = DATE_ADD( UTC_TIMESTAMP(), INTERVAL %d DAY )
+			  {$where} AND s.expires_at IS NOT NULL
+			    AND s.expires_at > DATE_ADD( UTC_TIMESTAMP(), INTERVAL %d DAY )",
 			$max_days,
 			$max_days
 		) );
 	}
 
-	// phpcs:enable
+	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	return $updated;
 }
