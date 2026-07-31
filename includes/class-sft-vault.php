@@ -538,7 +538,7 @@ function sft_prepare_binary_response(): void {
 	if ( function_exists( 'apache_setenv' ) ) {
 		@apache_setenv( 'no-gzip', '1' );
 	}
-	@ini_set( 'zlib.output_compression', 'Off' );
+	@ini_set( 'zlib.output_compression', 'Off' ); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged, WordPress.PHP.NoSilencedErrors.Discouraged -- must not compress a body whose Content-Length we already declared.
 }
 
 /**
@@ -771,11 +771,12 @@ function sft_get_vaults_by_owner( array $owner_ids ): array {
 	// Safe interpolation: every element was cast to int above.
 	$in = implode( ',', $owner_ids );
 
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	$rows = $wpdb->get_results(
 		"SELECT id, name, status, owner_id FROM {$wpdb->prefix}sft_vaults
 		  WHERE owner_id IN ({$in}) ORDER BY created_at DESC"
 	) ?: [];
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	foreach ( $rows as $row ) {
 		$by_owner[ (int) $row->owner_id ][] = $row;
@@ -850,10 +851,11 @@ function sft_group_rows_by_vault( array $vault_ids, string $table, string $order
 	// the two wrappers as literals and never carry request data.
 	$in = implode( ',', $vault_ids );
 
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	$rows = $wpdb->get_results(
 		"SELECT * FROM {$wpdb->prefix}{$table} WHERE vault_id IN ({$in}) ORDER BY {$order_by} DESC"
 	) ?: [];
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	foreach ( $rows as $row ) {
 		$grouped[ (int) $row->vault_id ][] = $row;
@@ -902,7 +904,7 @@ function sft_get_vault_counts( array $vault_ids ): array {
 		"SELECT vault_id, COUNT(*) AS c
 		   FROM {$wpdb->prefix}sft_shares WHERE vault_id IN ({$in}) GROUP BY vault_id"
 	) ?: [];
-	// phpcs:enable
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	foreach ( $files as $row ) {
 		$counts[ (int) $row->vault_id ]['files'] = (int) $row->c;

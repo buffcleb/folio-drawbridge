@@ -211,12 +211,14 @@ function sft_drop_superseded_indexes(): void {
 
 	$table = $wpdb->prefix . 'sft_audit';
 
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- $table is $wpdb->prefix plus a literal; index names are literals. Schema changes are the point of this function, and it runs once per version bump.
 	$has_composite = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_created' ) );
 	$has_old       = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_type' ) );
 
 	if ( $has_composite && $has_old ) {
-		$wpdb->query( "ALTER TABLE `{$table}` DROP INDEX event_type" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name from $wpdb->prefix, index name is a literal.
+		$wpdb->query( "ALTER TABLE `{$table}` DROP INDEX event_type" );
 	}
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 }
 
 // ─── Audit log pruning ────────────────────────────────────────────────────────
