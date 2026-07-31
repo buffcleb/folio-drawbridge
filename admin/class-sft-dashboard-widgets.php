@@ -58,13 +58,13 @@ function sft_render_admin_overview_widget(): void {
 
 	// OTP failures last 30 days.
 	$otp_failures = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}sft_audit WHERE event = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+		"SELECT COUNT(*) FROM {$prefix}sft_audit WHERE event_type = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
 		SFT_EVT_OTP_FAILED
 	) );
 
 	// Downloads last 7 days.
 	$downloads_7d = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}sft_audit WHERE event = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+		"SELECT COUNT(*) FROM {$prefix}sft_audit WHERE event_type = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
 		SFT_EVT_FILE_DOWNLOADED
 	) );
 
@@ -148,7 +148,7 @@ function sft_render_user_vaults_widget(): void {
 
 	// Last 5 audit events for this user's vaults.
 	$recent = $wpdb->get_results( $wpdb->prepare(
-		"SELECT a.event, a.created_at, v.name AS vault_name
+		"SELECT a.event_type, a.created_at, v.name AS vault_name
 		 FROM {$prefix}sft_audit a
 		 INNER JOIN {$prefix}sft_vaults v ON v.id = a.vault_id
 		 WHERE v.owner_id = %d
@@ -212,7 +212,7 @@ function sft_render_user_vaults_widget(): void {
 		<strong style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em;">Recent Activity</strong>
 		<table>
 		<?php foreach ( $recent as $row ) :
-			$label = $label_map[ $row->event ] ?? ucwords( str_replace( '_', ' ', $row->event ) );
+			$label = $label_map[ $row->event_type ] ?? ucwords( str_replace( '_', ' ', $row->event_type ) );
 			$dt    = sft_format_date( $row->created_at );
 		?>
 			<tr>
