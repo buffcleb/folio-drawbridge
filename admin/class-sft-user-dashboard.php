@@ -332,7 +332,7 @@ function sft_handle_user_dashboard_post(): void {
 			exit;
 		}
 
-		$result = sft_upload_file_to_vault( $vault_id, $_FILES['sft_upload'], $user_id );
+		$result = sft_upload_file_to_vault( $vault_id, $_FILES['sft_upload'], $user_id ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $_FILES entry is validated (error code) and its name sanitized inside sft_upload_file_to_vault().
 
 		if ( is_wp_error( $result ) ) {
 			sft_ud_set_notice( $result->get_error_message(), 'error' );

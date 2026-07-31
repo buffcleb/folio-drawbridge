@@ -921,10 +921,10 @@ function sft_ajax_upload_chunk_handler(): void {
 	}
 
 	$vault_id      = absint( wp_unslash( $_POST['vault_id']     ?? 0 ) );
-	$upload_id     = preg_replace( '/[^a-f0-9]/', '', $_POST['upload_id'] ?? '' );
+	$upload_id     = preg_replace( '/[^a-f0-9]/', '', sanitize_text_field( wp_unslash( $_POST['upload_id'] ?? '' ) ) );
 	$chunk_index   = absint( wp_unslash( $_POST['chunk_index']  ?? 0 ) );
 	$total_chunks  = absint( wp_unslash( $_POST['total_chunks'] ?? 0 ) );
-	$original_name = sanitize_file_name( $_POST['file_name']   ?? '' );
+	$original_name = sanitize_file_name( wp_unslash( $_POST['file_name'] ?? '' ) );
 	$total_size    = absint( wp_unslash( $_POST['total_size']   ?? 0 ) );
 
 	if ( ! $upload_id || strlen( $upload_id ) < 8 || ! $original_name
@@ -1094,7 +1094,7 @@ function sft_ajax_upload_file_handler(): void {
 		wp_send_json_error( 'No file received.' );
 	}
 
-	$result = sft_upload_file_to_vault( $vault_id, $_FILES['sft_file'], $user_id );
+	$result = sft_upload_file_to_vault( $vault_id, $_FILES['sft_file'], $user_id ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $_FILES entry is validated (error code) and its name sanitized inside sft_upload_file_to_vault().
 
 	if ( is_wp_error( $result ) ) {
 		wp_send_json_error( $result->get_error_message() );
