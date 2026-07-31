@@ -27,16 +27,23 @@ class Folio_Drawbridge_Hub {
 	 * Ensure the shared "Folio" top-level menu exists. Idempotent across plugins:
 	 * only the first caller in a request creates it.
 	 *
+	 * Pass the capability your own submenu requires. A plugin that delegates
+	 * access to a non-administrator role must pass that role's capability, or
+	 * WordPress hides the parent and its submenu becomes unreachable. render()
+	 * enforces manage_options separately, so a lower parent capability never
+	 * exposes the suite dashboard itself.
+	 *
+	 * @param string $capability Capability required to see the parent menu.
 	 * @return void
 	 */
-	public static function ensure_parent() {
+	public static function ensure_parent( $capability = 'manage_options' ) {
 		if ( self::parent_exists() ) {
 			return;
 		}
 		add_menu_page(
 			__( 'Folio', 'folio-drawbridge' ),
 			__( 'Folio', 'folio-drawbridge' ),
-			'manage_options',
+			$capability,
 			self::SLUG,
 			array( __CLASS__, 'render' ),
 			'dashicons-shield-alt',
@@ -47,7 +54,7 @@ class Folio_Drawbridge_Hub {
 			self::SLUG,
 			__( 'Folio', 'folio-drawbridge' ),
 			__( 'Dashboard', 'folio-drawbridge' ),
-			'manage_options',
+			$capability,
 			self::SLUG,
 			array( __CLASS__, 'render' )
 		);

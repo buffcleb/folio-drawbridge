@@ -151,3 +151,17 @@ The two-factor flow relies on email deliverability. If an attacker controls the 
 | Chunk assembly TOCTOU | Low | Documented, mitigated by directory permissions |
 | Hardcoded download session TTL | Low | Documented, acceptable default |
 | SQL ORDER BY whitelist pattern | Informational | Design correct; documented |
+
+### Full security audit (v1.2.0, pre-submission)
+
+| Finding | Severity | Status |
+|---|---|---|
+| File names/sizes rendered in share page HTML before OTP verification (CSS-only gating) | High | Fixed — manifest moved into the post-verification AJAX response |
+| Admin panel required `manage_options`, locking out delegated `sft_admin` users | High | Fixed — submenu and shared Folio parent register with `sft_admin` |
+| Download limit bypassable by concurrent requests (check-then-increment race) | Medium | Fixed — atomic `sft_claim_download_slot()` enforces the cap inside the UPDATE |
+| CSV formula injection in audit export and SIEM CSV output | Medium | Fixed — `sft_csv_safe()` neutralises `= + - @` prefixes |
+| SIEM log path allows writing inside the web root / executable extensions | Medium | Pending hardening PR |
+| OTP attempts reset per code with no cap on codes issued | Low | Pending hardening PR |
+| Audit log IP spoofable via proxy headers | Low | Pending hardening PR |
+
+Verified sound during the audit: all custom SQL uses `$wpdb->prepare()` with whitelisted `ORDER BY` columns; every state-changing route carries a nonce and a capability check; no IDOR (all vault/file/share handlers re-verify ownership); no path traversal (stored filenames are server-generated); encryption keys, OTPs, and session tokens all use CSPRNG sources with per-vault key separation.

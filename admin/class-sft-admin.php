@@ -387,13 +387,16 @@ function sft_handle_admin_post(): void {
 add_action( 'admin_menu', 'sft_register_admin_menu' );
 
 function sft_register_admin_menu(): void {
-	Folio_Drawbridge_Hub::ensure_parent();
+	// sft_admin, not manage_options: delegated SFT admins are non-administrator
+	// users who must still reach this panel. WordPress administrators receive
+	// sft_admin implicitly via the user_has_cap filter in the main plugin file.
+	Folio_Drawbridge_Hub::ensure_parent( 'sft_admin' );
 
 	$hook = add_submenu_page(
 		Folio_Drawbridge_Hub::SLUG,
 		'Folio Drawbridge',
 		'Drawbridge',
-		'manage_options',
+		'sft_admin',
 		'sft-pro',
 		'sft_admin_page'
 	);

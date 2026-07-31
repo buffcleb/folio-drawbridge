@@ -45,7 +45,7 @@ function sft_maybe_export_audit_csv(): void {
 	foreach ( $rows as $row ) {
 		$actor  = $row->actor_id ? ( get_userdata( (int) $row->actor_id )->user_login ?? $row->actor_id ) : 'system';
 		$detail = $row->details ? str_replace( [ "\r", "\n" ], ' ', $row->details ) : '';
-		fputcsv( $fh, [
+		fputcsv( $fh, array_map( 'sft_csv_safe', [
 			$row->id,
 			sft_audit_event_label( $row->event_type ),
 			$row->vault_id ?? '',
@@ -54,7 +54,7 @@ function sft_maybe_export_audit_csv(): void {
 			$row->ip_address,
 			$detail,
 			sft_format_date( $row->created_at, 'Y-m-d H:i:s' ),
-		] );
+		] ) );
 	}
 
 	fclose( $fh );

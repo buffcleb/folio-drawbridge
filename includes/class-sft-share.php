@@ -559,7 +559,45 @@ function sft_get_download_session( string $token ): ?array {
 }
 
 /**
+ * Atomically claims one download slot for a share.
+ *
+ * The accessibility conditions (status, expiry, download limit) are evaluated
+ * inside the UPDATE itself, so the database serialises concurrent requests and
+ * only as many succeed as there are slots remaining. Checking with
+ * sft_share_is_accessible() and then incrementing separately would let parallel
+ * requests all pass the check before any of them wrote — letting a share
+ * capped at one download be retrieved many times.
+ *
+ * Callers must treat a false return as "refuse the download".
+ *
+ * @param int $share_id Share to claim a download against.
+ * @return bool True when a slot was claimed and the file may be served.
+ */
+function sft_claim_download_slot( int $share_id ): bool {
+	global $wpdb;
+
+	$claimed = $wpdb->query(
+		$wpdb->prepare(
+			"UPDATE {$wpdb->prefix}sft_shares
+			    SET download_count = download_count + 1,
+			        last_accessed  = %s
+			  WHERE id = %d
+			    AND status IN ('pending','active')
+			    AND ( expires_at IS NULL OR expires_at > UTC_TIMESTAMP() )
+			    AND ( max_downloads = 0 OR download_count < max_downloads )",
+			current_time( 'mysql', true ),
+			$share_id
+		)
+	);
+
+	return $claimed === 1;
+}
+
+/**
  * Increments the download counter for a share and returns the updated count.
+ *
+ * Prefer sft_claim_download_slot() on any path that serves a file — this
+ * function does not enforce the download limit.
  */
 function sft_increment_download_count( int $share_id ): int {
 	global $wpdb;
