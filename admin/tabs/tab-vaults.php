@@ -30,10 +30,10 @@ function sft_render_tab_vaults(): void {
 function sft_render_vault_list(): void {
 	global $wpdb;
 
-	$f_status  = sanitize_key( $_GET['f_status'] ?? '' );
-	$f_search  = sanitize_text_field( $_GET['f_search'] ?? '' );
-	$f_orderby = sanitize_key( $_GET['orderby'] ?? 'created_at' );
-	$f_order   = strtoupper( sanitize_key( $_GET['order'] ?? 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
+	$f_status  = sanitize_key( wp_unslash( $_GET['f_status'] ?? '' ) );
+	$f_search  = sanitize_text_field( wp_unslash( $_GET['f_search'] ?? '' ) );
+	$f_orderby = sanitize_key( wp_unslash( $_GET['orderby'] ?? 'created_at' ) );
+	$f_order   = strtoupper( sanitize_key( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$per_page  = 25;
 	$paged     = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
 

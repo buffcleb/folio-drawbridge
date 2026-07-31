@@ -295,7 +295,7 @@ function sft_share_page_error( string $title, string $message ): void {
 // ─── File download endpoint ───────────────────────────────────────────────────
 
 function sft_handle_file_download( int $file_id ): void {
-	$token = sanitize_text_field( $_GET['dt'] ?? '' );
+	$token = sanitize_text_field( wp_unslash( $_GET['dt'] ?? '' ) );
 
 	if ( ! $token ) {
 		wp_die( 'Invalid download request.', 403 );
@@ -340,7 +340,7 @@ function sft_handle_zip_download(): void {
 		wp_die( 'ZIP download is not available on this server (ZipArchive extension required).', 500 );
 	}
 
-	$token = sanitize_text_field( $_GET['dt'] ?? '' );
+	$token = sanitize_text_field( wp_unslash( $_GET['dt'] ?? '' ) );
 	if ( ! $token ) {
 		wp_die( 'Invalid download request.', 403 );
 	}
@@ -437,7 +437,7 @@ function sft_ajax_request_otp(): void {
 	check_ajax_referer( 'sft_public_nonce', '_wpnonce' );
 
 	$share_id = (int) ( $_POST['share_id'] ?? 0 );
-	$email    = sanitize_email( $_POST['email'] ?? '' );
+	$email    = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 
 	if ( ! $share_id || ! $email ) {
 		wp_send_json_error( 'Invalid request.' );
@@ -461,8 +461,8 @@ function sft_ajax_verify_otp(): void {
 	check_ajax_referer( 'sft_public_nonce', '_wpnonce' );
 
 	$share_id = (int) ( $_POST['share_id'] ?? 0 );
-	$email    = sanitize_email( $_POST['email'] ?? '' );
-	$otp      = preg_replace( '/\D/', '', $_POST['otp'] ?? '' );
+	$email    = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+	$otp      = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['otp'] ?? '' ) ) );
 
 	if ( ! $share_id || ! $email || strlen( $otp ) !== 6 ) {
 		wp_send_json_error( 'Invalid request.' );
@@ -1043,9 +1043,9 @@ function sft_ajax_create_vault_handler(): void {
 	}
 
 	$user_id    = get_current_user_id();
-	$name       = sanitize_text_field( $_POST['name'] ?? '' );
-	$desc       = sanitize_textarea_field( $_POST['desc'] ?? '' );
-	$expires_at = sanitize_text_field( $_POST['expires_at'] ?? '' );
+	$name       = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+	$desc       = sanitize_textarea_field( wp_unslash( $_POST['desc'] ?? '' ) );
+	$expires_at = sanitize_text_field( wp_unslash( $_POST['expires_at'] ?? '' ) );
 
 	if ( ! $name ) {
 		wp_send_json_error( 'Vault name is required.' );
@@ -1109,9 +1109,9 @@ function sft_ajax_create_share_handler(): void {
 
 	$user_id       = get_current_user_id();
 	$vault_id      = (int) ( $_POST['vault_id'] ?? 0 );
-	$email         = sanitize_email( $_POST['email'] ?? '' );
+	$email         = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 	$max_downloads = max( 0, (int) ( $_POST['max_downloads'] ?? 0 ) );
-	$expires_at    = sanitize_text_field( $_POST['expires_at'] ?? '' );
+	$expires_at    = sanitize_text_field( wp_unslash( $_POST['expires_at'] ?? '' ) );
 
 	$vault = sft_get_vault( $vault_id );
 	if ( ! $vault || (int) $vault->owner_id !== $user_id ) {

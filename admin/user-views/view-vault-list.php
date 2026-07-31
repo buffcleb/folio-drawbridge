@@ -18,8 +18,8 @@ function sft_render_user_vault_list(): void {
 	$user_id     = get_current_user_id();
 	$per_page    = 20;
 	$paged       = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
-	$vl_orderby  = sanitize_key( $_GET['orderby'] ?? 'created_at' );
-	$vl_order    = strtoupper( sanitize_key( $_GET['order'] ?? 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
+	$vl_orderby  = sanitize_key( wp_unslash( $_GET['orderby'] ?? 'created_at' ) );
+	$vl_order    = strtoupper( sanitize_key( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
 	$vaults      = sft_get_user_vaults( $user_id, [
 		'per_page' => $per_page,
 		'paged'    => $paged,

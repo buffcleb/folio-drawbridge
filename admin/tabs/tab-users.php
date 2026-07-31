@@ -50,7 +50,7 @@ function sft_render_user_vaults_subrow( array $vaults, int $user_id ): void {
 function sft_render_tab_users(): void {
 	global $wpdb;
 
-	$search        = sanitize_text_field( $_GET['sft_user_search'] ?? '' );
+	$search        = sanitize_text_field( wp_unslash( $_GET['sft_user_search'] ?? '' ) );
 	$search_result = null;
 	$search_error  = '';
 

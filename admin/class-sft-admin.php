@@ -32,7 +32,7 @@ function sft_handle_admin_post(): void {
 	if ( ! isset( $_POST['sft_nonce'] ) ) {
 		return;
 	}
-	if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'sft-pro' ) {
+	if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== 'sft-pro' ) {
 		return;
 	}
 	if ( ! sft_is_admin() ) {
@@ -41,7 +41,7 @@ function sft_handle_admin_post(): void {
 
 	check_admin_referer( 'sft_admin_action', 'sft_nonce' );
 
-	$current_tab = sanitize_key( $_GET['tab'] ?? 'dashboard' );
+	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) );
 
 	// ── Settings save ────────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_save_settings'] ) ) {
@@ -75,7 +75,7 @@ function sft_handle_admin_post(): void {
 		$expiry_warning_days = max( 0, (int) ( $_POST['sft_expiry_warning_days'] ?? 0 ) );
 
 		// File type restrictions.
-		$allowed_extensions = sanitize_text_field( $_POST['sft_allowed_file_extensions'] ?? '' );
+		$allowed_extensions = sanitize_text_field( wp_unslash( $_POST['sft_allowed_file_extensions'] ?? '' ) );
 
 		// Storage quotas.
 		$storage_quota_mb = max( 0, (int) ( $_POST['sft_storage_quota_mb'] ?? 0 ) );
@@ -84,14 +84,14 @@ function sft_handle_admin_post(): void {
 		$email_template_types = [ 'invite', 'otp', 'download_notification', 'expiry_warning' ];
 		$email_template_data  = [];
 		foreach ( $email_template_types as $type ) {
-			$subject = sanitize_text_field( $_POST[ "sft_email_{$type}_subject" ] ?? '' );
-			$body    = sanitize_textarea_field( $_POST[ "sft_email_{$type}_body" ] ?? '' );
+			$subject = sanitize_text_field( wp_unslash( $_POST[ "sft_email_{$type}_subject" ] ?? '' ) );
+			$body    = sanitize_textarea_field( wp_unslash( $_POST[ "sft_email_{$type}_body" ] ?? '' ) );
 			$email_template_data[ $type ] = compact( 'subject', 'body' );
 		}
 
 		// SIEM logging.
 		$siem_enabled    = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
-		$siem_log_path   = sanitize_text_field( $_POST['sft_siem_log_path'] ?? '' );
+		$siem_log_path   = sanitize_text_field( wp_unslash( $_POST['sft_siem_log_path'] ?? '' ) );
 		$siem_path_error = '';
 		if ( $siem_log_path !== '' ) {
 			// Require absolute path and block path-traversal sequences.
@@ -100,9 +100,8 @@ function sft_handle_admin_post(): void {
 				$siem_path_error = 'SIEM log path must be an absolute path with no ".." segments. Previous value retained.';
 			}
 		}
-		$siem_format   = in_array( $_POST['sft_siem_format'] ?? 'json', [ 'json', 'csv' ], true )
-			? sanitize_key( $_POST['sft_siem_format'] )
-			: 'json';
+		$siem_format = sanitize_key( wp_unslash( $_POST['sft_siem_format'] ?? 'json' ) );
+		$siem_format = in_array( $siem_format, [ 'json', 'csv' ], true ) ? $siem_format : 'json';
 
 		update_option( 'sft_otp_ttl_minutes',            $otp_ttl );
 		update_option( 'sft_otp_max_attempts',            $otp_max_attempts );
@@ -151,7 +150,7 @@ function sft_handle_admin_post(): void {
 		}
 
 		sft_set_notice( $notice, $siem_path_error ? 'warning' : 'success' );
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -162,7 +161,7 @@ function sft_handle_admin_post(): void {
 			sprintf( 'Share limits enforced. <strong>%d</strong> share%s updated.', $updated, $updated === 1 ? '' : 's' ),
 			'success'
 		);
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -171,7 +170,7 @@ function sft_handle_admin_post(): void {
 		$days    = max( 1, (int) ( $_POST['sft_prune_days_manual'] ?? 365 ) );
 		$deleted = sft_prune_audit_log( $days );
 		sft_set_notice( sprintf( 'Pruned <strong>%d</strong> audit log entr%s older than %d days.', $deleted, $deleted === 1 ? 'y' : 'ies', $days ), 'success' );
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -183,7 +182,7 @@ function sft_handle_admin_post(): void {
 			sft_set_notice( 'Share revoked.', 'success' );
 		}
 		$vault_id = (int) ( $_POST['vault_id'] ?? 0 );
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -199,19 +198,19 @@ function sft_handle_admin_post(): void {
 				sft_set_notice( 'Invite email resent.', 'success' );
 			}
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: change vault status ───────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_vault_status'] ) ) {
 		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
-		$new_status = sanitize_key( $_POST['new_status'] ?? '' );
+		$new_status = sanitize_key( wp_unslash( $_POST['new_status'] ?? '' ) );
 		if ( $vault_id && $new_status ) {
 			sft_update_vault_status( $vault_id, $new_status, get_current_user_id() );
 			sft_set_notice( 'Vault status updated to <strong>' . esc_html( $new_status ) . '</strong>.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -222,14 +221,14 @@ function sft_handle_admin_post(): void {
 			sft_delete_vault( $vault_id );
 			sft_set_notice( 'Vault permanently deleted.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: transfer vault ownership ──────────────────────────────────────
 	if ( isset( $_POST['sft_admin_transfer_vault'] ) ) {
 		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
-		$new_login  = sanitize_text_field( $_POST['new_owner_login'] ?? '' );
+		$new_login  = sanitize_text_field( wp_unslash( $_POST['new_owner_login'] ?? '' ) );
 		$new_user   = $new_login ? ( get_user_by( 'login', $new_login ) ?: get_user_by( 'email', $new_login ) ) : null;
 		$redirect   = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) );
 
@@ -244,7 +243,7 @@ function sft_handle_admin_post(): void {
 			}
 		}
 
-		wp_redirect( $redirect );
+		wp_safe_redirect( $redirect );
 		exit;
 	}
 
@@ -256,7 +255,7 @@ function sft_handle_admin_post(): void {
 			sft_delete_file( $file_id, get_current_user_id() );
 			sft_set_notice( 'File deleted.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -271,7 +270,7 @@ function sft_handle_admin_post(): void {
 				get_current_user_id() );
 			sft_set_notice( 'Vault access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -287,7 +286,7 @@ function sft_handle_admin_post(): void {
 				get_current_user_id() );
 			sft_set_notice( 'SFT Admin access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -302,7 +301,7 @@ function sft_handle_admin_post(): void {
 				get_current_user_id() );
 			sft_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> promoted to SFT Admin.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -317,7 +316,7 @@ function sft_handle_admin_post(): void {
 				get_current_user_id() );
 			sft_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> demoted to Vault User.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -333,28 +332,28 @@ function sft_handle_admin_post(): void {
 				get_current_user_id() );
 			sft_set_notice( 'All SFT access revoked for <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: edit vault expiry ─────────────────────────────────────────────
 	if ( isset( $_POST['sft_admin_edit_vault_expiry'] ) ) {
 		$vault_id   = (int) ( $_POST['vault_id'] ?? 0 );
-		$raw_date   = sanitize_text_field( $_POST['vault_new_expires'] ?? '' );
+		$raw_date   = sanitize_text_field( wp_unslash( $_POST['vault_new_expires'] ?? '' ) );
 		$expires_at = $raw_date ? $raw_date . ' 23:59:59' : '';
 		if ( $vault_id ) {
 			sft_update_vault_expiry( $vault_id, $expires_at, get_current_user_id() );
 			sft_set_notice( $expires_at ? 'Vault expiry updated.' : 'Vault expiry cleared.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: edit vault name/description ──────────────────────────────────
 	if ( isset( $_POST['sft_admin_edit_vault_meta'] ) ) {
 		$vault_id    = (int) ( $_POST['vault_id'] ?? 0 );
-		$name        = sanitize_text_field( $_POST['vault_new_name'] ?? '' );
-		$description = sanitize_textarea_field( $_POST['vault_new_description'] ?? '' );
+		$name        = sanitize_text_field( wp_unslash( $_POST['vault_new_name'] ?? '' ) );
+		$description = sanitize_textarea_field( wp_unslash( $_POST['vault_new_description'] ?? '' ) );
 		if ( $vault_id ) {
 			$result = sft_update_vault_meta( $vault_id, $name, $description, get_current_user_id() );
 			if ( is_wp_error( $result ) ) {
@@ -363,7 +362,7 @@ function sft_handle_admin_post(): void {
 				sft_set_notice( 'Vault name and description updated.', 'success' );
 			}
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -372,13 +371,13 @@ function sft_handle_admin_post(): void {
 		$share_id      = (int) ( $_POST['share_id'] ?? 0 );
 		$vault_id      = (int) ( $_POST['vault_id'] ?? 0 );
 		$max_downloads = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
-		$raw_date      = sanitize_text_field( $_POST['share_new_expires'] ?? '' );
+		$raw_date      = sanitize_text_field( wp_unslash( $_POST['share_new_expires'] ?? '' ) );
 		$expires_at    = $raw_date ? $raw_date . ' 23:59:59' : '';
 		if ( $share_id ) {
 			sft_update_share( $share_id, $max_downloads, $expires_at, get_current_user_id() );
 			sft_set_notice( 'Share updated.', 'success' );
 		}
-		wp_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 }
@@ -408,7 +407,7 @@ function sft_register_admin_menu(): void {
 
 function sft_register_admin_help_tabs(): void {
 	$screen = get_current_screen();
-	$tab    = sanitize_key( $_GET['tab'] ?? 'dashboard' );
+	$tab    = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) );
 
 	switch ( $tab ) {
 
@@ -688,7 +687,7 @@ function sft_enqueue_admin_assets( string $hook ): void {
 	// admin vault file serving via a direct AJAX action.
 	add_action( 'admin_head', 'sft_admin_inline_js' );
 
-	wp_register_style( 'sft-admin', false );
+	wp_register_style( 'sft-admin', false, [], SFT_VERSION );
 	wp_enqueue_style( 'sft-admin' );
 
 	wp_add_inline_style( 'sft-admin', '
@@ -975,7 +974,7 @@ function sft_admin_page(): void {
 		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
-	$current_tab = sanitize_key( $_GET['tab'] ?? 'dashboard' );
+	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) );
 
 	sft_show_notice();
 

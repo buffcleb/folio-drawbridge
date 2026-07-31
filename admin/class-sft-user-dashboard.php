@@ -134,7 +134,7 @@ function sft_enqueue_user_dashboard_assets( string $hook ): void {
 		return;
 	}
 
-	wp_register_style( 'sft-user-dash', false );
+	wp_register_style( 'sft-user-dash', false, [], SFT_VERSION );
 	wp_enqueue_style( 'sft-user-dash' );
 
 	// Reuse the same shared CSS variables as the admin panel plus a few extras.
@@ -188,7 +188,7 @@ function sft_enqueue_user_dashboard_assets( string $hook ): void {
 }
 
 function sft_user_dashboard_inline_js(): void {
-	if ( ( $_GET['page'] ?? '' ) !== 'sft-my-vaults' ) {
+	if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== 'sft-my-vaults' ) {
 		return;
 	}
 	?>
@@ -255,7 +255,7 @@ function sft_handle_user_dashboard_post(): void {
 	if ( ! isset( $_POST['sft_user_nonce'] ) ) {
 		return;
 	}
-	if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'sft-my-vaults' ) {
+	if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== 'sft-my-vaults' ) {
 		return;
 	}
 	if ( ! sft_user_can_use() ) {
@@ -284,13 +284,13 @@ function sft_handle_user_dashboard_post(): void {
 
 	// ── Create vault ─────────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_ud_create_vault'] ) ) {
-		$name    = sanitize_text_field( $_POST['vault_name'] ?? '' );
-		$desc    = sanitize_textarea_field( $_POST['vault_desc'] ?? '' );
-		$expires = sanitize_text_field( $_POST['vault_expires'] ?? '' );
+		$name    = sanitize_text_field( wp_unslash( $_POST['vault_name'] ?? '' ) );
+		$desc    = sanitize_textarea_field( wp_unslash( $_POST['vault_desc'] ?? '' ) );
+		$expires = sanitize_text_field( wp_unslash( $_POST['vault_expires'] ?? '' ) );
 
 		if ( ! $name ) {
 			sft_ud_set_notice( 'Vault name is required.', 'error' );
-			wp_redirect( $list_url );
+			wp_safe_redirect( $list_url );
 			exit;
 		}
 
@@ -305,10 +305,10 @@ function sft_handle_user_dashboard_post(): void {
 		$new_id = sft_create_vault( $user_id, $name, $desc, $expires_mysql );
 		if ( $new_id ) {
 			sft_ud_set_notice( 'Vault <strong>' . esc_html( $name ) . '</strong> created.', 'success' );
-			wp_redirect( $detail_url( $new_id ) );
+			wp_safe_redirect( $detail_url( $new_id ) );
 		} else {
 			sft_ud_set_notice( 'Could not create vault. Please try again.', 'error' );
-			wp_redirect( $list_url );
+			wp_safe_redirect( $list_url );
 		}
 		exit;
 	}
@@ -318,7 +318,7 @@ function sft_handle_user_dashboard_post(): void {
 		$vault = $assert_vault_owner( $vault_id );
 		sft_delete_vault( $vault_id );
 		sft_ud_set_notice( 'Vault <strong>' . esc_html( $vault->name ) . '</strong> deleted.', 'success' );
-		wp_redirect( $list_url );
+		wp_safe_redirect( $list_url );
 		exit;
 	}
 
@@ -328,7 +328,7 @@ function sft_handle_user_dashboard_post(): void {
 
 		if ( empty( $_FILES['sft_upload']['name'] ) ) {
 			sft_ud_set_notice( 'No file selected.', 'error' );
-			wp_redirect( $detail_url( $vault_id ) );
+			wp_safe_redirect( $detail_url( $vault_id ) );
 			exit;
 		}
 
@@ -339,7 +339,7 @@ function sft_handle_user_dashboard_post(): void {
 		} else {
 			sft_ud_set_notice( 'File encrypted and uploaded.', 'success' );
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
@@ -352,7 +352,7 @@ function sft_handle_user_dashboard_post(): void {
 			sft_delete_file( $file_id, $user_id );
 			sft_ud_set_notice( 'File deleted.', 'success' );
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
@@ -360,9 +360,9 @@ function sft_handle_user_dashboard_post(): void {
 	if ( isset( $_POST['sft_ud_create_share'] ) ) {
 		$assert_vault_owner( $vault_id );
 
-		$email        = sanitize_email( $_POST['share_email'] ?? '' );
+		$email        = sanitize_email( wp_unslash( $_POST['share_email'] ?? '' ) );
 		$max_dl       = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
-		$expires       = sanitize_text_field( $_POST['share_expires'] ?? '' );
+		$expires       = sanitize_text_field( wp_unslash( $_POST['share_expires'] ?? '' ) );
 		$expires_mysql = '';
 		if ( $expires ) {
 			$ts = strtotime( $expires . ' 23:59:59' );
@@ -378,7 +378,7 @@ function sft_handle_user_dashboard_post(): void {
 		} else {
 			sft_ud_set_notice( 'Share invite sent to <strong>' . esc_html( $email ) . '</strong>.', 'success' );
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
@@ -391,7 +391,7 @@ function sft_handle_user_dashboard_post(): void {
 			sft_revoke_share( $share_id, $user_id );
 			sft_ud_set_notice( 'Share revoked.', 'success' );
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
@@ -408,7 +408,7 @@ function sft_handle_user_dashboard_post(): void {
 				sft_ud_set_notice( 'Invite email resent to ' . esc_html( $share->recipient_email ) . '.', 'success' );
 			}
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
@@ -419,7 +419,7 @@ function sft_handle_user_dashboard_post(): void {
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
 			$max_dl  = max( 0, (int) ( $_POST['share_max_downloads'] ?? 0 ) );
-			$expires = sanitize_text_field( $_POST['share_new_expires'] ?? '' );
+			$expires = sanitize_text_field( wp_unslash( $_POST['share_new_expires'] ?? '' ) );
 			$expires_mysql = '';
 			if ( $expires ) {
 				$ts = strtotime( $expires . ' 23:59:59' );
@@ -430,14 +430,14 @@ function sft_handle_user_dashboard_post(): void {
 			sft_update_share( $share_id, $max_dl, $expires_mysql, $user_id );
 			sft_ud_set_notice( 'Share updated.', 'success' );
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	// ── Edit vault expiry ─────────────────────────────────────────────────────
 	if ( isset( $_POST['sft_ud_edit_vault_expiry'] ) ) {
 		$assert_vault_owner( $vault_id );
-		$expires = sanitize_text_field( $_POST['vault_new_expires'] ?? '' );
+		$expires = sanitize_text_field( wp_unslash( $_POST['vault_new_expires'] ?? '' ) );
 		$expires_mysql = '';
 		if ( $expires ) {
 			$ts = strtotime( $expires . ' 23:59:59' );
@@ -447,21 +447,21 @@ function sft_handle_user_dashboard_post(): void {
 		}
 		sft_update_vault_expiry( $vault_id, $expires_mysql, $user_id );
 		sft_ud_set_notice( 'Vault expiry updated.', 'success' );
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	if ( isset( $_POST['sft_ud_edit_vault_meta'] ) ) {
 		$assert_vault_owner( $vault_id );
-		$name        = sanitize_text_field( $_POST['vault_new_name'] ?? '' );
-		$description = sanitize_textarea_field( $_POST['vault_new_description'] ?? '' );
+		$name        = sanitize_text_field( wp_unslash( $_POST['vault_new_name'] ?? '' ) );
+		$description = sanitize_textarea_field( wp_unslash( $_POST['vault_new_description'] ?? '' ) );
 		$result      = sft_update_vault_meta( $vault_id, $name, $description, $user_id );
 		if ( is_wp_error( $result ) ) {
 			sft_ud_set_notice( $result->get_error_message(), 'error' );
 		} else {
 			sft_ud_set_notice( 'Vault updated.', 'success' );
 		}
-		wp_redirect( $detail_url( $vault_id ) );
+		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 }
