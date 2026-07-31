@@ -329,6 +329,15 @@ function sft_resend_share_invite( int $share_id, int $actor_id ) {
 // ─── OTP flow ─────────────────────────────────────────────────────────────────
 
 /**
+ * Maximum verification codes issuable for one share per hour.
+ *
+ * A floor under the configurable cooldown, which may be set to 0. Generous
+ * enough that a recipient retrying a slow or misdirected email is never
+ * blocked, low enough to keep brute-forcing a six-digit code impractical.
+ */
+define( 'SFT_OTP_MAX_PER_HOUR', 10 );
+
+/**
  * Generates a new OTP for a share, stores the hash, and emails the code to the recipient.
  *
  * Validates that $email matches the share's recipient_email before sending.
@@ -380,6 +389,28 @@ function sft_send_otp( int $share_id, string $email ) {
 				);
 			}
 		}
+	}
+
+	// Hard ceiling on codes issued per share per hour, independent of the
+	// configurable cooldown. The attempt limit resets with every new code, so
+	// without this a cooldown of 0 — which Settings permits — would leave the
+	// only brake on guessing a six-digit code as request throughput.
+	$issued_last_hour = (int) $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT COUNT(*) FROM {$wpdb->prefix}sft_otps
+			 WHERE share_id = %d
+			   AND created_at > DATE_SUB( UTC_TIMESTAMP(), INTERVAL 1 HOUR )",
+			$share_id
+		)
+	);
+
+	if ( $issued_last_hour >= SFT_OTP_MAX_PER_HOUR ) {
+		sft_log( SFT_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
+			[ 'reason' => 'hourly_request_cap', 'issued_last_hour' => $issued_last_hour ] );
+		return new WP_Error(
+			'otp_rate_limited',
+			'Too many verification codes have been requested for this link recently. Please try again later.'
+		);
 	}
 
 	// Expire any previous unused OTPs for this share.

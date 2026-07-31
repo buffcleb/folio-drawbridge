@@ -94,10 +94,26 @@ function sft_handle_admin_post(): void {
 		$siem_log_path   = sanitize_text_field( wp_unslash( $_POST['sft_siem_log_path'] ?? '' ) );
 		$siem_path_error = '';
 		if ( $siem_log_path !== '' ) {
-			// Require absolute path and block path-traversal sequences.
-			if ( ! path_is_absolute( $siem_log_path ) || strpos( $siem_log_path, '..' ) !== false ) {
-				$siem_log_path   = get_option( 'sft_siem_log_path', '' ); // keep previous value
-				$siem_path_error = 'SIEM log path must be an absolute path with no ".." segments. Previous value retained.';
+			// The log receives attacker-influenced text — a recipient's typed email
+			// is recorded on OTP mismatch — so the destination must never be a file
+			// the web server can execute or serve. Absolute path, no traversal, and
+			// outside the WordPress directory with a non-executable extension.
+			$candidate   = wp_normalize_path( $siem_log_path );
+			$abs_root    = wp_normalize_path( trailingslashit( ABSPATH ) );
+			$ext         = strtolower( pathinfo( $candidate, PATHINFO_EXTENSION ) );
+			$blocked_ext = [ 'php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'php8', 'phps', 'phar', 'htaccess', 'html', 'htm', 'js', 'cgi', 'pl' ];
+
+			if ( ! path_is_absolute( $candidate ) || strpos( $candidate, '..' ) !== false ) {
+				$siem_path_error = 'SIEM log path must be an absolute path with no ".." segments.';
+			} elseif ( strpos( $candidate, $abs_root ) === 0 ) {
+				$siem_path_error = 'SIEM log path must be outside the WordPress directory so the log can never be requested over the web.';
+			} elseif ( in_array( $ext, $blocked_ext, true ) ) {
+				$siem_path_error = 'SIEM log path must not use an executable or web-servable file extension.';
+			}
+
+			if ( $siem_path_error !== '' ) {
+				$siem_log_path    = get_option( 'sft_siem_log_path', '' ); // keep previous value
+				$siem_path_error .= ' Previous value retained.';
 			}
 		}
 		$siem_format = sanitize_key( wp_unslash( $_POST['sft_siem_format'] ?? 'json' ) );
@@ -548,7 +564,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>These settings control the one-time code (OTP) sent to share recipients as the second factor of authentication before they can download files.</p>' .
 					'<p><strong>OTP Validity</strong> — how many minutes a verification code remains valid after it is emailed. Shorter values reduce the window of opportunity if an email is intercepted; longer values are more forgiving if email delivery is slow. Range: 5–60 minutes.</p>' .
 					'<p><strong>Max Verification Attempts</strong> — the number of incorrect codes a recipient can enter before the code is invalidated and they must request a new one. Lower values reduce brute-force risk. Range: 1–10.</p>' .
-					'<p><strong>OTP Cooldown</strong> — minimum number of seconds a recipient must wait before they can request a new verification code. This prevents automated code-request flooding. Set to 0 to disable the cooldown.</p>',
+					'<p><strong>OTP Cooldown</strong> — minimum number of seconds a recipient must wait before they can request a new verification code. This prevents automated code-request flooding. Set to 0 to disable the cooldown.</p>' .'<p>Independently of this setting, a fixed ceiling of 10 codes per share per hour always applies. Because the attempt limit resets with each new code, that ceiling is what keeps guessing a six-digit code impractical even when the cooldown is 0.</p>',
 			] );
 			$screen->add_help_tab( [
 				'id'      => 'sft-settings-dl-limits',
@@ -587,7 +603,7 @@ function sft_register_admin_help_tabs(): void {
 				'title'   => 'SIEM Logging',
 				'content' =>
 					'<p>When enabled, every audit event is appended to a log file on the server in addition to being stored in the database. This allows external security information and event management (SIEM) tools such as Splunk, Datadog, or the ELK stack to ingest plugin activity in real time.</p>' .
-					'<p><strong>Log File Path</strong> — the absolute path to the log file. The directory must exist and the web server process must have write permission. The file is created automatically on first write.</p>' .
+					'<p><strong>Log File Path</strong> — the absolute path to the log file. The directory must exist and the web server process must have write permission. The file is created automatically on first write.</p>' .'<p>The path must sit <strong>outside</strong> the WordPress directory and must not use an executable or web-servable extension (<code>.php</code>, <code>.html</code>, and similar are rejected). Audit entries contain text supplied by unauthenticated visitors, so a log inside the web root could be requested — or executed — over HTTP.</p>' .
 					'<p><strong>Log Format</strong></p>' .
 					'<ul>' .
 					'<li><em>JSON</em> — one JSON object per line (NDJSON / JSON Lines format). Each line is a complete, self-contained event and can be streamed directly into most log aggregators.</li>' .
