@@ -87,7 +87,7 @@ function sft_render_tab_settings(): void {
 					<td>
 						<input type="number" id="sft_otp_cooldown_seconds" name="sft_otp_cooldown_seconds"
 						       value="<?php echo (int) $otp_cooldown; ?>" min="0" max="300" style="width:80px;">
-						<p class="description">Minimum seconds a recipient must wait before requesting a new code. 0 = no limit. Range 0–300.</p>
+						<p class="description">Minimum seconds a recipient must wait before requesting a new code. 0 = no limit. Range 0–300. A fixed ceiling of 10 codes per share per hour always applies, so brute-force protection remains even at 0.</p>
 					</td>
 				</tr>
 			</table>
@@ -279,8 +279,8 @@ function sft_render_tab_settings(): void {
 						       value="<?php echo esc_attr( $siem_log_path ); ?>"
 						       style="width:100%;max-width:520px;" placeholder="/var/log/sft-audit.json">
 						<p class="description">
-							Absolute path to the log file on the server. The web server process must have write permission.
-							Example: <code>/var/log/sft-audit.log</code>
+							Absolute path to the log file on the server, <strong>outside</strong> the WordPress directory, with a non-executable extension.
+							The web server process must have write permission. Example: <code>/var/log/sft-audit.log</code>
 						</p>
 					</td>
 				</tr>

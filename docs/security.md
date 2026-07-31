@@ -160,8 +160,24 @@ The two-factor flow relies on email deliverability. If an attacker controls the 
 | Admin panel required `manage_options`, locking out delegated `sft_admin` users | High | Fixed — submenu and shared Folio parent register with `sft_admin` |
 | Download limit bypassable by concurrent requests (check-then-increment race) | Medium | Fixed — atomic `sft_claim_download_slot()` enforces the cap inside the UPDATE |
 | CSV formula injection in audit export and SIEM CSV output | Medium | Fixed — `sft_csv_safe()` neutralises `= + - @` prefixes |
-| SIEM log path allows writing inside the web root / executable extensions | Medium | Pending hardening PR |
-| OTP attempts reset per code with no cap on codes issued | Low | Pending hardening PR |
-| Audit log IP spoofable via proxy headers | Low | Pending hardening PR |
+| SIEM log path allows writing inside the web root / executable extensions | Medium | Fixed — paths inside ABSPATH and executable/web-servable extensions rejected |
+| OTP attempts reset per code with no cap on codes issued | Low | Fixed — fixed ceiling of 10 codes per share per hour, independent of the cooldown setting |
+| Audit log IP spoofable via proxy headers | Low | Fixed — REMOTE_ADDR by default; proxy headers only via the SFT_TRUSTED_PROXY_HEADER opt-in |
 
 Verified sound during the audit: all custom SQL uses `$wpdb->prepare()` with whitelisted `ORDER BY` columns; every state-changing route carries a nonce and a capability check; no IDOR (all vault/file/share handlers re-verify ownership); no path traversal (stored filenames are server-generated); encryption keys, OTPs, and session tokens all use CSPRNG sources with per-vault key separation.
+
+### Audit log IP addresses
+
+`REMOTE_ADDR` is recorded by default because it is the only value a client cannot forge. Proxy and CDN headers such as `X-Forwarded-For` are ordinary request headers — on a site not actually behind a proxy that overwrites them, any visitor can choose the address attached to their own events, undermining the log's value as evidence.
+
+Sites genuinely behind a proxy opt in by naming the header their infrastructure sets, in `wp-config.php`:
+
+```php
+define( 'SFT_TRUSTED_PROXY_HEADER', 'HTTP_CF_CONNECTING_IP' );
+```
+
+Only enable this when the proxy strips any client-supplied copy of that header, which is standard behaviour for Cloudflare and most load balancers.
+
+### OTP request ceiling
+
+Beyond the configurable cooldown, a share may be issued at most **10 verification codes per hour**. Because the per-code attempt limit resets with every new code, this ceiling — which cannot be disabled from Settings — is what keeps brute-forcing a six-digit code impractical when the cooldown is set to 0.

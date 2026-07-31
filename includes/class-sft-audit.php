@@ -202,23 +202,37 @@ function sft_siem_write(
 // ─── IP resolution ────────────────────────────────────────────────────────────
 
 /**
- * Returns the most likely real client IP address.
+ * Returns the client IP address to record against an audit event.
  *
- * Checks common proxy/CDN headers in order of trust before falling back
- * to REMOTE_ADDR. Stored for forensic purposes only — not used for access
- * control decisions.
+ * REMOTE_ADDR is the only value a client cannot forge, so it is the default.
+ * Proxy and CDN headers are plain request headers: on a site not actually
+ * behind a proxy that overwrites them, anyone can set X-Forwarded-For and
+ * choose the address attached to their own OTP failures and downloads. For a
+ * log whose purpose is non-repudiation, trusting them by default lets an
+ * attacker implicate someone else or muddy an investigation.
+ *
+ * Sites genuinely behind a proxy opt in by defining SFT_TRUSTED_PROXY_HEADER
+ * in wp-config.php with the header their infrastructure sets, e.g.
+ *
+ *     define( 'SFT_TRUSTED_PROXY_HEADER', 'HTTP_CF_CONNECTING_IP' );
+ *
+ * Only meaningful when the proxy strips any client-supplied copy of that
+ * header, which is the standard behaviour for Cloudflare and most load
+ * balancers.
  */
 function sft_get_client_ip(): string {
-	$candidates = [
-		'HTTP_CF_CONNECTING_IP', // Cloudflare
-		'HTTP_X_REAL_IP',
-		'HTTP_X_FORWARDED_FOR',
-		'REMOTE_ADDR',
-	];
+	$candidates = [];
+
+	if ( defined( 'SFT_TRUSTED_PROXY_HEADER' ) && SFT_TRUSTED_PROXY_HEADER ) {
+		$candidates[] = (string) SFT_TRUSTED_PROXY_HEADER;
+	}
+
+	$candidates[] = 'REMOTE_ADDR';
 
 	foreach ( $candidates as $key ) {
 		if ( ! empty( $_SERVER[ $key ] ) ) {
-			// X-Forwarded-For may be a comma-separated list; take the first.
+			// A forwarding header may carry a comma-separated chain; the original
+			// client is the first entry.
 			$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) ) )[0] );
 			if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
 				return $ip;

@@ -46,7 +46,7 @@ Controls the one-time code (OTP) sent to share recipients.
 |---|---|---|---|
 | OTP Validity | Minutes a code remains valid after being emailed | 15 | 5–60 |
 | Max Verification Attempts | Incorrect code entries before invalidation | 5 | 1–20 |
-| OTP Cooldown | Minimum seconds between code requests | 60 | 0 = off |
+| OTP Cooldown | Minimum seconds between code requests | 60 | 0 = off. A fixed ceiling of 10 codes per share per hour applies regardless. |
 
 Shorter OTP validity reduces the exposure window if email is delayed or intercepted. Lower attempt limits reduce brute-force risk. The cooldown prevents automated code-request flooding — the recipient sees a countdown message if they request a code too quickly.
 
@@ -159,7 +159,7 @@ Writes every audit event to an OS-level log file for ingestion by SIEM tools (Sp
 | Setting | Description |
 |---|---|
 | Enable SIEM Log | Turns file-based logging on or off |
-| Log File Path | Absolute path to the log file. Directory must exist and be writable. |
+| Log File Path | Absolute path to the log file. Must be **outside** the WordPress directory and must not use an executable or web-servable extension (`.php`, `.html`, …). Directory must exist and be writable. |
 | Log Format | JSON (NDJSON — one object per line) or CSV |
 
 Both formats include: `timestamp_utc`, `event`, `vault_id`, `share_id`, `actor_id`, `ip`, `details`, `site`.
