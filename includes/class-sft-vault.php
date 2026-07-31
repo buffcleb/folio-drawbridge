@@ -747,6 +747,10 @@ function sft_upload_error_message( int $code ): string {
  *
  * One query for a whole user list rather than one per user.
  *
+ * Returns whatever is asked for: callers are responsible for having established
+ * that the current user may see these owners' vaults. Every present caller is
+ * an admin-only screen.
+ *
  * @param int[] $owner_ids WordPress user IDs.
  * @return array<int,object[]> Owner ID → vault rows (id, name, status), newest first.
  */
@@ -803,14 +807,33 @@ function sft_get_shares_by_vault( array $vault_ids ): array {
 /**
  * Fetches rows for many vaults in one query and groups them by vault_id.
  *
+ * $table and $order_by are interpolated into the query, so both are matched
+ * against a whitelist rather than trusted. The two wrappers only ever pass
+ * literals, but this is a public function — a future caller that forwarded
+ * request data would otherwise have an injection point.
+ *
  * @internal Shared by sft_get_files_by_vault() and sft_get_shares_by_vault().
  * @param int[]  $vault_ids
- * @param string $table    Unprefixed plugin table name (internal literal, never request data).
- * @param string $order_by Column to sort within each vault, newest first (likewise internal).
- * @return array<int,object[]>
+ * @param string $table    Unprefixed plugin table name. Must be a known table.
+ * @param string $order_by Column to sort within each vault, newest first.
+ * @return array<int,object[]> Empty when $table/$order_by are not recognised.
  */
 function sft_group_rows_by_vault( array $vault_ids, string $table, string $order_by ): array {
 	global $wpdb;
+
+	$allowed = [
+		'sft_files'  => [ 'uploaded_at', 'id' ],
+		'sft_shares' => [ 'created_at', 'id' ],
+	];
+
+	if ( ! isset( $allowed[ $table ] ) || ! in_array( $order_by, $allowed[ $table ], true ) ) {
+		_doing_it_wrong(
+			__FUNCTION__,
+			'Unrecognised table or sort column requested.',
+			'1.2.1'
+		);
+		return [];
+	}
 
 	$vault_ids = array_values( array_unique( array_map( 'intval', $vault_ids ) ) );
 
@@ -844,6 +867,9 @@ function sft_group_rows_by_vault( array $vault_ids, string $table, string $order
  *
  * List screens previously issued two COUNT queries per row, so a 25-row page
  * cost 50 round trips. Two grouped queries answer the whole page instead.
+ *
+ * Performs no access control — pass only vault IDs the current user is already
+ * entitled to see.
  *
  * @param int[] $vault_ids Vault IDs on the current page.
  * @return array<int,array{files:int,bytes:int,shares:int}> Keyed by vault ID;
