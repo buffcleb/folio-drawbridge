@@ -70,7 +70,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_otp_ttl_minutes">OTP Validity (minutes)</label></th>
 					<td>
 						<input type="number" id="sft_otp_ttl_minutes" name="sft_otp_ttl_minutes"
-						       value="<?php echo $otp_ttl; ?>" min="5" max="60" style="width:80px;">
+						       value="<?php echo (int) $otp_ttl; ?>" min="5" max="60" style="width:80px;">
 						<p class="description">How long a verification code remains valid. Minimum 5, maximum 60 minutes.</p>
 					</td>
 				</tr>
@@ -78,7 +78,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_otp_max_attempts">Max Verification Attempts</label></th>
 					<td>
 						<input type="number" id="sft_otp_max_attempts" name="sft_otp_max_attempts"
-						       value="<?php echo $otp_max_attempts; ?>" min="1" max="10" style="width:80px;">
+						       value="<?php echo (int) $otp_max_attempts; ?>" min="1" max="10" style="width:80px;">
 						<p class="description">Number of incorrect OTP attempts allowed before the code is invalidated and a new one must be requested. Minimum 1, maximum 10.</p>
 					</td>
 				</tr>
@@ -86,7 +86,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_otp_cooldown_seconds">OTP Rate Limit (seconds)</label></th>
 					<td>
 						<input type="number" id="sft_otp_cooldown_seconds" name="sft_otp_cooldown_seconds"
-						       value="<?php echo $otp_cooldown; ?>" min="0" max="300" style="width:80px;">
+						       value="<?php echo (int) $otp_cooldown; ?>" min="0" max="300" style="width:80px;">
 						<p class="description">Minimum seconds a recipient must wait before requesting a new code. 0 = no limit. Range 0–300.</p>
 					</td>
 				</tr>
@@ -112,7 +112,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_default_max_downloads">Default Download Limit</label></th>
 					<td>
 						<input type="number" id="sft_default_max_downloads" name="sft_default_max_downloads"
-						       value="<?php echo $default_max_dl; ?>" min="0" style="width:80px;">
+						       value="<?php echo (int) $default_max_dl; ?>" min="0" style="width:80px;">
 						<p class="description">Pre-filled value in the share creation form. 0 = unlimited (only valid when unlimited is allowed).</p>
 					</td>
 				</tr>
@@ -120,7 +120,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_max_download_limit">Maximum Download Limit</label></th>
 					<td>
 						<input type="number" id="sft_max_download_limit" name="sft_max_download_limit"
-						       value="<?php echo $max_dl_ceiling; ?>" min="0" style="width:80px;">
+						       value="<?php echo (int) $max_dl_ceiling; ?>" min="0" style="width:80px;">
 						<p class="description">Hard ceiling users cannot exceed when setting a limit. 0 = no ceiling. Admins are exempt.</p>
 					</td>
 				</tr>
@@ -155,7 +155,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_default_expiry_days">Default Expiry (days from today)</label></th>
 					<td>
 						<input type="number" id="sft_default_expiry_days" name="sft_default_expiry_days"
-						       value="<?php echo $default_expiry_days; ?>" min="0" style="width:80px;">
+						       value="<?php echo (int) $default_expiry_days; ?>" min="0" style="width:80px;">
 						<p class="description">Pre-filled expiry in the share creation form, as days from today. 0 = no pre-fill.</p>
 					</td>
 				</tr>
@@ -163,7 +163,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_max_expiry_days">Maximum Expiry (days from today)</label></th>
 					<td>
 						<input type="number" id="sft_max_expiry_days" name="sft_max_expiry_days"
-						       value="<?php echo $max_expiry_days; ?>" min="0" style="width:80px;">
+						       value="<?php echo (int) $max_expiry_days; ?>" min="0" style="width:80px;">
 						<p class="description">Furthest-out expiration date a user can set, as days from today. 0 = no ceiling. Admins are exempt.</p>
 					</td>
 				</tr>
@@ -187,7 +187,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_max_file_mb">Maximum File Size (MB)</label></th>
 					<td>
 						<input type="number" id="sft_max_file_mb" name="sft_max_file_mb"
-						       value="<?php echo $max_file_mb; ?>" min="1" style="width:80px;">
+						       value="<?php echo (int) $max_file_mb; ?>" min="1" style="width:80px;">
 						<p class="description">
 							Files are uploaded in chunks and reassembled server-side, so this limit can safely
 							<strong>exceed</strong> your server's <code>upload_max_filesize</code> and <code>post_max_size</code> PHP settings.
@@ -220,7 +220,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_audit_prune_days">Retention Window (days)</label></th>
 					<td>
 						<input type="number" id="sft_audit_prune_days" name="sft_audit_prune_days"
-						       value="<?php echo $prune_days; ?>" min="30" style="width:80px;">
+						       value="<?php echo (int) $prune_days; ?>" min="30" style="width:80px;">
 						<p class="description">Entries older than this are deleted when auto-prune runs. Minimum 30 days.</p>
 					</td>
 				</tr>
@@ -313,7 +313,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_expiry_warning_days">Share Expiry Warning (days)</label></th>
 					<td>
 						<input type="number" id="sft_expiry_warning_days" name="sft_expiry_warning_days"
-						       value="<?php echo $expiry_warning_days; ?>" min="0" style="width:80px;">
+						       value="<?php echo (int) $expiry_warning_days; ?>" min="0" style="width:80px;">
 						<p class="description">Email vault owners this many days before a share link expires. 0 = disabled. Warning is sent once per share via hourly WP-Cron.</p>
 					</td>
 				</tr>
@@ -344,7 +344,7 @@ function sft_render_tab_settings(): void {
 					<th><label for="sft_storage_quota_mb">Per-User Quota (MB)</label></th>
 					<td>
 						<input type="number" id="sft_storage_quota_mb" name="sft_storage_quota_mb"
-						       value="<?php echo $storage_quota_mb; ?>" min="0" style="width:80px;">
+						       value="<?php echo (int) $storage_quota_mb; ?>" min="0" style="width:80px;">
 						<p class="description">Maximum total encrypted storage per vault user across all their vaults. 0 = no limit. WordPress and SFT admins are exempt.</p>
 					</td>
 				</tr>

@@ -15,6 +15,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
+
 function sft_render_tab_vaults(): void {
 	$vault_id = (int) ( $_GET['vault_id'] ?? 0 );
 
@@ -67,7 +70,7 @@ function sft_render_vault_list(): void {
 					<select name="f_status" style="width:100%;">
 						<option value="">All</option>
 						<?php foreach ( [ 'active', 'expired', 'revoked', 'archived' ] as $s ) : ?>
-							<option value="<?php echo esc_attr( $s ); ?>" <?php selected( $f_status, $s ); ?>><?php echo ucfirst( $s ); ?></option>
+							<option value="<?php echo esc_attr( $s ); ?>" <?php selected( $f_status, $s ); ?>><?php echo esc_html( ucfirst( $s ) ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</p>
@@ -85,16 +88,16 @@ function sft_render_vault_list(): void {
 
 		<!-- Table -->
 		<div class="sft-filter-body">
-			<p style="color:#888;font-size:13px;margin:0 0 8px;"><?php echo number_format( $total ); ?> vault<?php echo $total !== 1 ? 's' : ''; ?> found</p>
+			<p style="color:#888;font-size:13px;margin:0 0 8px;"><?php echo esc_html( number_format( $total ) ); ?> vault<?php echo $total !== 1 ? 's' : ''; ?> found</p>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<?php echo sft_sortable_th( 'Vault Name', 'name',       $f_orderby, $f_order, $sort_base ); ?>
+					<?php echo sft_sortable_th( 'Vault Name', 'name',       $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort>Owner</th>
-					<?php echo sft_sortable_th( 'Status',     'status',     $f_orderby, $f_order, $sort_base ); ?>
+					<?php echo sft_sortable_th( 'Status',     'status',     $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort>Files</th>
 					<th data-nosort>Shares</th>
-					<?php echo sft_sortable_th( 'Created',    'created_at', $f_orderby, $f_order, $sort_base ); ?>
-					<?php echo sft_sortable_th( 'Expires',    'expires_at', $f_orderby, $f_order, $sort_base ); ?>
+					<?php echo sft_sortable_th( 'Created',    'created_at', $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo sft_sortable_th( 'Expires',    'expires_at', $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort>Actions</th>
 				</tr></thead>
 				<tbody>
@@ -182,7 +185,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<div class="sft-card" style="margin-top:0;padding:14px 20px;">
 				<form method="post" action="<?php echo esc_url( $form_url ); ?>">
 					<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
-					<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+					<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 					<div style="margin-bottom:10px;">
 						<label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">
 							Vault Name <span style="color:#d63638;">*</span>
@@ -210,7 +213,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<div class="sft-card" style="margin-top:0;padding:14px 20px;">
 				<form method="post" action="<?php echo esc_url( $form_url ); ?>" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
 					<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
-					<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+					<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 					<div>
 						<label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">
 							Expiry Date <span style="font-weight:400;color:#888;">(leave blank to remove)</span>
@@ -233,11 +236,11 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
 				<form method="post" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0;">
 					<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
-					<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+					<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 					<label style="font-size:13px;font-weight:600;">Change Status:</label>
 					<select name="new_status" style="padding:4px 8px;font-size:13px;">
 						<?php foreach ( [ 'active', 'expired', 'revoked', 'archived' ] as $s ) : ?>
-							<option value="<?php echo esc_attr( $s ); ?>" <?php selected( $vault->status, $s ); ?>><?php echo ucfirst( $s ); ?></option>
+							<option value="<?php echo esc_attr( $s ); ?>" <?php selected( $vault->status, $s ); ?>><?php echo esc_html( ucfirst( $s ) ); ?></option>
 						<?php endforeach; ?>
 					</select>
 					<input type="submit" name="sft_admin_vault_status" value="Update Status" class="button">
@@ -245,7 +248,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 				<form method="post" style="display:flex; align-items:center; margin:0;"
 				      onsubmit="return confirm('Permanently delete this vault and ALL its files? This cannot be undone.');">
 					<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
-					<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+					<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 					<input type="submit" name="sft_admin_delete_vault" value="Delete Vault" class="button sft-danger">
 				</form>
 			</div>
@@ -258,7 +261,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 				<p style="font-size:13px;margin:0 0 8px;">Enter the login name or email of the new vault owner. They must already have Vault User or SFT Admin access.</p>
 				<form method="post" style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
 					<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
-					<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+					<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 					<input type="text" name="new_owner_login" placeholder="username or email"
 					       style="width:220px;padding:4px 8px;font-size:13px;" required>
 					<input type="submit" name="sft_admin_transfer_vault" value="Transfer" class="button button-primary">
@@ -269,11 +272,11 @@ function sft_render_vault_inspector( int $vault_id ): void {
 
 		<!-- Files -->
 		<div class="sft-card">
-			<h3 style="margin-top:0;">Encrypted Files (<?php echo count( $files ); ?>)</h3>
+			<h3 style="margin-top:0;">Encrypted Files (<?php echo (int) count( $files ); ?>)</h3>
 			<?php if ( ! $files ) : ?>
 				<p style="color:#888;font-size:13px;">No files in this vault.</p>
 			<?php else : ?>
-				<table id="sft-insp-files-<?php echo $vault_id; ?>" class="sft-table widefat">
+				<table id="sft-insp-files-<?php echo (int) $vault_id; ?>" class="sft-table widefat">
 					<thead><tr>
 						<th>Filename</th><th>Size</th><th>Uploaded By</th><th>Date</th><th data-nosort>Actions</th>
 					</tr></thead>
@@ -292,7 +295,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 								      onsubmit="return confirm('Permanently delete this file?');">
 									<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
 									<input type="hidden" name="file_id"  value="<?php echo (int) $f->id; ?>">
-									<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+									<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 									<input type="submit" name="sft_admin_delete_file" value="Delete" class="sft-btn sft-danger">
 								</form>
 							</td>
@@ -305,11 +308,11 @@ function sft_render_vault_inspector( int $vault_id ): void {
 
 		<!-- Shares -->
 		<div class="sft-card">
-			<h3 style="margin-top:0;">Shares (<?php echo count( $shares ); ?>)</h3>
+			<h3 style="margin-top:0;">Shares (<?php echo (int) count( $shares ); ?>)</h3>
 			<?php if ( ! $shares ) : ?>
 				<p style="color:#888;font-size:13px;">No shares created for this vault.</p>
 			<?php else : ?>
-				<table id="sft-insp-shares-<?php echo $vault_id; ?>" class="sft-table widefat">
+				<table id="sft-insp-shares-<?php echo (int) $vault_id; ?>" class="sft-table widefat">
 					<thead><tr>
 						<th>Recipient</th><th>Status</th><th>Created By</th><th>Downloads</th>
 						<th>Expires</th><th>Last Access</th><th data-nosort>Actions</th>
@@ -337,7 +340,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 									<form method="post" style="display:inline;margin-right:4px;">
 										<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
 										<input type="hidden" name="share_id" value="<?php echo (int) $s->id; ?>">
-										<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+										<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 										<input type="submit" name="sft_admin_resend_share" value="Resend" class="sft-btn"
 										       title="Resend the invite email to <?php echo esc_attr( $s->recipient_email ); ?>">
 									</form>
@@ -345,11 +348,11 @@ function sft_render_vault_inspector( int $vault_id ): void {
 									      onsubmit="return confirm('Revoke this share? The recipient loses access immediately.');">
 										<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
 										<input type="hidden" name="share_id" value="<?php echo (int) $s->id; ?>">
-										<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+										<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 										<input type="submit" name="sft_admin_revoke_share" value="Revoke" class="sft-btn sft-danger">
 									</form>
 								<?php else : ?>
-									<span style="color:#aaa;font-size:12px;"><?php echo ucfirst( $s->status ); ?></span>
+									<span style="color:#aaa;font-size:12px;"><?php echo esc_html( ucfirst( $s->status ) ); ?></span>
 								<?php endif; ?>
 							</td>
 						</tr>
@@ -360,7 +363,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 								      style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
 									<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
 									<input type="hidden" name="share_id" value="<?php echo (int) $s->id; ?>">
-									<input type="hidden" name="vault_id" value="<?php echo $vault_id; ?>">
+									<input type="hidden" name="vault_id" value="<?php echo (int) $vault_id; ?>">
 									<div>
 										<label style="display:block;font-size:12px;font-weight:600;margin-bottom:3px;">Download Limit <span style="font-weight:400;color:#888;">(0 = ∞)</span></label>
 										<input type="number" name="share_max_downloads"
@@ -394,7 +397,7 @@ function sft_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $audit_rows ) : ?>
 				<p style="color:#888;font-size:13px;">No audit events recorded for this vault.</p>
 			<?php else : ?>
-				<table id="sft-insp-audit-<?php echo $vault_id; ?>" class="sft-table widefat striped">
+				<table id="sft-insp-audit-<?php echo (int) $vault_id; ?>" class="sft-table widefat striped">
 					<thead><tr>
 						<th>Event</th><th>Actor</th><th>IP</th><th data-nosort>Details</th><th>Time</th>
 					</tr></thead>

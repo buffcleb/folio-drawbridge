@@ -29,6 +29,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.WP.AlternativeFunctions -- streams encrypted files in fixed-size chunks and manages its own protected storage directory; WP_Filesystem cannot stream and buffers whole files in memory.
+
 // ─── Master key ───────────────────────────────────────────────────────────────
 
 /**
@@ -43,7 +45,7 @@ function sft_get_master_key(): string {
 			return hex2bin( $hex );
 		}
 		// Misconfigured constant — log and fall through to DB key.
-		error_log( 'Folio Drawbridge: SFT_MASTER_KEY is defined but is not a valid 64-character hex string. Falling back to database key.' );
+		error_log( 'Folio Drawbridge: SFT_MASTER_KEY is defined but is not a valid 64-character hex string. Falling back to database key.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- deliberate one-line warning so admins notice a misconfigured key constant.
 	}
 
 	$hex = get_option( 'sft_master_key' );
@@ -239,7 +241,7 @@ function sft_stream_decrypt_file(
 			break;
 		}
 
-		echo $decrypted;
+		echo $decrypted; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- raw decrypted file bytes streamed to the browser; escaping would corrupt the download.
 		$current_iv = substr( $cipher_chunk, -$block );
 	}
 
@@ -263,7 +265,7 @@ function sft_stream_decrypt_file(
 			} else {
 				// Strip PKCS7 padding.
 				$pad = ord( $decrypted[-1] );
-				echo substr( $decrypted, 0, -$pad );
+				echo substr( $decrypted, 0, -$pad ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- raw decrypted file bytes streamed to the browser; escaping would corrupt the download.
 			}
 		}
 	}

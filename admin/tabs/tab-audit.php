@@ -12,6 +12,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
+
 // ─── CSV export (must run before any output — hooked via admin_init in admin class) ──
 add_action( 'admin_init', 'sft_maybe_export_audit_csv' );
 
@@ -125,7 +128,7 @@ function sft_render_tab_audit(): void {
 
 				<p style="margin:0 0 8px;">
 					<label style="display:block;font-weight:600;margin-bottom:3px;font-size:13px;">Vault ID</label>
-					<input type="number" name="f_vault_id" value="<?php echo $f_vault_id ?: ''; ?>" style="width:100%;" placeholder="e.g. 42" min="1">
+					<input type="number" name="f_vault_id" value="<?php echo $f_vault_id ? (int) $f_vault_id : ''; ?>" style="width:100%;" placeholder="e.g. 42" min="1">
 				</p>
 
 				<p style="margin:0 0 8px;">
@@ -166,20 +169,20 @@ function sft_render_tab_audit(): void {
 		<!-- Table -->
 		<div class="sft-filter-body">
 			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-				<span style="color:#888;font-size:13px;"><?php echo number_format( $total ); ?> event<?php echo $total !== 1 ? 's' : ''; ?> found</span>
+				<span style="color:#888;font-size:13px;"><?php echo esc_html( number_format( $total ) ); ?> event<?php echo $total !== 1 ? 's' : ''; ?> found</span>
 				<a href="<?php echo esc_url( $export_url ); ?>" class="button">Export to CSV</a>
 			</div>
 
 			<?php $audit_sort_base = array_merge( [ 'page' => 'sft-pro', 'tab' => 'audit' ], $filter_args ); ?>
 			<table class="sft-table widefat striped">
 				<thead><tr>
-					<?php echo sft_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); ?>
-					<?php echo sft_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
-					<?php echo sft_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
-					<?php echo sft_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo sft_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo sft_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo sft_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort>IP</th>
 					<th data-nosort>Details</th>
-					<?php echo sft_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php echo sft_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 				</tr></thead>
 				<tbody>
 				<?php if ( ! $rows ) : ?>
@@ -196,7 +199,7 @@ function sft_render_tab_audit(): void {
 				?>
 					<tr>
 						<td><strong><?php echo esc_html( sft_audit_event_label( $row->event_type ) ); ?></strong></td>
-						<td><?php echo $vault_link; // escaped above ?></td>
+						<td><?php echo $vault_link; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built above from esc_url/esc_html parts. ?></td>
 						<td><?php echo $row->share_id ? '#' . (int) $row->share_id : '—'; ?></td>
 						<td><?php echo $actor ? esc_html( $actor->user_login ) : '<em>system</em>'; ?></td>
 						<td style="font-size:11px;color:#888;"><?php echo esc_html( $row->ip_address ); ?></td>

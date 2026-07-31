@@ -9,6 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
+
 function sft_render_tab_dashboard(): void {
 	global $wpdb;
 
@@ -93,15 +96,15 @@ function sft_render_tab_dashboard(): void {
 				$pts[] = round( $i * $step ) . ',' . round( $sh - ( $v / $max_val ) * $sh );
 			}
 			?>
-			<svg viewBox="0 0 <?php echo $sw; ?> <?php echo $sh + 20; ?>" style="width:100%;overflow:visible;">
+			<svg viewBox="0 0 <?php echo (int) $sw; ?> <?php echo (int) $sh + 20; ?>" style="width:100%;overflow:visible;">
 				<?php foreach ( $days as $i => $day ) : ?>
-					<text x="<?php echo round( $i * $step ); ?>" y="<?php echo $sh + 14; ?>"
+					<text x="<?php echo (int) round( $i * $step ); ?>" y="<?php echo (int) $sh + 14; ?>"
 					      text-anchor="middle" font-size="8" fill="#aaa"><?php echo esc_html( gmdate( 'M j', strtotime( $day ) ) ); ?></text>
 				<?php endforeach; ?>
-				<polyline points="<?php echo implode( ' ', $pts ); ?>"
+				<polyline points="<?php echo esc_attr( implode( ' ', $pts ) ); ?>"
 				          fill="none" stroke="#2271b1" stroke-width="2.5" stroke-linejoin="round"/>
 				<?php foreach ( $vals as $i => $v ) : ?>
-					<circle cx="<?php echo round( $i * $step ); ?>" cy="<?php echo round( $sh - ( $v / $max_val ) * $sh ); ?>"
+					<circle cx="<?php echo (int) round( $i * $step ); ?>" cy="<?php echo (int) round( $sh - ( $v / $max_val ) * $sh ); ?>"
 					        r="3" fill="#2271b1"/>
 				<?php endforeach; ?>
 			</svg>
@@ -120,13 +123,12 @@ function sft_render_tab_dashboard(): void {
 					<tbody>
 					<?php foreach ( $recent as $row ) :
 						$actor = $row->actor_id ? get_userdata( (int) $row->actor_id ) : null;
-						$actor_label = $actor ? $actor->user_login : '<em>system</em>';
 						$vault_label = $row->vault_id ? '#' . (int) $row->vault_id : '—';
 					?>
 						<tr>
 							<td><strong><?php echo esc_html( sft_audit_event_label( $row->event_type ) ); ?></strong></td>
 							<td><?php echo esc_html( $vault_label ); ?></td>
-							<td><?php echo $actor_label; // pre-sanitized ?></td>
+							<td><?php echo $actor ? esc_html( $actor->user_login ) : '<em>system</em>'; ?></td>
 							<td style="color:#888;white-space:nowrap;"><?php echo esc_html( gmdate( 'M j, H:i', strtotime( $row->created_at ) ) ); ?></td>
 						</tr>
 					<?php endforeach; ?>
