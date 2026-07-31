@@ -177,7 +177,7 @@ function sft_render_tab_users(): void {
 							<td style="font-size:13px;"><?php echo esc_html( $u->user_email ); ?></td>
 							<td style="font-size:13px;">
 								<?php if ( $user_vaults ) : ?>
-									<a href="#" onclick="return sftToggleUserVaults(<?php echo (int) $u->ID; ?>, this);" style="text-decoration:none;"><?php echo count( $user_vaults ); ?> <span style="font-size:10px;">▸</span></a>
+									<a href="#" class="sft-btn" onclick="return sftToggleUserVaults(<?php echo (int) $u->ID; ?>, this);"><?php echo count( $user_vaults ); ?> vault<?php echo count( $user_vaults ) === 1 ? '' : 's'; ?> <span>▸</span></a>
 								<?php else : ?>
 									0
 								<?php endif; ?>
@@ -229,7 +229,7 @@ function sft_render_tab_users(): void {
 							<td style="font-size:13px;"><?php echo esc_html( $u->user_email ); ?></td>
 							<td style="font-size:13px;">
 								<?php if ( $user_vaults ) : ?>
-									<a href="#" onclick="return sftToggleUserVaults(<?php echo (int) $u->ID; ?>, this);" style="text-decoration:none;"><?php echo count( $user_vaults ); ?> <span style="font-size:10px;">▸</span></a>
+									<a href="#" class="sft-btn" onclick="return sftToggleUserVaults(<?php echo (int) $u->ID; ?>, this);"><?php echo count( $user_vaults ); ?> vault<?php echo count( $user_vaults ) === 1 ? '' : 's'; ?> <span>▸</span></a>
 								<?php else : ?>
 									0
 								<?php endif; ?>
