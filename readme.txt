@@ -70,7 +70,9 @@ Yes. Each share can have a download limit and an expiry date, and site-wide defa
 4. Settings — two-factor verification (code validity, attempt limit, request rate limit) and download limits.
 5. Settings — link expiration defaults and ceilings, chunked upload size limit, and audit log retention.
 6. Settings — encryption key source and generator, SIEM log file export, and owner notification options.
-7. Settings — file type allowlist, per-user storage quotas, customisable email templates with placeholder tokens, and data removal policy.
+7. Settings — file type allowlist and per-user storage quotas.
+8. Settings — customisable templates for all four system emails, each with its available placeholder tokens.
+9. Settings — data removal policy on uninstall, and encrypted storage location with its protection status.
 
 == Changelog ==
 
