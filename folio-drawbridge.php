@@ -10,7 +10,7 @@
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain:       folio-drawbridge
  * Requires at least: 5.3
- * Tested up to:      7.0.2
+ * Tested up to:      7.0
  * Requires PHP:      7.4
  *
  * @package FolioDrawbridge
