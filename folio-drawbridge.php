@@ -1,13 +1,17 @@
 <?php
 /**
  * Plugin Name:       Folio Drawbridge
+ * Plugin URI:        https://github.com/buffcleb/folio-drawbridge
  * Description:       Encrypted file vaults with two-factor external sharing, comprehensive audit logging, lifecycle management, and role-based vault oversight.
  * Version:           1.2.0
- * Requires at least: 5.3
- * Requires PHP:      7.4
+ * Author:            buffcleb
+ * Author URI:        https://github.com/buffcleb
  * License:           GPL-3.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain:       folio-drawbridge
+ * Requires at least: 5.3
+ * Tested up to:      7.0.2
+ * Requires PHP:      7.4
  *
  * @package FolioDrawbridge
  */
