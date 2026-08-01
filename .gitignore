@@ -37,3 +37,6 @@ uploads/
 # PHPUnit
 .phpunit.result.cache
 coverage/
+
+# Release packages built by bin/build-release.sh
+/build/
