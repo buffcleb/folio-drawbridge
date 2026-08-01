@@ -2,7 +2,7 @@
 Contributors: buffcleb
 Tags: encryption, file-sharing, secure-files, two-factor, audit-log
 Requires at least: 5.3
-Tested up to: 7.0
+Tested up to: 7.2
 Requires PHP: 7.4
 Stable tag: 1.2.0
 License: GPLv3 or later
@@ -64,10 +64,13 @@ Yes. Each share can have a download limit and an expiry date, and site-wide defa
 
 == Screenshots ==
 
-1. Admin dashboard with vault statistics, 7-day download activity, and recent events.
-2. Vault inspector — files, shares, and audit trail for a single vault.
-3. Recipient download page after two-factor verification.
-4. Settings tab with two-factor, share limit, and notification configuration.
+1. Admin dashboard — vault, file, share, and download totals, seven-day download activity, recent events, and the security status panel showing key source, algorithm, storage protection, and cron health.
+2. Vault inspector — encrypted file list with per-file admin download, shares showing live status including "Limit reached", ownership transfer, status control, and the vault's own audit trail.
+3. Recipient download page after two-factor verification, with per-file downloads and the ZIP bulk download option.
+4. Settings — two-factor verification (code validity, attempt limit, request rate limit) and download limits.
+5. Settings — link expiration defaults and ceilings, chunked upload size limit, and audit log retention.
+6. Settings — encryption key source and generator, SIEM log file export, and owner notification options.
+7. Settings — file type allowlist, per-user storage quotas, customisable email templates with placeholder tokens, and data removal policy.
 
 == Changelog ==
 
