@@ -41,25 +41,40 @@ git archive --format=zip --prefix="${SLUG}/" --output="$ZIP" "$REF"
 
 echo "built: ${ZIP}"
 echo "version: ${VERSION} (stable tag matches)"
+
+# Listed once and reused. Piping unzip into `grep -q` would trip pipefail: grep
+# exits on its first match, unzip takes SIGPIPE, and the pipeline reports a
+# failure even though the file was found.
+LISTING="$(unzip -Z1 "$ZIP")"
+
 echo
 echo "contents:"
-unzip -Z1 "$ZIP" | sed 's/^/  /'
+printf '%s\n' "$LISTING" | sed 's/^/  /'
 echo
 echo "size: $(du -h "$ZIP" | cut -f1)"
 
-# Anything here would be rejected or flagged during review.
 echo
 echo "sanity checks:"
 PROBLEMS=0
-for pattern in '\.git' '\.DS_Store' 'assets/' 'docs/' 'images/' 'node_modules' '\.claude'; do
-	if unzip -Z1 "$ZIP" | grep -qE "$pattern"; then
+
+# Anything matching these would be flagged in review or is simply dead weight.
+for pattern in '(^|/)\.git' '\.DS_Store' '^'"${SLUG}"'/assets/' '^'"${SLUG}"'/docs/' '^'"${SLUG}"'/images/' 'node_modules' '\.claude' '^'"${SLUG}"'/bin/'; do
+	if printf '%s\n' "$LISTING" | grep -qE "$pattern"; then
 		echo "  ✗ contains ${pattern}"
 		PROBLEMS=1
 	fi
 done
-unzip -Z1 "$ZIP" | grep -q "^${SLUG}/${SLUG}.php$" || { echo "  ✗ main plugin file missing"; PROBLEMS=1; }
-unzip -Z1 "$ZIP" | grep -q "^${SLUG}/readme.txt$"   || { echo "  ✗ readme.txt missing"; PROBLEMS=1; }
-unzip -Z1 "$ZIP" | grep -q "^${SLUG}/uninstall.php$" || { echo "  ✗ uninstall.php missing"; PROBLEMS=1; }
-[ "$PROBLEMS" -eq 0 ] && echo "  ✓ all clear"
+
+# Everything WordPress needs in order to install and uninstall the plugin.
+for required in "${SLUG}/${SLUG}.php" "${SLUG}/readme.txt" "${SLUG}/uninstall.php" "${SLUG}/LICENSE"; do
+	if ! printf '%s\n' "$LISTING" | grep -qxF "$required"; then
+		echo "  ✗ missing ${required}"
+		PROBLEMS=1
+	fi
+done
+
+if [ "$PROBLEMS" -eq 0 ]; then
+	echo "  ✓ all clear"
+fi
 
 exit "$PROBLEMS"
