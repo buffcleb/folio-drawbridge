@@ -92,29 +92,12 @@ function sft_handle_admin_post(): void {
 		// SIEM logging.
 		$siem_enabled    = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
 		$siem_log_path   = sanitize_text_field( wp_unslash( $_POST['sft_siem_log_path'] ?? '' ) );
-		$siem_path_error = '';
-		if ( $siem_log_path !== '' ) {
-			// The log receives attacker-influenced text — a recipient's typed email
-			// is recorded on OTP mismatch — so the destination must never be a file
-			// the web server can execute or serve. Absolute path, no traversal, and
-			// outside the WordPress directory with a non-executable extension.
-			$candidate   = wp_normalize_path( $siem_log_path );
-			$abs_root    = wp_normalize_path( trailingslashit( ABSPATH ) );
-			$ext         = strtolower( pathinfo( $candidate, PATHINFO_EXTENSION ) );
-			$blocked_ext = [ 'php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'php8', 'phps', 'phar', 'htaccess', 'html', 'htm', 'js', 'cgi', 'pl' ];
-
-			if ( ! path_is_absolute( $candidate ) || strpos( $candidate, '..' ) !== false ) {
-				$siem_path_error = 'SIEM log path must be an absolute path with no ".." segments.';
-			} elseif ( strpos( $candidate, $abs_root ) === 0 ) {
-				$siem_path_error = 'SIEM log path must be outside the WordPress directory so the log can never be requested over the web.';
-			} elseif ( in_array( $ext, $blocked_ext, true ) ) {
-				$siem_path_error = 'SIEM log path must not use an executable or web-servable file extension.';
-			}
-
-			if ( $siem_path_error !== '' ) {
-				$siem_log_path    = get_option( 'sft_siem_log_path', '' ); // keep previous value
-				$siem_path_error .= ' Previous value retained.';
-			}
+		// The rule itself lives with the writer (sft_siem_path_error), so the
+		// check made here and the check made on every append can never drift.
+		$siem_path_error = sft_siem_path_error( $siem_log_path );
+		if ( $siem_path_error !== '' ) {
+			$siem_log_path    = get_option( 'sft_siem_log_path', '' ); // keep previous value
+			$siem_path_error .= ' Previous value retained.';
 		}
 		$siem_format = sanitize_key( wp_unslash( $_POST['sft_siem_format'] ?? 'json' ) );
 		$siem_format = in_array( $siem_format, [ 'json', 'csv' ], true ) ? $siem_format : 'json';

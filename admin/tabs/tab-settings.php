@@ -50,10 +50,13 @@ function sft_render_tab_settings(): void {
 	$default_expiry_days  = (int) get_option( 'sft_default_expiry_days', 0 );
 	$max_expiry_days      = (int) get_option( 'sft_max_expiry_days', 0 );
 
-	// SIEM logging settings.
-	$siem_enabled  = get_option( 'sft_siem_enabled', '0' );
-	$siem_log_path = (string) get_option( 'sft_siem_log_path', '' );
-	$siem_format   = get_option( 'sft_siem_format', 'json' );
+	// SIEM logging settings. A path stored before the validation rule existed can
+	// still be sitting in the options table; the writer refuses it, so say so
+	// here rather than leaving an administrator to wonder why the feed is empty.
+	$siem_enabled      = get_option( 'sft_siem_enabled', '0' );
+	$siem_log_path     = (string) get_option( 'sft_siem_log_path', '' );
+	$siem_format       = get_option( 'sft_siem_format', 'json' );
+	$siem_stored_error = sft_siem_path_error( $siem_log_path );
 
 	$form_url = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) );
 	$ajax_url = admin_url( 'admin-ajax.php' );
@@ -278,6 +281,12 @@ function sft_render_tab_settings(): void {
 						<input type="text" id="sft_siem_log_path" name="sft_siem_log_path"
 						       value="<?php echo esc_attr( $siem_log_path ); ?>"
 						       style="width:100%;max-width:520px;" placeholder="/var/log/sft-audit.json">
+						<?php if ( $siem_stored_error !== '' ) : ?>
+							<p style="margin:6px 0;color:#d63638;">
+								<strong>Nothing is being written to this path.</strong>
+								<?php echo esc_html( $siem_stored_error ); ?>
+							</p>
+						<?php endif; ?>
 						<p class="description">
 							Absolute path to the log file on the server, <strong>outside</strong> the WordPress directory, with a non-executable extension.
 							The web server process must have write permission. Example: <code>/var/log/sft-audit.log</code>

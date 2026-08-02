@@ -129,6 +129,47 @@ function sft_csv_safe( $value ): string {
 // ─── SIEM file logger ─────────────────────────────────────────────────────────
 
 /**
+ * Returns why a SIEM log path must be refused, or '' when it is acceptable.
+ *
+ * The log receives attacker-influenced text — a recipient's typed email is
+ * recorded on OTP mismatch, and filenames come from uploads — so the
+ * destination must never be a file the web server can execute or serve.
+ * Required: an absolute path, no traversal, outside the WordPress directory,
+ * and a non-executable extension.
+ *
+ * Settings validates a path before storing it, and the writer checks again
+ * before every append. The second check is not redundant: a path stored before
+ * this rule existed is still sitting in the options table, and only the writer
+ * is in a position to refuse it.
+ *
+ * @param string $path Candidate log path.
+ * @return string Empty when acceptable, otherwise a human-readable reason.
+ */
+function sft_siem_path_error( string $path ): string {
+	$path = trim( $path );
+	if ( $path === '' ) {
+		return '';
+	}
+
+	$candidate   = wp_normalize_path( $path );
+	$abs_root    = wp_normalize_path( trailingslashit( ABSPATH ) );
+	$ext         = strtolower( pathinfo( $candidate, PATHINFO_EXTENSION ) );
+	$blocked_ext = [ 'php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'php8', 'phps', 'phar', 'htaccess', 'html', 'htm', 'js', 'cgi', 'pl' ];
+
+	if ( ! path_is_absolute( $candidate ) || strpos( $candidate, '..' ) !== false ) {
+		return 'SIEM log path must be an absolute path with no ".." segments.';
+	}
+	if ( strpos( $candidate, $abs_root ) === 0 ) {
+		return 'SIEM log path must be outside the WordPress directory so the log can never be requested over the web.';
+	}
+	if ( in_array( $ext, $blocked_ext, true ) ) {
+		return 'SIEM log path must not use an executable or web-servable file extension.';
+	}
+
+	return '';
+}
+
+/**
  * Appends an audit event to the SIEM log file if file logging is enabled.
  *
  * Controlled by three options set in Settings:
@@ -154,6 +195,13 @@ function sft_siem_write(
 
 	$path = trim( (string) get_option( 'sft_siem_log_path', '' ) );
 	if ( ! $path ) {
+		return;
+	}
+
+	// A stored path may predate the validation in Settings. Never append to a
+	// location the web server could serve or execute; the event is still in the
+	// database audit log either way.
+	if ( sft_siem_path_error( $path ) !== '' ) {
 		return;
 	}
 
