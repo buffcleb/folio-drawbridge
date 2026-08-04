@@ -1,6 +1,6 @@
 # User Guide — My Vaults
 
-This guide is for users who have been granted **Vault User** or **SFT Admin** access by a site administrator. If you can't see the **My Vaults** menu in your wp-admin sidebar, contact your administrator.
+This guide is for users who have been granted **Vault User** or **Drawbridge Admin** access by a site administrator. If you can't see the **My Vaults** menu in your wp-admin sidebar, contact your administrator.
 
 ---
 
@@ -163,4 +163,4 @@ If your administrator has enabled it, a **Secure File Transfer — My Vaults** w
 
 ## Shortcode (Front-End)
 
-The `[sft_my_vaults]` shortcode renders equivalent vault management functionality on any front-end WordPress page. All the same create/upload/share/revoke features are available. Useful for sites that want to keep editors or clients out of wp-admin entirely.
+The `[folio_drawbridge_vaults]` shortcode renders equivalent vault management functionality on any front-end WordPress page. All the same create/upload/share/revoke features are available. Useful for sites that want to keep editors or clients out of wp-admin entirely.

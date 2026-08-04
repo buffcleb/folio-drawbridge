@@ -13,7 +13,7 @@
  * Tested up to:      7.0
  * Requires PHP:      7.4
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,38 +21,39 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ─── Plugin constants ─────────────────────────────────────────────────────────
-define( 'SFT_VERSION',    '1.2.0' );
-define( 'SFT_DB_VERSION', '1.2.1' ); // bump to apply the sft_audit composite index
-define( 'SFT_DIR',        plugin_dir_path( __FILE__ ) );
-define( 'SFT_BASENAME',   plugin_basename( __FILE__ ) );
-define( 'SFT_VAULT_DIR',  WP_CONTENT_DIR . '/uploads/sft-vaults/' );
+define( 'FOLIO_DRAWBRIDGE_VERSION',          '1.2.0' );
+define( 'FOLIO_DRAWBRIDGE_DB_VERSION',       '1.2.1' ); // bump to apply the folio_drawbridge_audit composite index
+define( 'FOLIO_DRAWBRIDGE_PLUGIN_DIR',       plugin_dir_path( __FILE__ ) );
+define( 'FOLIO_DRAWBRIDGE_PLUGIN_URL',       plugin_dir_url( __FILE__ ) );
+define( 'FOLIO_DRAWBRIDGE_PLUGIN_BASENAME',  plugin_basename( __FILE__ ) );
+define( 'FOLIO_DRAWBRIDGE_VAULT_DIR',        WP_CONTENT_DIR . '/uploads/folio-drawbridge-vaults/' );
 
-// Administrators can define SFT_MASTER_KEY as 64 hex chars in wp-config.php
+// Administrators can define FOLIO_DRAWBRIDGE_MASTER_KEY as 64 hex chars in wp-config.php
 // to keep the encryption master key out of the database entirely.
 
-// ─── SFT admin capability ─────────────────────────────────────────────────────
+// ─── Drawbridge admin capability ─────────────────────────────────────────────────────
 
 /**
- * Returns true when the user is an SFT administrator.
+ * Returns true when the user is an Drawbridge administrator.
  *
  * WordPress administrators (manage_options) always qualify. Non-admin users
- * explicitly granted the sft_admin capability also qualify, giving them full
- * access to the SFT admin panel without WordPress administrator privileges.
+ * explicitly granted the folio_drawbridge_admin capability also qualify, giving them full
+ * access to the Drawbridge admin panel without WordPress administrator privileges.
  *
  * @param int|null $user_id Defaults to the current user.
  */
-function sft_is_admin( ?int $user_id = null ): bool {
+function folio_drawbridge_is_admin( ?int $user_id = null ): bool {
 	if ( $user_id !== null ) {
 		$user = get_userdata( $user_id );
-		return $user && ( $user->has_cap( 'manage_options' ) || $user->has_cap( 'sft_admin' ) );
+		return $user && ( $user->has_cap( 'manage_options' ) || $user->has_cap( 'folio_drawbridge_manage_vaults' ) );
 	}
-	return current_user_can( 'manage_options' ) || current_user_can( 'sft_admin' );
+	return current_user_can( 'manage_options' ) || current_user_can( 'folio_drawbridge_manage_vaults' );
 }
 
-// WordPress administrators implicitly receive the sft_admin capability.
+// WordPress administrators implicitly receive the folio_drawbridge_admin capability.
 add_filter( 'user_has_cap', static function ( array $allcaps ): array {
 	if ( ! empty( $allcaps['manage_options'] ) ) {
-		$allcaps['sft_admin'] = true;
+		$allcaps['folio_drawbridge_manage_vaults'] = true;
 	}
 	return $allcaps;
 } );
@@ -69,24 +70,24 @@ add_filter( 'user_has_cap', static function ( array $allcaps ): array {
  * @param string $utc_mysql  MySQL datetime string in UTC.
  * @param string $format     Date format accepted by wp_date().
  */
-function sft_format_date( string $utc_mysql, string $format = 'M j, Y g:i A' ): string {
+function folio_drawbridge_format_date( string $utc_mysql, string $format = 'M j, Y g:i A' ): string {
 	$ts = strtotime( $utc_mysql . ' UTC' );
 	return $ts ? (string) wp_date( $format, $ts ) : '';
 }
 
 // ─── Load core modules ────────────────────────────────────────────────────────
-require_once SFT_DIR . 'includes/class-sft-db.php';
-require_once SFT_DIR . 'includes/class-sft-crypto.php';
-require_once SFT_DIR . 'includes/class-sft-audit.php';
-require_once SFT_DIR . 'includes/class-sft-vault.php';
-require_once SFT_DIR . 'includes/class-sft-share.php';
-require_once SFT_DIR . 'includes/class-sft-notifications.php';
-require_once SFT_DIR . 'includes/class-sft-lifecycle.php';
-require_once SFT_DIR . 'includes/class-sft-frontend.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-db.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-crypto.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-audit.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-vault.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-share.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-notifications.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-lifecycle.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'includes/class-folio-drawbridge-frontend.php';
 
 if ( is_admin() ) {
-	require_once SFT_DIR . 'admin/class-folio-drawbridge-hub.php';
-	require_once SFT_DIR . 'admin/class-sft-admin.php';
-	require_once SFT_DIR . 'admin/class-sft-user-dashboard.php';
-	require_once SFT_DIR . 'admin/class-sft-dashboard-widgets.php';
+	require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/class-folio-drawbridge-hub.php';
+	require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/class-folio-drawbridge-admin.php';
+	require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/class-folio-drawbridge-user-dashboard.php';
+	require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/class-folio-drawbridge-dashboard-widgets.php';
 }

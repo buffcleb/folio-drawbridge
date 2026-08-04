@@ -13,7 +13,7 @@ The master key is the root secret from which every vault's unique per-vault encr
 Place the constant before the `/* That's all, stop editing! */` comment:
 
 ```php
-define( 'SFT_MASTER_KEY', 'your-64-hex-character-key-here' );
+define( 'FOLIO_DRAWBRIDGE_MASTER_KEY', 'your-64-hex-character-key-here' );
 ```
 
 When the constant is defined, the key is never stored in the database and the Settings tab shows a confirmation.
@@ -24,7 +24,7 @@ When the constant is defined, the key is never stored in the database and the Se
 2. Click **Generate New Key**.
 3. Read the warning, check the acknowledgement checkbox, then click **Show Key**.
 4. Copy the 64-character key immediately — the plugin never stores it.
-5. Paste it as the `SFT_MASTER_KEY` constant in `wp-config.php`.
+5. Paste it as the `FOLIO_DRAWBRIDGE_MASTER_KEY` constant in `wp-config.php`.
 
 <p align="center">
 <img src="/images/AdminDashboard_Settings_EncryptionKeys.jpg" width="300" alt="Admin Dashboard - Key generator modal"/>
@@ -34,7 +34,7 @@ When the constant is defined, the key is never stored in the database and the Se
 
 ### Fallback — database storage
 
-If `SFT_MASTER_KEY` is not defined the plugin auto-generates a key on first use and stores it in `wp_options` (autoload disabled). A yellow advisory banner appears in Settings recommending you move the key to `wp-config.php`.
+If `FOLIO_DRAWBRIDGE_MASTER_KEY` is not defined the plugin auto-generates a key on first use and stores it in `wp_options` (autoload disabled). A yellow advisory banner appears in Settings recommending you move the key to `wp-config.php`.
 
 ---
 
@@ -165,7 +165,7 @@ Writes every audit event to an OS-level log file for ingestion by SIEM tools (Sp
 Both formats include: `timestamp_utc`, `event`, `vault_id`, `share_id`, `actor_id`, `ip`, `details`, `site`.
 
 **Requirements:**
-- Path must be an absolute path (e.g. `/Sites/secure-download/app/public/sft-events.json`).
+- Path must be an absolute path (e.g. `/Sites/secure-download/app/public/folio-drawbridge-events.json`).
 - Path must not contain `..` segments.
 - The directory must already exist; the file is created on first write.
 - The web server process must have write permission to the directory.

@@ -4,7 +4,7 @@
  *
  * Every security-relevant action — vault creation, file upload, share creation,
  * OTP request/failure/success, file download, admin vault access, share
- * revocation, lifecycle expiry — is written as an immutable row in sft_audit.
+ * revocation, lifecycle expiry — is written as an immutable row in folio_drawbridge_audit.
  *
  * Event type constants (use these everywhere; never raw strings):
  *
@@ -16,7 +16,7 @@
  *   DOWNLOAD_NOTIFIED    EXPIRY_WARNING_SENT
  *   ADMIN_VAULT_ACCESS   SETTINGS_SAVED
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,42 +29,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── Event type constants ─────────────────────────────────────────────────────
 
-define( 'SFT_EVT_VAULT_CREATED',       'vault_created' );
-define( 'SFT_EVT_VAULT_DELETED',       'vault_deleted' );
-define( 'SFT_EVT_VAULT_EXPIRED',       'vault_expired' );
-define( 'SFT_EVT_VAULT_STATUS',        'vault_status_changed' );
-define( 'SFT_EVT_FILE_UPLOADED',       'file_uploaded' );
-define( 'SFT_EVT_FILE_DELETED',        'file_deleted' );
-define( 'SFT_EVT_FILE_DOWNLOADED',     'file_downloaded' );
-define( 'SFT_EVT_FILE_SERVED_ADMIN',   'file_served_admin' );
-define( 'SFT_EVT_SHARE_CREATED',       'share_created' );
-define( 'SFT_EVT_SHARE_RESENT',        'share_resent' );
-define( 'SFT_EVT_SHARE_UPDATED',       'share_updated' );
-define( 'SFT_EVT_SHARE_REVOKED',       'share_revoked' );
-define( 'SFT_EVT_SHARE_EXPIRED',       'share_expired' );
-define( 'SFT_EVT_OTP_REQUESTED',       'otp_requested' );
-define( 'SFT_EVT_OTP_FAILED',          'otp_failed' );
-define( 'SFT_EVT_OTP_SUCCESS',         'otp_success' );
-define( 'SFT_EVT_OTP_EXPIRED',         'otp_expired' );
-define( 'SFT_EVT_ADMIN_VAULT_ACCESS',  'admin_vault_access' );
-define( 'SFT_EVT_SETTINGS_SAVED',      'settings_saved' );
-define( 'SFT_EVT_VAULT_UPDATED',       'vault_updated' );
-define( 'SFT_EVT_VAULT_TRANSFERRED',   'vault_transferred' );
-define( 'SFT_EVT_DOWNLOAD_NOTIFIED',   'download_notified' );
-define( 'SFT_EVT_EXPIRY_WARNING_SENT', 'expiry_warning_sent' );
+define( 'FOLIO_DRAWBRIDGE_EVT_VAULT_CREATED',       'vault_created' );
+define( 'FOLIO_DRAWBRIDGE_EVT_VAULT_DELETED',       'vault_deleted' );
+define( 'FOLIO_DRAWBRIDGE_EVT_VAULT_EXPIRED',       'vault_expired' );
+define( 'FOLIO_DRAWBRIDGE_EVT_VAULT_STATUS',        'vault_status_changed' );
+define( 'FOLIO_DRAWBRIDGE_EVT_FILE_UPLOADED',       'file_uploaded' );
+define( 'FOLIO_DRAWBRIDGE_EVT_FILE_DELETED',        'file_deleted' );
+define( 'FOLIO_DRAWBRIDGE_EVT_FILE_DOWNLOADED',     'file_downloaded' );
+define( 'FOLIO_DRAWBRIDGE_EVT_FILE_SERVED_ADMIN',   'file_served_admin' );
+define( 'FOLIO_DRAWBRIDGE_EVT_SHARE_CREATED',       'share_created' );
+define( 'FOLIO_DRAWBRIDGE_EVT_SHARE_RESENT',        'share_resent' );
+define( 'FOLIO_DRAWBRIDGE_EVT_SHARE_UPDATED',       'share_updated' );
+define( 'FOLIO_DRAWBRIDGE_EVT_SHARE_REVOKED',       'share_revoked' );
+define( 'FOLIO_DRAWBRIDGE_EVT_SHARE_EXPIRED',       'share_expired' );
+define( 'FOLIO_DRAWBRIDGE_EVT_OTP_REQUESTED',       'otp_requested' );
+define( 'FOLIO_DRAWBRIDGE_EVT_OTP_FAILED',          'otp_failed' );
+define( 'FOLIO_DRAWBRIDGE_EVT_OTP_SUCCESS',         'otp_success' );
+define( 'FOLIO_DRAWBRIDGE_EVT_OTP_EXPIRED',         'otp_expired' );
+define( 'FOLIO_DRAWBRIDGE_EVT_ADMIN_VAULT_ACCESS',  'admin_vault_access' );
+define( 'FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED',      'settings_saved' );
+define( 'FOLIO_DRAWBRIDGE_EVT_VAULT_UPDATED',       'vault_updated' );
+define( 'FOLIO_DRAWBRIDGE_EVT_VAULT_TRANSFERRED',   'vault_transferred' );
+define( 'FOLIO_DRAWBRIDGE_EVT_DOWNLOAD_NOTIFIED',   'download_notified' );
+define( 'FOLIO_DRAWBRIDGE_EVT_EXPIRY_WARNING_SENT', 'expiry_warning_sent' );
 
 // ─── Core logging function ────────────────────────────────────────────────────
 
 /**
  * Inserts one audit event row.
  *
- * @param string      $event_type  One of the SFT_EVT_* constants.
+ * @param string      $event_type  One of the FOLIO_DRAWBRIDGE_EVT_* constants.
  * @param int|null    $vault_id    Associated vault (null if not applicable).
  * @param int|null    $share_id    Associated share (null if not applicable).
  * @param array       $details     Arbitrary key→value context (stored as JSON).
  * @param int|null    $actor_id    WP user performing the action; null for system/anonymous.
  */
-function sft_log(
+function folio_drawbridge_log(
 	string $event_type,
 	?int   $vault_id  = null,
 	?int   $share_id  = null,
@@ -78,11 +78,11 @@ function sft_log(
 		$actor_id = get_current_user_id() ?: null;
 	}
 
-	$ip         = sft_get_client_ip();
+	$ip         = folio_drawbridge_get_client_ip();
 	$created_at = current_time( 'mysql', true );
 
 	$wpdb->insert(
-		"{$wpdb->prefix}sft_audit",
+		"{$wpdb->prefix}folio_drawbridge_audit",
 		[
 			'event_type' => $event_type,
 			'vault_id'   => $vault_id,
@@ -96,7 +96,7 @@ function sft_log(
 		[ '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s' ]
 	);
 
-	sft_siem_write( $event_type, $vault_id, $share_id, $actor_id, $ip, $details, $created_at );
+	folio_drawbridge_siem_write( $event_type, $vault_id, $share_id, $actor_id, $ip, $details, $created_at );
 }
 
 // ─── CSV safety ───────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ function sft_log(
  * @param mixed $value Raw cell value.
  * @return string Value safe to write into a CSV.
  */
-function sft_csv_safe( $value ): string {
+function folio_drawbridge_csv_safe( $value ): string {
 	$value = (string) $value;
 
 	if ( $value !== '' && strpbrk( $value[0], "=+-@\t\r" ) !== false ) {
@@ -145,7 +145,7 @@ function sft_csv_safe( $value ): string {
  * @param string $path Candidate log path.
  * @return string Empty when acceptable, otherwise a human-readable reason.
  */
-function sft_siem_path_error( string $path ): string {
+function folio_drawbridge_siem_path_error( string $path ): string {
 	$path = trim( $path );
 	if ( $path === '' ) {
 		return '';
@@ -173,14 +173,14 @@ function sft_siem_path_error( string $path ): string {
  * Appends an audit event to the SIEM log file if file logging is enabled.
  *
  * Controlled by three options set in Settings:
- *   sft_siem_enabled   — '1' to enable
- *   sft_siem_log_path  — absolute path to the log file
- *   sft_siem_format    — 'json' (one JSON object per line) or 'csv'
+ *   folio_drawbridge_siem_enabled   — '1' to enable
+ *   folio_drawbridge_siem_log_path  — absolute path to the log file
+ *   folio_drawbridge_siem_format    — 'json' (one JSON object per line) or 'csv'
  *
  * The file is written with LOCK_EX so concurrent requests don't interleave.
  * A CSV header row is written when the file is first created.
  */
-function sft_siem_write(
+function folio_drawbridge_siem_write(
 	string $event_type,
 	?int   $vault_id,
 	?int   $share_id,
@@ -189,11 +189,11 @@ function sft_siem_write(
 	array  $details,
 	string $created_at
 ): void {
-	if ( get_option( 'sft_siem_enabled', '0' ) !== '1' ) {
+	if ( get_option( 'folio_drawbridge_siem_enabled', '0' ) !== '1' ) {
 		return;
 	}
 
-	$path = trim( (string) get_option( 'sft_siem_log_path', '' ) );
+	$path = trim( (string) get_option( 'folio_drawbridge_siem_log_path', '' ) );
 	if ( ! $path ) {
 		return;
 	}
@@ -201,11 +201,11 @@ function sft_siem_write(
 	// A stored path may predate the validation in Settings. Never append to a
 	// location the web server could serve or execute; the event is still in the
 	// database audit log either way.
-	if ( sft_siem_path_error( $path ) !== '' ) {
+	if ( folio_drawbridge_siem_path_error( $path ) !== '' ) {
 		return;
 	}
 
-	$format = get_option( 'sft_siem_format', 'json' );
+	$format = get_option( 'folio_drawbridge_siem_format', 'json' );
 
 	if ( $format === 'csv' ) {
 		$new_file = ! file_exists( $path );
@@ -216,7 +216,7 @@ function sft_siem_write(
 			$header = stream_get_contents( $fh );
 			rewind( $fh );
 		}
-		fputcsv( $fh, array_map( 'sft_csv_safe', [
+		fputcsv( $fh, array_map( 'folio_drawbridge_csv_safe', [
 			$created_at,
 			$event_type,
 			$vault_id  ?? '',
@@ -259,20 +259,20 @@ function sft_siem_write(
  * log whose purpose is non-repudiation, trusting them by default lets an
  * attacker implicate someone else or muddy an investigation.
  *
- * Sites genuinely behind a proxy opt in by defining SFT_TRUSTED_PROXY_HEADER
+ * Sites genuinely behind a proxy opt in by defining FOLIO_DRAWBRIDGE_TRUSTED_PROXY_HEADER
  * in wp-config.php with the header their infrastructure sets, e.g.
  *
- *     define( 'SFT_TRUSTED_PROXY_HEADER', 'HTTP_CF_CONNECTING_IP' );
+ *     define( 'FOLIO_DRAWBRIDGE_TRUSTED_PROXY_HEADER', 'HTTP_CF_CONNECTING_IP' );
  *
  * Only meaningful when the proxy strips any client-supplied copy of that
  * header, which is the standard behaviour for Cloudflare and most load
  * balancers.
  */
-function sft_get_client_ip(): string {
+function folio_drawbridge_get_client_ip(): string {
 	$candidates = [];
 
-	if ( defined( 'SFT_TRUSTED_PROXY_HEADER' ) && SFT_TRUSTED_PROXY_HEADER ) {
-		$candidates[] = (string) SFT_TRUSTED_PROXY_HEADER;
+	if ( defined( 'FOLIO_DRAWBRIDGE_TRUSTED_PROXY_HEADER' ) && FOLIO_DRAWBRIDGE_TRUSTED_PROXY_HEADER ) {
+		$candidates[] = (string) FOLIO_DRAWBRIDGE_TRUSTED_PROXY_HEADER;
 	}
 
 	$candidates[] = 'REMOTE_ADDR';
@@ -308,7 +308,7 @@ function sft_get_client_ip(): string {
  *   @type string      $order       ASC|DESC (default DESC).
  * }
  */
-function sft_get_audit_logs( array $args = [] ): array {
+function folio_drawbridge_get_audit_logs( array $args = [] ): array {
 	global $wpdb;
 
 	$defaults = [
@@ -337,12 +337,12 @@ function sft_get_audit_logs( array $args = [] ): array {
 
 	$order   = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
 
-	[ $where_sql, $values ] = sft_audit_build_where( $args );
+	[ $where_sql, $values ] = folio_drawbridge_audit_build_where( $args );
 
 	$per_page = max( 1, (int) $args['per_page'] );
 	$offset   = ( max( 1, (int) $args['paged'] ) - 1 ) * $per_page;
 
-	$sql = "SELECT * FROM {$wpdb->prefix}sft_audit {$where_sql} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
+	$sql = "SELECT * FROM {$wpdb->prefix}folio_drawbridge_audit {$where_sql} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
 	array_push( $values, $per_page, $offset );
 
 	// Safe interpolation: $orderby/$order come from the whitelists above and
@@ -352,16 +352,16 @@ function sft_get_audit_logs( array $args = [] ): array {
 }
 
 /**
- * Returns the total count of audit rows matching the same filters as sft_get_audit_logs().
+ * Returns the total count of audit rows matching the same filters as folio_drawbridge_get_audit_logs().
  */
-function sft_count_audit_logs( array $args = [] ): int {
+function folio_drawbridge_count_audit_logs( array $args = [] ): int {
 	global $wpdb;
 
-	[ $where_sql, $values ] = sft_audit_build_where( $args );
+	[ $where_sql, $values ] = folio_drawbridge_audit_build_where( $args );
 
-	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit {$where_sql}";
+	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit {$where_sql}";
 
-	// Safe interpolation: placeholder-only WHERE, values in $values (see sft_audit_build_where()).
+	// Safe interpolation: placeholder-only WHERE, values in $values (see folio_drawbridge_audit_build_where()).
 	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return (int) ( $values
 		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
@@ -375,7 +375,7 @@ function sft_count_audit_logs( array $args = [] ): int {
  * @internal
  * @return array{string, array} [$where_sql, $values]
  */
-function sft_audit_build_where( array $args ): array {
+function folio_drawbridge_audit_build_where( array $args ): array {
 	global $wpdb;
 
 	$where  = [];
@@ -414,30 +414,30 @@ function sft_audit_build_where( array $args ): array {
 /**
  * Human-readable label for an event type constant.
  */
-function sft_audit_event_label( string $event_type ): string {
+function folio_drawbridge_audit_event_label( string $event_type ): string {
 	$map = [
-		SFT_EVT_VAULT_CREATED      => 'Vault Created',
-		SFT_EVT_VAULT_DELETED      => 'Vault Deleted',
-		SFT_EVT_VAULT_EXPIRED      => 'Vault Expired',
-		SFT_EVT_VAULT_STATUS       => 'Vault Status Changed',
-		SFT_EVT_FILE_UPLOADED      => 'File Uploaded',
-		SFT_EVT_FILE_DELETED       => 'File Deleted',
-		SFT_EVT_FILE_DOWNLOADED    => 'File Downloaded',
-		SFT_EVT_FILE_SERVED_ADMIN  => 'File Served (Admin)',
-		SFT_EVT_SHARE_CREATED      => 'Share Created',
-		SFT_EVT_SHARE_RESENT       => 'Share Invite Resent',
-		SFT_EVT_SHARE_REVOKED      => 'Share Revoked',
-		SFT_EVT_SHARE_EXPIRED      => 'Share Expired',
-		SFT_EVT_OTP_REQUESTED      => 'OTP Requested',
-		SFT_EVT_OTP_FAILED         => 'OTP Verification Failed',
-		SFT_EVT_OTP_SUCCESS        => 'OTP Verified',
-		SFT_EVT_OTP_EXPIRED        => 'OTP Expired',
-		SFT_EVT_ADMIN_VAULT_ACCESS  => 'Admin Vault Access',
-		SFT_EVT_SETTINGS_SAVED      => 'Settings Saved',
-		SFT_EVT_VAULT_UPDATED       => 'Vault Updated',
-		SFT_EVT_VAULT_TRANSFERRED   => 'Vault Transferred',
-		SFT_EVT_DOWNLOAD_NOTIFIED   => 'Download Notification Sent',
-		SFT_EVT_EXPIRY_WARNING_SENT => 'Expiry Warning Sent',
+		FOLIO_DRAWBRIDGE_EVT_VAULT_CREATED      => 'Vault Created',
+		FOLIO_DRAWBRIDGE_EVT_VAULT_DELETED      => 'Vault Deleted',
+		FOLIO_DRAWBRIDGE_EVT_VAULT_EXPIRED      => 'Vault Expired',
+		FOLIO_DRAWBRIDGE_EVT_VAULT_STATUS       => 'Vault Status Changed',
+		FOLIO_DRAWBRIDGE_EVT_FILE_UPLOADED      => 'File Uploaded',
+		FOLIO_DRAWBRIDGE_EVT_FILE_DELETED       => 'File Deleted',
+		FOLIO_DRAWBRIDGE_EVT_FILE_DOWNLOADED    => 'File Downloaded',
+		FOLIO_DRAWBRIDGE_EVT_FILE_SERVED_ADMIN  => 'File Served (Admin)',
+		FOLIO_DRAWBRIDGE_EVT_SHARE_CREATED      => 'Share Created',
+		FOLIO_DRAWBRIDGE_EVT_SHARE_RESENT       => 'Share Invite Resent',
+		FOLIO_DRAWBRIDGE_EVT_SHARE_REVOKED      => 'Share Revoked',
+		FOLIO_DRAWBRIDGE_EVT_SHARE_EXPIRED      => 'Share Expired',
+		FOLIO_DRAWBRIDGE_EVT_OTP_REQUESTED      => 'OTP Requested',
+		FOLIO_DRAWBRIDGE_EVT_OTP_FAILED         => 'OTP Verification Failed',
+		FOLIO_DRAWBRIDGE_EVT_OTP_SUCCESS        => 'OTP Verified',
+		FOLIO_DRAWBRIDGE_EVT_OTP_EXPIRED        => 'OTP Expired',
+		FOLIO_DRAWBRIDGE_EVT_ADMIN_VAULT_ACCESS  => 'Admin Vault Access',
+		FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED      => 'Settings Saved',
+		FOLIO_DRAWBRIDGE_EVT_VAULT_UPDATED       => 'Vault Updated',
+		FOLIO_DRAWBRIDGE_EVT_VAULT_TRANSFERRED   => 'Vault Transferred',
+		FOLIO_DRAWBRIDGE_EVT_DOWNLOAD_NOTIFIED   => 'Download Notification Sent',
+		FOLIO_DRAWBRIDGE_EVT_EXPIRY_WARNING_SENT => 'Expiry Warning Sent',
 	];
 
 	return $map[ $event_type ] ?? ucwords( str_replace( '_', ' ', $event_type ) );

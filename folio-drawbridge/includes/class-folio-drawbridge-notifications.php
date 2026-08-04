@@ -4,8 +4,8 @@
  *
  * Provides a lightweight template engine and two notification types:
  *
- *   sft_send_download_notification() — tells the vault owner when a recipient downloads a file.
- *   sft_send_expiry_warning()        — warns the vault owner before a share link expires.
+ *   folio_drawbridge_send_download_notification() — tells the vault owner when a recipient downloads a file.
+ *   folio_drawbridge_send_expiry_warning()        — warns the vault owner before a share link expires.
  *
  * Template placeholders (all types):
  *   {site_name}          get_bloginfo('name')
@@ -27,7 +27,7 @@
  * Templates are loaded from wp_options (set via Settings → Email Templates).
  * An empty saved template falls back to the hardcoded defaults below.
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -45,7 +45,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $type  'invite' | 'otp' | 'download_notification' | 'expiry_warning'
  * @return array{subject: string, body: string}
  */
-function sft_get_email_template( string $type ): array {
+function folio_drawbridge_get_email_template( string $type ): array {
 	static $defaults = null;
 
 	if ( $defaults === null ) {
@@ -99,8 +99,8 @@ function sft_get_email_template( string $type ): array {
 		];
 	}
 
-	$subject = (string) get_option( "sft_email_{$type}_subject", '' );
-	$body    = (string) get_option( "sft_email_{$type}_body", '' );
+	$subject = (string) get_option( "folio_drawbridge_email_{$type}_subject", '' );
+	$body    = (string) get_option( "folio_drawbridge_email_{$type}_body", '' );
 
 	return [
 		'subject' => $subject !== '' ? $subject : ( $defaults[ $type ]['subject'] ?? '' ),
@@ -115,7 +115,7 @@ function sft_get_email_template( string $type ): array {
  * @param array<string,string> $vars  Map of placeholder name → replacement value.
  * @return string
  */
-function sft_render_email_template( string $text, array $vars ): string {
+function folio_drawbridge_render_email_template( string $text, array $vars ): string {
 	foreach ( $vars as $key => $value ) {
 		$text = str_replace( '{' . $key . '}', (string) $value, $text );
 	}
@@ -133,18 +133,18 @@ function sft_render_email_template( string $text, array $vars ): string {
  * @param int    $file_id       File that was downloaded.
  * @param string $recipient_ip  IP of the downloader.
  */
-function sft_send_download_notification( int $share_id, int $file_id, string $recipient_ip = '' ): void {
-	if ( get_option( 'sft_notify_on_download', '0' ) !== '1' ) {
+function folio_drawbridge_send_download_notification( int $share_id, int $file_id, string $recipient_ip = '' ): void {
+	if ( get_option( 'folio_drawbridge_notify_on_download', '0' ) !== '1' ) {
 		return;
 	}
 
-	$share = sft_get_share( $share_id );
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share ) {
 		return;
 	}
 
-	$vault = sft_get_vault( (int) $share->vault_id );
-	$file  = sft_get_file( $file_id );
+	$vault = folio_drawbridge_get_vault( (int) $share->vault_id );
+	$file  = folio_drawbridge_get_file( $file_id );
 
 	if ( ! $vault || ! $file ) {
 		return;
@@ -155,10 +155,10 @@ function sft_send_download_notification( int $share_id, int $file_id, string $re
 		return;
 	}
 
-	$share_url = add_query_arg( 'sft_share', $share->share_token, home_url( '/' ) );
+	$share_url = add_query_arg( 'folio_drawbridge_share', $share->share_token, home_url( '/' ) );
 
 	$expires_note = $share->expires_at
-		? 'Expires on ' . sft_format_date( $share->expires_at, 'F j, Y' ) . '.'
+		? 'Expires on ' . folio_drawbridge_format_date( $share->expires_at, 'F j, Y' ) . '.'
 		: 'No expiry date.';
 
 	$vars = [
@@ -173,14 +173,14 @@ function sft_send_download_notification( int $share_id, int $file_id, string $re
 		'recipient_ip'    => $recipient_ip ?: 'unknown',
 	];
 
-	$tmpl   = sft_get_email_template( 'download_notification' );
-	$subject = sft_render_email_template( $tmpl['subject'], $vars );
-	$body    = sft_render_email_template( $tmpl['body'], $vars );
+	$tmpl   = folio_drawbridge_get_email_template( 'download_notification' );
+	$subject = folio_drawbridge_render_email_template( $tmpl['subject'], $vars );
+	$body    = folio_drawbridge_render_email_template( $tmpl['body'], $vars );
 
 	wp_mail( $owner->user_email, $subject, $body, [ 'Content-Type: text/plain; charset=UTF-8' ] );
 
-	sft_log(
-		SFT_EVT_DOWNLOAD_NOTIFIED,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_DOWNLOAD_NOTIFIED,
 		(int) $vault->id,
 		$share_id,
 		[ 'file_id' => $file_id, 'recipient' => $share->recipient_email ],
@@ -194,12 +194,12 @@ function sft_send_download_notification( int $share_id, int $file_id, string $re
  * Emails the vault owner that a share link is about to expire.
  * Marks the share record so it is not warned again.
  *
- * @param object $share  Full share row from sft_shares.
+ * @param object $share  Full share row from folio_drawbridge_shares.
  */
-function sft_send_expiry_warning( object $share ): void {
+function folio_drawbridge_send_expiry_warning( object $share ): void {
 	global $wpdb;
 
-	$vault = sft_get_vault( (int) $share->vault_id );
+	$vault = folio_drawbridge_get_vault( (int) $share->vault_id );
 	if ( ! $vault ) {
 		return;
 	}
@@ -212,7 +212,7 @@ function sft_send_expiry_warning( object $share ): void {
 	$expires_ts      = strtotime( $share->expires_at . ' UTC' );
 	$days_remaining  = max( 0, (int) ceil( ( $expires_ts - time() ) / DAY_IN_SECONDS ) );
 	$expiry_date     = (string) wp_date( 'F j, Y', $expires_ts );
-	$share_url       = add_query_arg( 'sft_share', $share->share_token, home_url( '/' ) );
+	$share_url       = add_query_arg( 'folio_drawbridge_share', $share->share_token, home_url( '/' ) );
 
 	$expires_note = 'Expires on ' . $expiry_date . '.';
 
@@ -227,23 +227,23 @@ function sft_send_expiry_warning( object $share ): void {
 		'days_until_expiry' => (string) $days_remaining,
 	];
 
-	$tmpl    = sft_get_email_template( 'expiry_warning' );
-	$subject = sft_render_email_template( $tmpl['subject'], $vars );
-	$body    = sft_render_email_template( $tmpl['body'], $vars );
+	$tmpl    = folio_drawbridge_get_email_template( 'expiry_warning' );
+	$subject = folio_drawbridge_render_email_template( $tmpl['subject'], $vars );
+	$body    = folio_drawbridge_render_email_template( $tmpl['body'], $vars );
 
 	wp_mail( $owner->user_email, $subject, $body, [ 'Content-Type: text/plain; charset=UTF-8' ] );
 
 	// Mark as warned so we don't email again.
 	$wpdb->update(
-		"{$wpdb->prefix}sft_shares",
+		"{$wpdb->prefix}folio_drawbridge_shares",
 		[ 'expiry_warning_sent' => 1 ],
 		[ 'id' => (int) $share->id ],
 		[ '%d' ],
 		[ '%d' ]
 	);
 
-	sft_log(
-		SFT_EVT_EXPIRY_WARNING_SENT,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_EXPIRY_WARNING_SENT,
 		(int) $share->vault_id,
 		(int) $share->id,
 		[

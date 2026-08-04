@@ -3,33 +3,33 @@
  * User dashboard — wp-admin panel scoped to the current user's own vaults.
  *
  * Registered as a top-level menu item visible to any user with the
- * use_sft_vaults capability (or manage_options). All queries are owner-scoped
+ * folio_drawbridge_use_vaults capability (or manage_options). All queries are owner-scoped
  * so a user can never see or modify another user's data.
  *
  * Uses traditional form-submit + redirect (admin_init POST handler) rather
  * than AJAX, matching the main admin panel's pattern.
  *
  * Views:
- *   Default (?page=sft-my-vaults)            — vault list + create form
- *   Detail  (?page=sft-my-vaults&vault_id=N) — files, shares, vault audit log
+ *   Default (?page=folio-drawbridge-vaults)            — vault list + create form
+ *   Detail  (?page=folio-drawbridge-vaults&vault_id=N) — files, shares, vault audit log
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-require_once SFT_DIR . 'admin/user-views/view-vault-list.php';
-require_once SFT_DIR . 'admin/user-views/view-vault-detail.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/user-views/view-vault-list.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/user-views/view-vault-detail.php';
 
 // ─── Menu registration ────────────────────────────────────────────────────────
 
-add_action( 'admin_menu', 'sft_register_user_dashboard_menu' );
+add_action( 'admin_menu', 'folio_drawbridge_register_user_dashboard_menu' );
 
-function sft_register_user_dashboard_menu(): void {
-	// Show to any user who can use vaults (including admins via sft_user_can_use).
-	if ( ! sft_user_can_use() ) {
+function folio_drawbridge_register_user_dashboard_menu(): void {
+	// Show to any user who can use vaults (including admins via folio_drawbridge_user_can_use).
+	if ( ! folio_drawbridge_user_can_use() ) {
 		return;
 	}
 
@@ -37,33 +37,33 @@ function sft_register_user_dashboard_menu(): void {
 		'My Vaults',
 		'My Vaults',
 		'read', // WordPress minimum; our own capability check is in the callback.
-		'sft-my-vaults',
-		'sft_user_dashboard_page',
+		'folio-drawbridge-vaults',
+		'folio_drawbridge_user_dashboard_page',
 		'dashicons-portfolio',
 		81
 	);
 
-	add_action( "load-{$hook}", 'sft_register_user_dashboard_help_tabs' );
+	add_action( "load-{$hook}", 'folio_drawbridge_register_user_dashboard_help_tabs' );
 }
 
 // ─── Contextual help ──────────────────────────────────────────────────────────
 
-function sft_register_user_dashboard_help_tabs(): void {
+function folio_drawbridge_register_user_dashboard_help_tabs(): void {
 	$screen   = get_current_screen();
 	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view selector.
 
 	if ( $vault_id > 0 ) {
 		// Vault detail view.
 		$screen->add_help_tab( [
-			'id'      => 'sft-ud-files',
+			'id'      => 'folio-drawbridge-ud-files',
 			'title'   => 'Files',
 			'content' =>
 				'<p>The <strong>Files</strong> section lists every file stored in this vault.</p>' .
-				'<p>To add a file, click <strong>Encrypt &amp; Upload</strong>. The file is encrypted on the server before being written to disk — the original is never stored. Files can be up to ' . (int) get_option( 'sft_max_file_mb', 50 ) . ' MB.</p>' .
+				'<p>To add a file, click <strong>Encrypt &amp; Upload</strong>. The file is encrypted on the server before being written to disk — the original is never stored. Files can be up to ' . (int) get_option( 'folio_drawbridge_max_file_mb', 50 ) . ' MB.</p>' .
 				'<p>To remove a file, click <strong>Delete</strong> next to it. Deletion is permanent and cannot be undone. The encrypted file is removed from the server immediately.</p>',
 		] );
 		$screen->add_help_tab( [
-			'id'      => 'sft-ud-shares',
+			'id'      => 'folio-drawbridge-ud-shares',
 			'title'   => 'Shares',
 			'content' =>
 				'<p>A share gives an external recipient access to all files in this vault via a two-step verification process.</p>' .
@@ -78,7 +78,7 @@ function sft_register_user_dashboard_help_tabs(): void {
 				'<p>To remove a recipient\'s access at any time, click <strong>Revoke</strong>. Revocation is immediate.</p>',
 		] );
 		$screen->add_help_tab( [
-			'id'      => 'sft-ud-activity',
+			'id'      => 'folio-drawbridge-ud-activity',
 			'title'   => 'Activity Log',
 			'content' =>
 				'<p>The <strong>Activity Log</strong> shows the 20 most recent events for this vault — uploads, downloads, share creation, OTP verifications, and more.</p>' .
@@ -88,7 +88,7 @@ function sft_register_user_dashboard_help_tabs(): void {
 	} else {
 		// Vault list view.
 		$screen->add_help_tab( [
-			'id'      => 'sft-ud-vaults',
+			'id'      => 'folio-drawbridge-ud-vaults',
 			'title'   => 'Your Vaults',
 			'content' =>
 				'<p>A <strong>vault</strong> is an encrypted container you can fill with files and then share securely with people outside this site.</p>' .
@@ -103,7 +103,7 @@ function sft_register_user_dashboard_help_tabs(): void {
 				'</ul>',
 		] );
 		$screen->add_help_tab( [
-			'id'      => 'sft-ud-create',
+			'id'      => 'folio-drawbridge-ud-create',
 			'title'   => 'Creating a Vault',
 			'content' =>
 				'<p>Use the <strong>Create New Vault</strong> form at the bottom of the page to set up a new vault.</p>' .
@@ -127,73 +127,73 @@ function sft_register_user_dashboard_help_tabs(): void {
 
 // ─── Asset enqueueing ─────────────────────────────────────────────────────────
 
-add_action( 'admin_enqueue_scripts', 'sft_enqueue_user_dashboard_assets' );
+add_action( 'admin_enqueue_scripts', 'folio_drawbridge_enqueue_user_dashboard_assets' );
 
-function sft_enqueue_user_dashboard_assets( string $hook ): void {
-	if ( $hook !== 'toplevel_page_sft-my-vaults' ) {
+function folio_drawbridge_enqueue_user_dashboard_assets( string $hook ): void {
+	if ( $hook !== 'toplevel_page_folio-drawbridge-vaults' ) {
 		return;
 	}
 
-	wp_register_style( 'sft-user-dash', false, [], SFT_VERSION );
-	wp_enqueue_style( 'sft-user-dash' );
+	wp_register_style( 'folio-drawbridge-user-dash', false, [], FOLIO_DRAWBRIDGE_VERSION );
+	wp_enqueue_style( 'folio-drawbridge-user-dash' );
 
 	// Reuse the same shared CSS variables as the admin panel plus a few extras.
-	wp_add_inline_style( 'sft-user-dash', '
-		.sft-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
+	wp_add_inline_style( 'folio-drawbridge-user-dash', '
+		.folio-drawbridge-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
 		           cursor:pointer; font-size:12px; color:#2271b1; text-decoration:none; display:inline-block; }
-		.sft-btn:hover { background:#f0f6fb; }
-		.sft-danger { color:#d63638; border-color:#d63638; }
-		.sft-danger:hover { background:#fef0f0; }
-		.sft-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
-		.sft-primary:hover { background:#135e96; color:#fff; }
-		.sft-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
-		.sft-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
-		.sft-badge-active  { background:#d1e7dd; color:#0a3622; }
-		.sft-badge-expired,.sft-badge-revoked,.sft-badge-limit_reached { background:#f8d7da; color:#58151c; }
-		.sft-badge-archived,.sft-badge-pending { background:#e2e3e5; color:#41464b; }
-		.sft-table { width:100%; border-collapse:collapse; }
-		.sft-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
-		.sft-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
-		.sft-table tr:hover td { background:#f9fafc; }
-		.sft-form-row { margin-bottom:12px; }
-		.sft-form-row label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; }
-		.sft-form-row input[type=text],
-		.sft-form-row input[type=email],
-		.sft-form-row input[type=date],
-		.sft-form-row input[type=number],
-		.sft-form-row input[type=datetime-local],
-		.sft-form-row textarea,
-		.sft-form-row select { width:100%; padding:7px 10px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px; }
-		.sft-form-actions { margin-top:16px; display:flex; gap:8px; }
-		.sft-notice-success { background:#d1e7dd; border-left:4px solid #0a3622; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
-		.sft-notice-error   { background:#f8d7da; border-left:4px solid #d63638; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
+		.folio-drawbridge-btn:hover { background:#f0f6fb; }
+		.folio-drawbridge-danger { color:#d63638; border-color:#d63638; }
+		.folio-drawbridge-danger:hover { background:#fef0f0; }
+		.folio-drawbridge-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
+		.folio-drawbridge-primary:hover { background:#135e96; color:#fff; }
+		.folio-drawbridge-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
+		.folio-drawbridge-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+		.folio-drawbridge-badge-active  { background:#d1e7dd; color:#0a3622; }
+		.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked,.folio-drawbridge-badge-limit_reached { background:#f8d7da; color:#58151c; }
+		.folio-drawbridge-badge-archived,.folio-drawbridge-badge-pending { background:#e2e3e5; color:#41464b; }
+		.folio-drawbridge-table { width:100%; border-collapse:collapse; }
+		.folio-drawbridge-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
+		.folio-drawbridge-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
+		.folio-drawbridge-table tr:hover td { background:#f9fafc; }
+		.folio-drawbridge-form-row { margin-bottom:12px; }
+		.folio-drawbridge-form-row label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; }
+		.folio-drawbridge-form-row input[type=text],
+		.folio-drawbridge-form-row input[type=email],
+		.folio-drawbridge-form-row input[type=date],
+		.folio-drawbridge-form-row input[type=number],
+		.folio-drawbridge-form-row input[type=datetime-local],
+		.folio-drawbridge-form-row textarea,
+		.folio-drawbridge-form-row select { width:100%; padding:7px 10px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px; }
+		.folio-drawbridge-form-actions { margin-top:16px; display:flex; gap:8px; }
+		.folio-drawbridge-notice-success { background:#d1e7dd; border-left:4px solid #0a3622; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
+		.folio-drawbridge-notice-error   { background:#f8d7da; border-left:4px solid #d63638; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
 
 		/* ── Sortable columns ── */
-		.sft-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
-		.sft-table th[data-sortable] { cursor:pointer; user-select:none; }
-		.sft-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
-		.sft-sort-ind.active { color:#2271b1; }
+		.folio-drawbridge-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
+		.folio-drawbridge-table th[data-sortable] { cursor:pointer; user-select:none; }
+		.folio-drawbridge-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
+		.folio-drawbridge-sort-ind.active { color:#2271b1; }
 
 		/* ── Pagination ── */
-		.sft-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
-		.sft-pagination a, .sft-pagination span { display:inline-flex; align-items:center; justify-content:center;
+		.folio-drawbridge-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
+		.folio-drawbridge-pagination a, .folio-drawbridge-pagination span { display:inline-flex; align-items:center; justify-content:center;
 		    min-width:32px; height:32px; padding:0 8px; border:1px solid #ccd0d4; border-radius:6px;
 		    font-size:13px; text-decoration:none; color:#2271b1; background:#fff; }
-		.sft-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
-		.sft-pagination a:hover { background:#f0f6fb; }
-		.sft-pagination .dots { border:none; background:none; color:#999; }
+		.folio-drawbridge-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
+		.folio-drawbridge-pagination a:hover { background:#f0f6fb; }
+		.folio-drawbridge-pagination .dots { border:none; background:none; color:#999; }
 	' );
 
-	add_action( 'admin_head', 'sft_user_dashboard_inline_js' );
+	add_action( 'admin_head', 'folio_drawbridge_user_dashboard_inline_js' );
 }
 
-function sft_user_dashboard_inline_js(): void {
-	if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== 'sft-my-vaults' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page gate for inline JS.
+function folio_drawbridge_user_dashboard_inline_js(): void {
+	if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== 'folio-drawbridge-vaults' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page gate for inline JS.
 		return;
 	}
 	?>
 	<script>
-	function sftSortTable(tableId) {
+	function folioDrawbridgeSortTable(tableId) {
 		var tbl = document.getElementById(tableId);
 		if (!tbl) return;
 		var headers = tbl.querySelectorAll('thead th');
@@ -202,13 +202,13 @@ function sft_user_dashboard_inline_js(): void {
 			th.style.cursor = 'pointer';
 			th.style.userSelect = 'none';
 			var ind = document.createElement('span');
-			ind.className = 'sft-sort-ind';
+			ind.className = 'folio-drawbridge-sort-ind';
 			ind.textContent = ' ↕';
 			th.appendChild(ind);
 			var asc = true;
 			th.addEventListener('click', function() {
 				headers.forEach(function(h) {
-					var i = h.querySelector('.sft-sort-ind');
+					var i = h.querySelector('.folio-drawbridge-sort-ind');
 					if (i) { i.textContent = ' ↕'; i.classList.remove('active'); }
 				});
 				ind.textContent = asc ? ' ↑' : ' ↓';
@@ -249,47 +249,47 @@ function sft_user_dashboard_inline_js(): void {
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
-add_action( 'admin_init', 'sft_handle_user_dashboard_post' );
+add_action( 'admin_init', 'folio_drawbridge_handle_user_dashboard_post' );
 
-function sft_handle_user_dashboard_post(): void {
-	if ( ! isset( $_POST['sft_user_nonce'] ) ) {
+function folio_drawbridge_handle_user_dashboard_post(): void {
+	if ( ! isset( $_POST['folio_drawbridge_user_nonce'] ) ) {
 		return;
 	}
-	if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== 'sft-my-vaults' ) {
+	if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== 'folio-drawbridge-vaults' ) {
 		return;
 	}
-	if ( ! sft_user_can_use() ) {
+	if ( ! folio_drawbridge_user_can_use() ) {
 		wp_die( esc_html__( 'You do not have permission to perform this action.', 'folio-drawbridge' ) );
 	}
 
-	check_admin_referer( 'sft_user_dashboard_action', 'sft_user_nonce' );
+	check_admin_referer( 'folio_drawbridge_user_dashboard_action', 'folio_drawbridge_user_nonce' );
 
 	$user_id  = get_current_user_id();
 	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? $_POST['vault_id'] ?? 0 ) );
 
 	// Helper: verify the vault belongs to this user (or user is admin).
 	$assert_vault_owner = function( int $vid ) use ( $user_id ): object {
-		$vault = sft_get_vault( $vid );
+		$vault = folio_drawbridge_get_vault( $vid );
 		if ( ! $vault ) {
 			wp_die( 'Vault not found.' );
 		}
-		if ( (int) $vault->owner_id !== $user_id && ! sft_is_admin() ) {
+		if ( (int) $vault->owner_id !== $user_id && ! folio_drawbridge_is_admin() ) {
 			wp_die( 'Access denied.' );
 		}
 		return $vault;
 	};
 
-	$list_url   = add_query_arg( [ 'page' => 'sft-my-vaults' ], admin_url( 'admin.php' ) );
-	$detail_url = fn( int $vid ) => add_query_arg( [ 'page' => 'sft-my-vaults', 'vault_id' => $vid ], admin_url( 'admin.php' ) );
+	$list_url   = add_query_arg( [ 'page' => 'folio-drawbridge-vaults' ], admin_url( 'admin.php' ) );
+	$detail_url = fn( int $vid ) => add_query_arg( [ 'page' => 'folio-drawbridge-vaults', 'vault_id' => $vid ], admin_url( 'admin.php' ) );
 
 	// ── Create vault ─────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_create_vault'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_create_vault'] ) ) {
 		$name    = sanitize_text_field( wp_unslash( $_POST['vault_name'] ?? '' ) );
 		$desc    = sanitize_textarea_field( wp_unslash( $_POST['vault_desc'] ?? '' ) );
 		$expires = sanitize_text_field( wp_unslash( $_POST['vault_expires'] ?? '' ) );
 
 		if ( ! $name ) {
-			sft_ud_set_notice( 'Vault name is required.', 'error' );
+			folio_drawbridge_ud_set_notice( 'Vault name is required.', 'error' );
 			wp_safe_redirect( $list_url );
 			exit;
 		}
@@ -302,62 +302,62 @@ function sft_handle_user_dashboard_post(): void {
 			}
 		}
 
-		$new_id = sft_create_vault( $user_id, $name, $desc, $expires_mysql );
+		$new_id = folio_drawbridge_create_vault( $user_id, $name, $desc, $expires_mysql );
 		if ( $new_id ) {
-			sft_ud_set_notice( 'Vault <strong>' . esc_html( $name ) . '</strong> created.', 'success' );
+			folio_drawbridge_ud_set_notice( 'Vault <strong>' . esc_html( $name ) . '</strong> created.', 'success' );
 			wp_safe_redirect( $detail_url( $new_id ) );
 		} else {
-			sft_ud_set_notice( 'Could not create vault. Please try again.', 'error' );
+			folio_drawbridge_ud_set_notice( 'Could not create vault. Please try again.', 'error' );
 			wp_safe_redirect( $list_url );
 		}
 		exit;
 	}
 
 	// ── Delete vault ─────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_delete_vault'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_delete_vault'] ) ) {
 		$vault = $assert_vault_owner( $vault_id );
-		sft_delete_vault( $vault_id );
-		sft_ud_set_notice( 'Vault <strong>' . esc_html( $vault->name ) . '</strong> deleted.', 'success' );
+		folio_drawbridge_delete_vault( $vault_id );
+		folio_drawbridge_ud_set_notice( 'Vault <strong>' . esc_html( $vault->name ) . '</strong> deleted.', 'success' );
 		wp_safe_redirect( $list_url );
 		exit;
 	}
 
 	// ── Upload file ───────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_upload_file'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_upload_file'] ) ) {
 		$assert_vault_owner( $vault_id );
 
-		if ( empty( $_FILES['sft_upload']['name'] ) ) {
-			sft_ud_set_notice( 'No file selected.', 'error' );
+		if ( empty( $_FILES['folio_drawbridge_upload']['name'] ) ) {
+			folio_drawbridge_ud_set_notice( 'No file selected.', 'error' );
 			wp_safe_redirect( $detail_url( $vault_id ) );
 			exit;
 		}
 
-		$result = sft_upload_file_to_vault( $vault_id, $_FILES['sft_upload'], $user_id ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $_FILES entry is validated (error code) and its name sanitized inside sft_upload_file_to_vault().
+		$result = folio_drawbridge_upload_file_to_vault( $vault_id, $_FILES['folio_drawbridge_upload'], $user_id ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $_FILES entry is validated (error code) and its name sanitized inside folio_drawbridge_upload_file_to_vault().
 
 		if ( is_wp_error( $result ) ) {
-			sft_ud_set_notice( $result->get_error_message(), 'error' );
+			folio_drawbridge_ud_set_notice( $result->get_error_message(), 'error' );
 		} else {
-			sft_ud_set_notice( 'File encrypted and uploaded.', 'success' );
+			folio_drawbridge_ud_set_notice( 'File encrypted and uploaded.', 'success' );
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	// ── Delete file ───────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_delete_file'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_delete_file'] ) ) {
 		$file_id = absint( wp_unslash( $_POST['file_id'] ?? 0 ) );
-		$file    = sft_get_file( $file_id );
+		$file    = folio_drawbridge_get_file( $file_id );
 		if ( $file ) {
 			$assert_vault_owner( (int) $file->vault_id );
-			sft_delete_file( $file_id, $user_id );
-			sft_ud_set_notice( 'File deleted.', 'success' );
+			folio_drawbridge_delete_file( $file_id, $user_id );
+			folio_drawbridge_ud_set_notice( 'File deleted.', 'success' );
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	// ── Create share ──────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_create_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_create_share'] ) ) {
 		$assert_vault_owner( $vault_id );
 
 		$email        = sanitize_email( wp_unslash( $_POST['share_email'] ?? '' ) );
@@ -371,41 +371,41 @@ function sft_handle_user_dashboard_post(): void {
 			}
 		}
 
-		$result = sft_create_share( $vault_id, $user_id, $email, $max_dl, $expires_mysql );
+		$result = folio_drawbridge_create_share( $vault_id, $user_id, $email, $max_dl, $expires_mysql );
 
 		if ( is_wp_error( $result ) ) {
-			sft_ud_set_notice( $result->get_error_message(), 'error' );
+			folio_drawbridge_ud_set_notice( $result->get_error_message(), 'error' );
 		} else {
-			sft_ud_set_notice( 'Share invite sent to <strong>' . esc_html( $email ) . '</strong>.', 'success' );
+			folio_drawbridge_ud_set_notice( 'Share invite sent to <strong>' . esc_html( $email ) . '</strong>.', 'success' );
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	// ── Revoke share ──────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_revoke_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_revoke_share'] ) ) {
 		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
-		$share    = sft_get_share( $share_id );
+		$share    = folio_drawbridge_get_share( $share_id );
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
-			sft_revoke_share( $share_id, $user_id );
-			sft_ud_set_notice( 'Share revoked.', 'success' );
+			folio_drawbridge_revoke_share( $share_id, $user_id );
+			folio_drawbridge_ud_set_notice( 'Share revoked.', 'success' );
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	// ── Resend share invite ───────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_resend_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_resend_share'] ) ) {
 		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
-		$share    = sft_get_share( $share_id );
+		$share    = folio_drawbridge_get_share( $share_id );
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
-			$result = sft_resend_share_invite( $share_id, $user_id );
+			$result = folio_drawbridge_resend_share_invite( $share_id, $user_id );
 			if ( is_wp_error( $result ) ) {
-				sft_ud_set_notice( 'Could not resend invite: ' . esc_html( $result->get_error_message() ), 'error' );
+				folio_drawbridge_ud_set_notice( 'Could not resend invite: ' . esc_html( $result->get_error_message() ), 'error' );
 			} else {
-				sft_ud_set_notice( 'Invite email resent to ' . esc_html( $share->recipient_email ) . '.', 'success' );
+				folio_drawbridge_ud_set_notice( 'Invite email resent to ' . esc_html( $share->recipient_email ) . '.', 'success' );
 			}
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
@@ -413,9 +413,9 @@ function sft_handle_user_dashboard_post(): void {
 	}
 
 	// ── Edit share (download limit + expiry) ──────────────────────────────────
-	if ( isset( $_POST['sft_ud_edit_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_edit_share'] ) ) {
 		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
-		$share    = sft_get_share( $share_id );
+		$share    = folio_drawbridge_get_share( $share_id );
 		if ( $share ) {
 			$assert_vault_owner( (int) $share->vault_id );
 			$max_dl  = max( 0, absint( wp_unslash( $_POST['share_max_downloads'] ?? 0 ) ) );
@@ -427,15 +427,15 @@ function sft_handle_user_dashboard_post(): void {
 					$expires_mysql = gmdate( 'Y-m-d H:i:s', $ts );
 				}
 			}
-			sft_update_share( $share_id, $max_dl, $expires_mysql, $user_id );
-			sft_ud_set_notice( 'Share updated.', 'success' );
+			folio_drawbridge_update_share( $share_id, $max_dl, $expires_mysql, $user_id );
+			folio_drawbridge_ud_set_notice( 'Share updated.', 'success' );
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
 	// ── Edit vault expiry ─────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_ud_edit_vault_expiry'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_edit_vault_expiry'] ) ) {
 		$assert_vault_owner( $vault_id );
 		$expires = sanitize_text_field( wp_unslash( $_POST['vault_new_expires'] ?? '' ) );
 		$expires_mysql = '';
@@ -445,21 +445,21 @@ function sft_handle_user_dashboard_post(): void {
 				$expires_mysql = gmdate( 'Y-m-d H:i:s', $ts );
 			}
 		}
-		sft_update_vault_expiry( $vault_id, $expires_mysql, $user_id );
-		sft_ud_set_notice( 'Vault expiry updated.', 'success' );
+		folio_drawbridge_update_vault_expiry( $vault_id, $expires_mysql, $user_id );
+		folio_drawbridge_ud_set_notice( 'Vault expiry updated.', 'success' );
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
 	}
 
-	if ( isset( $_POST['sft_ud_edit_vault_meta'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_ud_edit_vault_meta'] ) ) {
 		$assert_vault_owner( $vault_id );
 		$name        = sanitize_text_field( wp_unslash( $_POST['vault_new_name'] ?? '' ) );
 		$description = sanitize_textarea_field( wp_unslash( $_POST['vault_new_description'] ?? '' ) );
-		$result      = sft_update_vault_meta( $vault_id, $name, $description, $user_id );
+		$result      = folio_drawbridge_update_vault_meta( $vault_id, $name, $description, $user_id );
 		if ( is_wp_error( $result ) ) {
-			sft_ud_set_notice( $result->get_error_message(), 'error' );
+			folio_drawbridge_ud_set_notice( $result->get_error_message(), 'error' );
 		} else {
-			sft_ud_set_notice( 'Vault updated.', 'success' );
+			folio_drawbridge_ud_set_notice( 'Vault updated.', 'success' );
 		}
 		wp_safe_redirect( $detail_url( $vault_id ) );
 		exit;
@@ -468,28 +468,28 @@ function sft_handle_user_dashboard_post(): void {
 
 // ─── Notice helpers ───────────────────────────────────────────────────────────
 
-function sft_ud_set_notice( string $message, string $type = 'success' ): void {
-	set_transient( 'sft_ud_notice_' . get_current_user_id(), compact( 'message', 'type' ), 30 );
+function folio_drawbridge_ud_set_notice( string $message, string $type = 'success' ): void {
+	set_transient( 'folio_drawbridge_ud_notice_' . get_current_user_id(), compact( 'message', 'type' ), 30 );
 }
 
-function sft_ud_show_notice(): void {
-	$key    = 'sft_ud_notice_' . get_current_user_id();
+function folio_drawbridge_ud_show_notice(): void {
+	$key    = 'folio_drawbridge_ud_notice_' . get_current_user_id();
 	$notice = get_transient( $key );
 	if ( ! $notice ) {
 		return;
 	}
 	delete_transient( $key );
 	printf(
-		'<div class="sft-notice-%s" style="margin-top:15px;"><p>%s</p></div>',
+		'<div class="folio-drawbridge-notice-%s" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $notice['type'] ),
-		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by sft_set_notice() callers before storage.
+		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by folio_drawbridge_set_notice() callers before storage.
 	);
 }
 
 // ─── Main page callback ───────────────────────────────────────────────────────
 
-function sft_user_dashboard_page(): void {
-	if ( ! sft_user_can_use() ) {
+function folio_drawbridge_user_dashboard_page(): void {
+	if ( ! folio_drawbridge_user_can_use() ) {
 		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
@@ -497,12 +497,12 @@ function sft_user_dashboard_page(): void {
 
 	echo '<div class="wrap"><h1>My Vaults</h1>';
 
-	sft_ud_show_notice();
+	folio_drawbridge_ud_show_notice();
 
 	if ( $vault_id > 0 ) {
-		sft_render_user_vault_detail( $vault_id );
+		folio_drawbridge_render_user_vault_detail( $vault_id );
 	} else {
-		sft_render_user_vault_list();
+		folio_drawbridge_render_user_vault_list();
 	}
 
 	echo '</div>';

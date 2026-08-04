@@ -2,7 +2,7 @@
 /**
  * Lifecycle management for Folio Drawbridge.
  *
- * A WP-Cron event ('sft_lifecycle_cron') runs hourly and:
+ * A WP-Cron event ('folio_drawbridge_lifecycle_sweep') runs hourly and:
  *   1. Marks vaults past their expires_at as 'expired'.
  *   2. Marks shares past their expires_at as 'expired'.
  *   3. Sends expiry-warning emails to vault owners for shares expiring soon.
@@ -12,7 +12,7 @@
  *
  * All expiry actions write audit events so the record is complete.
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -23,11 +23,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── Cron registration ────────────────────────────────────────────────────────
 
-add_action( 'sft_lifecycle_cron', 'sft_run_lifecycle' );
+add_action( 'folio_drawbridge_lifecycle_sweep', 'folio_drawbridge_run_lifecycle' );
 
-function sft_schedule_lifecycle_cron(): void {
-	if ( ! wp_next_scheduled( 'sft_lifecycle_cron' ) ) {
-		wp_schedule_event( time(), 'hourly', 'sft_lifecycle_cron' );
+function folio_drawbridge_schedule_lifecycle_cron(): void {
+	if ( ! wp_next_scheduled( 'folio_drawbridge_lifecycle_sweep' ) ) {
+		wp_schedule_event( time(), 'hourly', 'folio_drawbridge_lifecycle_sweep' );
 	}
 }
 
@@ -35,15 +35,15 @@ function sft_schedule_lifecycle_cron(): void {
 
 /**
  * Orchestrates all periodic cleanup tasks.
- * Called by WP-Cron hourly via the 'sft_lifecycle_cron' hook.
+ * Called by WP-Cron hourly via the 'folio_drawbridge_lifecycle_sweep' hook.
  */
-function sft_run_lifecycle(): void {
-	sft_expire_vaults();
-	sft_expire_shares();
-	sft_send_expiry_warnings();
-	sft_cleanup_otps();
-	sft_auto_prune_audit();
-	sft_cleanup_orphaned_chunks();
+function folio_drawbridge_run_lifecycle(): void {
+	folio_drawbridge_expire_vaults();
+	folio_drawbridge_expire_shares();
+	folio_drawbridge_send_expiry_warnings();
+	folio_drawbridge_cleanup_otps();
+	folio_drawbridge_auto_prune_audit();
+	folio_drawbridge_cleanup_orphaned_chunks();
 }
 
 // ─── Vault expiry ─────────────────────────────────────────────────────────────
@@ -52,11 +52,11 @@ function sft_run_lifecycle(): void {
  * Finds active vaults whose expires_at is in the past and marks them 'expired'.
  * Logs one audit event per vault expired.
  */
-function sft_expire_vaults(): int {
+function folio_drawbridge_expire_vaults(): int {
 	global $wpdb;
 
 	$expired = $wpdb->get_results(
-		"SELECT id, name FROM {$wpdb->prefix}sft_vaults
+		"SELECT id, name FROM {$wpdb->prefix}folio_drawbridge_vaults
 		 WHERE status = 'active'
 		   AND expires_at IS NOT NULL
 		   AND expires_at < UTC_TIMESTAMP()"
@@ -65,14 +65,14 @@ function sft_expire_vaults(): int {
 	$count = 0;
 	foreach ( $expired as $vault ) {
 		$wpdb->update(
-			"{$wpdb->prefix}sft_vaults",
+			"{$wpdb->prefix}folio_drawbridge_vaults",
 			[ 'status' => 'expired', 'updated_at' => current_time( 'mysql', true ) ],
 			[ 'id' => $vault->id ],
 			[ '%s', '%s' ],
 			[ '%d' ]
 		);
 
-		sft_log( SFT_EVT_VAULT_EXPIRED, (int) $vault->id, null,
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_VAULT_EXPIRED, (int) $vault->id, null,
 			[ 'name' => $vault->name ], null );
 
 		$count++;
@@ -87,11 +87,11 @@ function sft_expire_vaults(): int {
  * Finds active/pending shares whose expires_at is in the past and marks them 'expired'.
  * Logs one audit event per share expired.
  */
-function sft_expire_shares(): int {
+function folio_drawbridge_expire_shares(): int {
 	global $wpdb;
 
 	$expired = $wpdb->get_results(
-		"SELECT id, vault_id, recipient_email FROM {$wpdb->prefix}sft_shares
+		"SELECT id, vault_id, recipient_email FROM {$wpdb->prefix}folio_drawbridge_shares
 		 WHERE status IN ('pending','active')
 		   AND expires_at IS NOT NULL
 		   AND expires_at < UTC_TIMESTAMP()"
@@ -100,14 +100,14 @@ function sft_expire_shares(): int {
 	$count = 0;
 	foreach ( $expired as $share ) {
 		$wpdb->update(
-			"{$wpdb->prefix}sft_shares",
+			"{$wpdb->prefix}folio_drawbridge_shares",
 			[ 'status' => 'expired' ],
 			[ 'id' => $share->id ],
 			[ '%s' ],
 			[ '%d' ]
 		);
 
-		sft_log( SFT_EVT_SHARE_EXPIRED, (int) $share->vault_id, (int) $share->id,
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SHARE_EXPIRED, (int) $share->vault_id, (int) $share->id,
 			[ 'recipient' => $share->recipient_email ], null );
 
 		$count++;
@@ -122,11 +122,11 @@ function sft_expire_shares(): int {
  * Deletes OTP records that are either used or more than 24 hours old.
  * Returns the number of rows deleted.
  */
-function sft_cleanup_otps(): int {
+function folio_drawbridge_cleanup_otps(): int {
 	global $wpdb;
 
 	$result = $wpdb->query(
-		"DELETE FROM {$wpdb->prefix}sft_otps
+		"DELETE FROM {$wpdb->prefix}folio_drawbridge_otps
 		 WHERE used_at IS NOT NULL
 		    OR created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
 	);
@@ -138,41 +138,41 @@ function sft_cleanup_otps(): int {
 
 /**
  * Prunes audit entries older than the configured retention window.
- * Only runs if 'sft_audit_prune_enabled' is '1' in wp_options.
+ * Only runs if 'folio_drawbridge_audit_prune_enabled' is '1' in wp_options.
  */
-function sft_auto_prune_audit(): int {
-	if ( get_option( 'sft_audit_prune_enabled', '0' ) !== '1' ) {
+function folio_drawbridge_auto_prune_audit(): int {
+	if ( get_option( 'folio_drawbridge_audit_prune_enabled', '0' ) !== '1' ) {
 		return 0;
 	}
 
-	$days = (int) get_option( 'sft_audit_prune_days', 365 );
+	$days = (int) get_option( 'folio_drawbridge_audit_prune_days', 365 );
 	if ( $days < 1 ) {
 		return 0;
 	}
 
-	return sft_prune_audit_log( $days );
+	return folio_drawbridge_prune_audit_log( $days );
 }
 
 // ─── Share expiry warnings ────────────────────────────────────────────────────
 
 /**
  * Emails vault owners for share links expiring within the configured warning window.
- * Only runs when sft_expiry_warning_days > 0 (0 = disabled).
+ * Only runs when folio_drawbridge_expiry_warning_days > 0 (0 = disabled).
  * Sets expiry_warning_sent = 1 on each share after the email is sent.
  *
  * @return int Number of warnings sent.
  */
-function sft_send_expiry_warnings(): int {
+function folio_drawbridge_send_expiry_warnings(): int {
 	global $wpdb;
 
-	$warning_days = (int) get_option( 'sft_expiry_warning_days', 0 );
+	$warning_days = (int) get_option( 'folio_drawbridge_expiry_warning_days', 0 );
 	if ( $warning_days < 1 ) {
 		return 0;
 	}
 
 	$shares = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}sft_shares
+			"SELECT * FROM {$wpdb->prefix}folio_drawbridge_shares
 			 WHERE status IN ('pending','active')
 			   AND expires_at IS NOT NULL
 			   AND expires_at > UTC_TIMESTAMP()
@@ -183,7 +183,7 @@ function sft_send_expiry_warnings(): int {
 	) ?: [];
 
 	foreach ( $shares as $share ) {
-		sft_send_expiry_warning( $share );
+		folio_drawbridge_send_expiry_warning( $share );
 	}
 
 	return count( $shares );

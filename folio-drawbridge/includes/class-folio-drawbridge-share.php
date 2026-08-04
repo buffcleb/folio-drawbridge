@@ -3,19 +3,19 @@
  * Share management and two-factor access flow for Folio Drawbridge.
  *
  * Two-factor share flow:
- *   1. Authenticated user calls sft_create_share() → unique URL token generated,
+ *   1. Authenticated user calls folio_drawbridge_create_share() → unique URL token generated,
  *      share record inserted, invite email sent to recipient.
- *   2. Recipient opens /?sft_share=TOKEN → enters their email address.
- *   3. sft_send_otp() generates a 6-digit OTP, hashes it, stores it in sft_otps,
+ *   2. Recipient opens /?folio_drawbridge_share=TOKEN → enters their email address.
+ *   3. folio_drawbridge_send_otp() generates a 6-digit OTP, hashes it, stores it in folio_drawbridge_otps,
  *      and emails the plaintext OTP to the recipient.
- *   4. Recipient submits the OTP → sft_verify_otp_for_share() checks the hash,
+ *   4. Recipient submits the OTP → folio_drawbridge_verify_otp_for_share() checks the hash,
  *      enforces the attempt limit (5), and marks the OTP used on success.
- *   5. sft_create_download_session() issues a 32-byte random download token
+ *   5. folio_drawbridge_create_download_session() issues a 32-byte random download token
  *      stored in a WordPress transient (30 min TTL). The token is returned to
  *      the browser and appended to each file download URL.
- *   6. Download requests pass the token via ?dt=TOKEN. sft_get_download_session()
+ *   6. Download requests pass the token via ?dt=TOKEN. folio_drawbridge_get_download_session()
  *      validates the transient, checks the share is still active, and the
- *      download count is within the allowed limit before sft_serve_file() streams
+ *      download count is within the allowed limit before folio_drawbridge_serve_file() streams
  *      the decrypted file to the browser.
  *
  * Share statuses: pending | active | expired | revoked
@@ -24,7 +24,7 @@
  *   expired  — past expires_at; set by the lifecycle cron.
  *   revoked  — manually revoked by the vault owner or an admin.
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -45,7 +45,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $expires_at       MySQL datetime, or empty string for no expiry.
  * @return int|WP_Error Share ID on success, WP_Error on failure.
  */
-function sft_create_share(
+function folio_drawbridge_create_share(
 	int    $vault_id,
 	int    $created_by,
 	string $recipient_email,
@@ -54,7 +54,7 @@ function sft_create_share(
 ) {
 	global $wpdb;
 
-	$vault = sft_get_vault( $vault_id );
+	$vault = folio_drawbridge_get_vault( $vault_id );
 	if ( ! $vault || $vault->status !== 'active' ) {
 		return new WP_Error( 'invalid_vault', 'Vault not found or not active.' );
 	}
@@ -65,27 +65,27 @@ function sft_create_share(
 	}
 
 	// Enforce global share limits unless the creator is an admin.
-	$is_admin = sft_is_admin( $created_by );
+	$is_admin = folio_drawbridge_is_admin( $created_by );
 
 	if ( ! $is_admin ) {
 		// Download limit.
-		if ( $max_downloads === 0 && get_option( 'sft_allow_unlimited_downloads', '1' ) === '0' ) {
-			$max_downloads = (int) get_option( 'sft_default_max_downloads', 10 );
+		if ( $max_downloads === 0 && get_option( 'folio_drawbridge_allow_unlimited_downloads', '1' ) === '0' ) {
+			$max_downloads = (int) get_option( 'folio_drawbridge_default_max_downloads', 10 );
 			if ( $max_downloads === 0 ) {
 				$max_downloads = 1; // guard against misconfigured default
 			}
 		}
 		// Only cap positive values — never override an explicitly-unlimited (0) share
 		// when unlimited downloads are permitted.
-		$ceiling = (int) get_option( 'sft_max_download_limit', 0 );
+		$ceiling = (int) get_option( 'folio_drawbridge_max_download_limit', 0 );
 		if ( $ceiling > 0 && $max_downloads > $ceiling ) {
 			$max_downloads = $ceiling;
 		}
 
 		// Expiry.
-		$max_days = (int) get_option( 'sft_max_expiry_days', 0 );
-		if ( ! $expires_at && get_option( 'sft_allow_no_expiry', '1' ) === '0' ) {
-			$default_days = (int) get_option( 'sft_default_expiry_days', 30 );
+		$max_days = (int) get_option( 'folio_drawbridge_max_expiry_days', 0 );
+		if ( ! $expires_at && get_option( 'folio_drawbridge_allow_no_expiry', '1' ) === '0' ) {
+			$default_days = (int) get_option( 'folio_drawbridge_default_expiry_days', 30 );
 			$expires_at   = gmdate( 'Y-m-d H:i:s', strtotime( "+{$default_days} days" ) );
 		}
 		if ( $expires_at && $max_days > 0 ) {
@@ -96,11 +96,11 @@ function sft_create_share(
 		}
 	}
 
-	$token = sft_generate_token( 32 ); // 64 hex chars
+	$token = folio_drawbridge_generate_token( 32 ); // 64 hex chars
 	$now   = current_time( 'mysql', true );
 
 	$result = $wpdb->insert(
-		"{$wpdb->prefix}sft_shares",
+		"{$wpdb->prefix}folio_drawbridge_shares",
 		[
 			'vault_id'        => $vault_id,
 			'created_by'      => $created_by,
@@ -121,8 +121,8 @@ function sft_create_share(
 
 	$share_id = (int) $wpdb->insert_id;
 
-	sft_log(
-		SFT_EVT_SHARE_CREATED,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_SHARE_CREATED,
 		$vault_id,
 		$share_id,
 		[
@@ -133,7 +133,7 @@ function sft_create_share(
 		$created_by
 	);
 
-	sft_send_share_invite( $share_id, $vault, $recipient_email, $created_by );
+	folio_drawbridge_send_share_invite( $share_id, $vault, $recipient_email, $created_by );
 
 	return $share_id;
 }
@@ -141,11 +141,11 @@ function sft_create_share(
 /**
  * Returns a share row by its database ID, or null.
  */
-function sft_get_share( int $share_id ): ?object {
+function folio_drawbridge_get_share( int $share_id ): ?object {
 	global $wpdb;
 
 	$row = $wpdb->get_row(
-		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_shares WHERE id = %d", $share_id )
+		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}folio_drawbridge_shares WHERE id = %d", $share_id )
 	);
 
 	return $row ?: null;
@@ -154,11 +154,11 @@ function sft_get_share( int $share_id ): ?object {
 /**
  * Returns a share row by its URL token, or null.
  */
-function sft_get_share_by_token( string $token ): ?object {
+function folio_drawbridge_get_share_by_token( string $token ): ?object {
 	global $wpdb;
 
 	$row = $wpdb->get_row(
-		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_shares WHERE share_token = %s", $token )
+		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}folio_drawbridge_shares WHERE share_token = %s", $token )
 	);
 
 	return $row ?: null;
@@ -167,12 +167,12 @@ function sft_get_share_by_token( string $token ): ?object {
 /**
  * Returns all share records for a vault.
  */
-function sft_get_vault_shares( int $vault_id ): array {
+function folio_drawbridge_get_vault_shares( int $vault_id ): array {
 	global $wpdb;
 
 	return $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}sft_shares WHERE vault_id = %d ORDER BY created_at DESC",
+			"SELECT * FROM {$wpdb->prefix}folio_drawbridge_shares WHERE vault_id = %d ORDER BY created_at DESC",
 			$vault_id
 		)
 	) ?: [];
@@ -181,16 +181,16 @@ function sft_get_vault_shares( int $vault_id ): array {
 /**
  * Revokes a share, blocking all future OTP verification and downloads.
  */
-function sft_revoke_share( int $share_id, int $actor_id ): bool {
+function folio_drawbridge_revoke_share( int $share_id, int $actor_id ): bool {
 	global $wpdb;
 
-	$share = sft_get_share( $share_id );
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share ) {
 		return false;
 	}
 
 	$result = $wpdb->update(
-		"{$wpdb->prefix}sft_shares",
+		"{$wpdb->prefix}folio_drawbridge_shares",
 		[ 'status' => 'revoked' ],
 		[ 'id' => $share_id ],
 		[ '%s' ],
@@ -198,7 +198,7 @@ function sft_revoke_share( int $share_id, int $actor_id ): bool {
 	);
 
 	if ( $result !== false ) {
-		sft_log( SFT_EVT_SHARE_REVOKED, (int) $share->vault_id, $share_id, [], $actor_id );
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SHARE_REVOKED, (int) $share->vault_id, $share_id, [], $actor_id );
 	}
 
 	return $result !== false;
@@ -213,16 +213,16 @@ function sft_revoke_share( int $share_id, int $actor_id ): bool {
  * @param int    $actor_id      WP user ID performing the update (for audit log).
  * @return bool True on success.
  */
-function sft_update_share( int $share_id, int $max_downloads, string $expires_at, int $actor_id ): bool {
+function folio_drawbridge_update_share( int $share_id, int $max_downloads, string $expires_at, int $actor_id ): bool {
 	global $wpdb;
 
-	$share = sft_get_share( $share_id );
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share ) {
 		return false;
 	}
 
 	$result = $wpdb->update(
-		"{$wpdb->prefix}sft_shares",
+		"{$wpdb->prefix}folio_drawbridge_shares",
 		[
 			'max_downloads' => $max_downloads,
 			'expires_at'    => $expires_at ?: null,
@@ -233,8 +233,8 @@ function sft_update_share( int $share_id, int $max_downloads, string $expires_at
 	);
 
 	if ( $result !== false ) {
-		sft_log(
-			SFT_EVT_SHARE_UPDATED,
+		folio_drawbridge_log(
+			FOLIO_DRAWBRIDGE_EVT_SHARE_UPDATED,
 			(int) $share->vault_id,
 			$share_id,
 			[
@@ -254,8 +254,8 @@ function sft_update_share( int $share_id, int $max_downloads, string $expires_at
  * Sends the initial share invite email to the recipient.
  * The link takes the recipient to the OTP request page — not directly to files.
  */
-function sft_send_share_invite( int $share_id, object $vault, string $recipient_email, int $sender_id ): void {
-	$share = sft_get_share( $share_id );
+function folio_drawbridge_send_share_invite( int $share_id, object $vault, string $recipient_email, int $sender_id ): void {
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share ) {
 		return;
 	}
@@ -263,7 +263,7 @@ function sft_send_share_invite( int $share_id, object $vault, string $recipient_
 	$sender      = get_userdata( $sender_id );
 	$sender_name = $sender ? $sender->display_name : get_bloginfo( 'name' );
 	$site_name   = get_bloginfo( 'name' );
-	$share_url   = add_query_arg( 'sft_share', $share->share_token, home_url( '/' ) );
+	$share_url   = add_query_arg( 'folio_drawbridge_share', $share->share_token, home_url( '/' ) );
 
 	$expires_note = $share->expires_at
 		? 'This link expires on ' . gmdate( 'F j, Y \a\t g:i A T', strtotime( $share->expires_at ) ) . '.'
@@ -298,8 +298,8 @@ function sft_send_share_invite( int $share_id, object $vault, string $recipient_
  * @param int $actor_id  WP user ID performing the resend (for audit log).
  * @return true|WP_Error
  */
-function sft_resend_share_invite( int $share_id, int $actor_id ) {
-	$share = sft_get_share( $share_id );
+function folio_drawbridge_resend_share_invite( int $share_id, int $actor_id ) {
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share ) {
 		return new WP_Error( 'not_found', 'Share not found.' );
 	}
@@ -308,15 +308,15 @@ function sft_resend_share_invite( int $share_id, int $actor_id ) {
 		return new WP_Error( 'share_inactive', 'Invite can only be resent for pending or active shares.' );
 	}
 
-	$vault = sft_get_vault( (int) $share->vault_id );
+	$vault = folio_drawbridge_get_vault( (int) $share->vault_id );
 	if ( ! $vault ) {
 		return new WP_Error( 'vault_not_found', 'Vault not found.' );
 	}
 
-	sft_send_share_invite( $share_id, $vault, $share->recipient_email, $actor_id );
+	folio_drawbridge_send_share_invite( $share_id, $vault, $share->recipient_email, $actor_id );
 
-	sft_log(
-		SFT_EVT_SHARE_RESENT,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_SHARE_RESENT,
 		(int) $share->vault_id,
 		$share_id,
 		[ 'recipient' => $share->recipient_email ],
@@ -335,7 +335,7 @@ function sft_resend_share_invite( int $share_id, int $actor_id ) {
  * enough that a recipient retrying a slow or misdirected email is never
  * blocked, low enough to keep brute-forcing a six-digit code impractical.
  */
-define( 'SFT_OTP_MAX_PER_HOUR', 10 );
+define( 'FOLIO_DRAWBRIDGE_OTP_MAX_PER_HOUR', 10 );
 
 /**
  * Generates a new OTP for a share, stores the hash, and emails the code to the recipient.
@@ -344,10 +344,10 @@ define( 'SFT_OTP_MAX_PER_HOUR', 10 );
  *
  * @return true|WP_Error
  */
-function sft_send_otp( int $share_id, string $email ) {
+function folio_drawbridge_send_otp( int $share_id, string $email ) {
 	global $wpdb;
 
-	$share = sft_get_share( $share_id );
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share ) {
 		return new WP_Error( 'not_found', 'Share not found.' );
 	}
@@ -362,18 +362,18 @@ function sft_send_otp( int $share_id, string $email ) {
 
 	// Email must match the intended recipient — case-insensitive.
 	if ( strtolower( trim( $email ) ) !== strtolower( $share->recipient_email ) ) {
-		sft_log( SFT_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
 			[ 'reason' => 'email_mismatch', 'provided' => $email ] );
 		// Return a generic error to avoid leaking the recipient address.
 		return new WP_Error( 'email_mismatch', 'The email address you entered does not match our records for this share.' );
 	}
 
 	// Enforce rate limit: reject if the most recent unused OTP was issued too recently.
-	$cooldown = (int) get_option( 'sft_otp_cooldown_seconds', 60 );
+	$cooldown = (int) get_option( 'folio_drawbridge_otp_cooldown_seconds', 60 );
 	if ( $cooldown > 0 ) {
 		$recent_created = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT created_at FROM {$wpdb->prefix}sft_otps
+				"SELECT created_at FROM {$wpdb->prefix}folio_drawbridge_otps
 				 WHERE share_id = %d AND used_at IS NULL
 				 ORDER BY created_at DESC LIMIT 1",
 				$share_id
@@ -397,15 +397,15 @@ function sft_send_otp( int $share_id, string $email ) {
 	// only brake on guessing a six-digit code as request throughput.
 	$issued_last_hour = (int) $wpdb->get_var(
 		$wpdb->prepare(
-			"SELECT COUNT(*) FROM {$wpdb->prefix}sft_otps
+			"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_otps
 			 WHERE share_id = %d
 			   AND created_at > DATE_SUB( UTC_TIMESTAMP(), INTERVAL 1 HOUR )",
 			$share_id
 		)
 	);
 
-	if ( $issued_last_hour >= SFT_OTP_MAX_PER_HOUR ) {
-		sft_log( SFT_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
+	if ( $issued_last_hour >= FOLIO_DRAWBRIDGE_OTP_MAX_PER_HOUR ) {
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
 			[ 'reason' => 'hourly_request_cap', 'issued_last_hour' => $issued_last_hour ] );
 		return new WP_Error(
 			'otp_rate_limited',
@@ -416,21 +416,21 @@ function sft_send_otp( int $share_id, string $email ) {
 	// Expire any previous unused OTPs for this share.
 	$wpdb->query(
 		$wpdb->prepare(
-			"UPDATE {$wpdb->prefix}sft_otps SET used_at = %s WHERE share_id = %d AND used_at IS NULL",
+			"UPDATE {$wpdb->prefix}folio_drawbridge_otps SET used_at = %s WHERE share_id = %d AND used_at IS NULL",
 			current_time( 'mysql', true ),
 			$share_id
 		)
 	);
 
-	$otp     = sft_generate_otp();
-	$ttl_min = (int) get_option( 'sft_otp_ttl_minutes', 15 );
+	$otp     = folio_drawbridge_generate_otp();
+	$ttl_min = (int) get_option( 'folio_drawbridge_otp_ttl_minutes', 15 );
 
 	$wpdb->insert(
-		"{$wpdb->prefix}sft_otps",
+		"{$wpdb->prefix}folio_drawbridge_otps",
 		[
 			'share_id'   => $share_id,
 			'email'      => strtolower( trim( $email ) ),
-			'otp_hash'   => sft_hash_otp( $otp ),
+			'otp_hash'   => folio_drawbridge_hash_otp( $otp ),
 			'expires_at' => gmdate( 'Y-m-d H:i:s', time() + $ttl_min * 60 ),
 			'used_at'    => null,
 			'attempts'   => 0,
@@ -439,10 +439,10 @@ function sft_send_otp( int $share_id, string $email ) {
 		[ '%d', '%s', '%s', '%s', '%s', '%d', '%s' ]
 	);
 
-	sft_log( SFT_EVT_OTP_REQUESTED, (int) $share->vault_id, $share_id,
+	folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_REQUESTED, (int) $share->vault_id, $share_id,
 		[ 'email' => $email, 'ttl_minutes' => $ttl_min ] );
 
-	sft_mail_otp( $email, $otp, $ttl_min );
+	folio_drawbridge_mail_otp( $email, $otp, $ttl_min );
 
 	return true;
 }
@@ -450,7 +450,7 @@ function sft_send_otp( int $share_id, string $email ) {
 /**
  * Sends the OTP code via email.
  */
-function sft_mail_otp( string $email, string $otp, int $ttl_min ): void {
+function folio_drawbridge_mail_otp( string $email, string $otp, int $ttl_min ): void {
 	$site_name = get_bloginfo( 'name' );
 
 	$subject = "[{$site_name}] Your secure file access code: {$otp}";
@@ -471,10 +471,10 @@ function sft_mail_otp( string $email, string $otp, int $ttl_min ): void {
  *
  * @return true|WP_Error True on success, WP_Error describing the failure.
  */
-function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
+function folio_drawbridge_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 	global $wpdb;
 
-	$share = sft_get_share( $share_id );
+	$share = folio_drawbridge_get_share( $share_id );
 	if ( ! $share || ! in_array( $share->status, [ 'pending', 'active' ], true ) ) {
 		return new WP_Error( 'share_inactive', 'This share is no longer active.' );
 	}
@@ -482,7 +482,7 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 	// Fetch the most recent valid OTP record.
 	$record = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}sft_otps
+			"SELECT * FROM {$wpdb->prefix}folio_drawbridge_otps
 			 WHERE share_id = %d AND email = %s AND used_at IS NULL
 			 ORDER BY created_at DESC LIMIT 1",
 			$share_id,
@@ -497,19 +497,19 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 	// Check expiry.
 	if ( strtotime( $record->expires_at ) < time() ) {
 		$wpdb->update(
-			"{$wpdb->prefix}sft_otps",
+			"{$wpdb->prefix}folio_drawbridge_otps",
 			[ 'used_at' => current_time( 'mysql', true ) ],
 			[ 'id' => $record->id ],
 			[ '%s' ], [ '%d' ]
 		);
-		sft_log( SFT_EVT_OTP_EXPIRED, (int) $share->vault_id, $share_id );
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_EXPIRED, (int) $share->vault_id, $share_id );
 		return new WP_Error( 'otp_expired', 'The verification code has expired. Please request a new one.' );
 	}
 
 	// Check attempt limit.
-	$max_attempts = (int) get_option( 'sft_otp_max_attempts', 5 );
+	$max_attempts = (int) get_option( 'folio_drawbridge_otp_max_attempts', 5 );
 	if ( (int) $record->attempts >= $max_attempts ) {
-		sft_log( SFT_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
 			[ 'reason' => 'max_attempts_exceeded' ] );
 		return new WP_Error( 'max_attempts', 'Too many incorrect attempts. Please request a new code.' );
 	}
@@ -517,20 +517,20 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 	// Increment attempt counter.
 	$wpdb->query(
 		$wpdb->prepare(
-			"UPDATE {$wpdb->prefix}sft_otps SET attempts = attempts + 1 WHERE id = %d",
+			"UPDATE {$wpdb->prefix}folio_drawbridge_otps SET attempts = attempts + 1 WHERE id = %d",
 			$record->id
 		)
 	);
 
-	if ( ! sft_verify_otp( $otp, $record->otp_hash ) ) {
-		sft_log( SFT_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
+	if ( ! folio_drawbridge_verify_otp( $otp, $record->otp_hash ) ) {
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_FAILED, (int) $share->vault_id, $share_id,
 			[ 'reason' => 'wrong_code', 'attempt' => (int) $record->attempts + 1 ] );
 		return new WP_Error( 'wrong_otp', 'The code you entered is incorrect.' );
 	}
 
 	// Mark OTP used.
 	$wpdb->update(
-		"{$wpdb->prefix}sft_otps",
+		"{$wpdb->prefix}folio_drawbridge_otps",
 		[ 'used_at' => current_time( 'mysql', true ) ],
 		[ 'id' => $record->id ],
 		[ '%s' ], [ '%d' ]
@@ -539,21 +539,21 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 	// Promote share to active if it was pending.
 	if ( $share->status === 'pending' ) {
 		$wpdb->update(
-			"{$wpdb->prefix}sft_shares",
+			"{$wpdb->prefix}folio_drawbridge_shares",
 			[ 'status' => 'active', 'last_accessed' => current_time( 'mysql', true ) ],
 			[ 'id' => $share_id ],
 			[ '%s', '%s' ], [ '%d' ]
 		);
 	} else {
 		$wpdb->update(
-			"{$wpdb->prefix}sft_shares",
+			"{$wpdb->prefix}folio_drawbridge_shares",
 			[ 'last_accessed' => current_time( 'mysql', true ) ],
 			[ 'id' => $share_id ],
 			[ '%s' ], [ '%d' ]
 		);
 	}
 
-	sft_log( SFT_EVT_OTP_SUCCESS, (int) $share->vault_id, $share_id,
+	folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_OTP_SUCCESS, (int) $share->vault_id, $share_id,
 		[ 'email' => $email ] );
 
 	return true;
@@ -562,20 +562,20 @@ function sft_verify_otp_for_share( int $share_id, string $email, string $otp ) {
 // ─── Download session ─────────────────────────────────────────────────────────
 
 /** How long a verified recipient may keep downloading, in seconds. */
-define( 'SFT_DL_SESSION_TTL', 1800 ); // 30 minutes
+define( 'FOLIO_DRAWBRIDGE_DL_SESSION_TTL', 1800 ); // 30 minutes
 
 /**
  * Issues a short-lived download session token (WordPress transient, 30 min).
  *
  * Returns the random token string. The caller appends it to download URLs as ?dt=TOKEN.
  */
-function sft_create_download_session( int $share_id ): string {
-	$token = sft_generate_token( 32 );
+function folio_drawbridge_create_download_session( int $share_id ): string {
+	$token = folio_drawbridge_generate_token( 32 );
 
 	set_transient(
-		'sft_dl_' . hash( 'sha256', $token ),
+		'folio_drawbridge_dl_' . hash( 'sha256', $token ),
 		[ 'share_id' => $share_id, 'created' => time(), 'claimed' => false ],
-		SFT_DL_SESSION_TTL
+		FOLIO_DRAWBRIDGE_DL_SESSION_TTL
 	);
 
 	return $token;
@@ -592,15 +592,15 @@ function sft_create_download_session( int $share_id ): string {
  * count, since later files in the same session find the claim already made.
  *
  * @param string $token   Raw session token from the request.
- * @param array  $session Session data from sft_get_download_session().
+ * @param array  $session Session data from folio_drawbridge_get_download_session().
  * @return bool True when the download may proceed.
  */
-function sft_session_claim_once( string $token, array $session ): bool {
+function folio_drawbridge_session_claim_once( string $token, array $session ): bool {
 	if ( ! empty( $session['claimed'] ) ) {
 		return true;
 	}
 
-	if ( ! sft_claim_share_access( (int) $session['share_id'] ) ) {
+	if ( ! folio_drawbridge_claim_share_access( (int) $session['share_id'] ) ) {
 		return false;
 	}
 
@@ -609,9 +609,9 @@ function sft_session_claim_once( string $token, array $session ): bool {
 	// Preserve the session's original lifetime rather than extending it on every
 	// first download.
 	$elapsed   = time() - (int) ( $session['created'] ?? time() );
-	$remaining = max( 60, SFT_DL_SESSION_TTL - $elapsed );
+	$remaining = max( 60, FOLIO_DRAWBRIDGE_DL_SESSION_TTL - $elapsed );
 
-	set_transient( 'sft_dl_' . hash( 'sha256', $token ), $session, $remaining );
+	set_transient( 'folio_drawbridge_dl_' . hash( 'sha256', $token ), $session, $remaining );
 
 	return true;
 }
@@ -621,8 +621,8 @@ function sft_session_claim_once( string $token, array $session ): bool {
  *
  * Returns the session data array on success, or null if invalid/expired.
  */
-function sft_get_download_session( string $token ): ?array {
-	$data = get_transient( 'sft_dl_' . hash( 'sha256', $token ) );
+function folio_drawbridge_get_download_session( string $token ): ?array {
+	$data = get_transient( 'folio_drawbridge_dl_' . hash( 'sha256', $token ) );
 
 	return is_array( $data ) ? $data : null;
 }
@@ -646,12 +646,12 @@ function sft_get_download_session( string $token ): ?array {
  * @param int $share_id Share to claim an access against.
  * @return bool True when a slot was claimed.
  */
-function sft_claim_share_access( int $share_id ): bool {
+function folio_drawbridge_claim_share_access( int $share_id ): bool {
 	global $wpdb;
 
 	$claimed = $wpdb->query(
 		$wpdb->prepare(
-			"UPDATE {$wpdb->prefix}sft_shares
+			"UPDATE {$wpdb->prefix}folio_drawbridge_shares
 			    SET download_count = download_count + 1,
 			        last_accessed  = %s
 			  WHERE id = %d
@@ -669,17 +669,17 @@ function sft_claim_share_access( int $share_id ): bool {
 /**
  * Retroactively applies current global download and expiry limits to all active/pending shares.
  *
- * Skips shares owned by SFT admins. Returns the count of updated shares.
+ * Skips shares owned by Drawbridge admins. Returns the count of updated shares.
  */
-function sft_enforce_share_limits(): int {
+function folio_drawbridge_enforce_share_limits(): int {
 	global $wpdb;
 
-	$allow_unlimited = get_option( 'sft_allow_unlimited_downloads', '1' ) === '1';
-	$ceiling         = (int) get_option( 'sft_max_download_limit', 0 );
-	$allow_no_expiry = get_option( 'sft_allow_no_expiry', '1' ) === '1';
-	$max_days        = (int) get_option( 'sft_max_expiry_days', 0 );
-	$default_dl      = (int) get_option( 'sft_default_max_downloads', 10 );
-	$default_expiry  = (int) get_option( 'sft_default_expiry_days', 30 );
+	$allow_unlimited = get_option( 'folio_drawbridge_allow_unlimited_downloads', '1' ) === '1';
+	$ceiling         = (int) get_option( 'folio_drawbridge_max_download_limit', 0 );
+	$allow_no_expiry = get_option( 'folio_drawbridge_allow_no_expiry', '1' ) === '1';
+	$max_days        = (int) get_option( 'folio_drawbridge_max_expiry_days', 0 );
+	$default_dl      = (int) get_option( 'folio_drawbridge_default_max_downloads', 10 );
+	$default_expiry  = (int) get_option( 'folio_drawbridge_default_expiry_days', 30 );
 
 	// Admins are exempt. Capabilities live in usermeta and cannot be expressed in
 	// SQL, so resolve the exempt owners once and exclude them by ID — rather than
@@ -687,15 +687,15 @@ function sft_enforce_share_limits(): int {
 	// query per changed share.
 	$exempt = array_map( 'intval', array_merge(
 		get_users( [ 'capability' => 'manage_options', 'fields' => 'ID' ] ),
-		get_users( [ 'capability' => 'sft_admin', 'fields' => 'ID' ] )
+		get_users( [ 'capability' => 'folio_drawbridge_manage_vaults', 'fields' => 'ID' ] )
 	) );
 	$exempt = array_values( array_unique( $exempt ) );
 
 	// Values are integers cast above; an empty list needs a never-matching id.
 	$not_exempt = 'v.owner_id NOT IN (' . ( $exempt ? implode( ',', $exempt ) : '0' ) . ')';
 
-	$shares = $wpdb->prefix . 'sft_shares';
-	$vaults = $wpdb->prefix . 'sft_vaults';
+	$shares = $wpdb->prefix . 'folio_drawbridge_shares';
+	$vaults = $wpdb->prefix . 'folio_drawbridge_vaults';
 
 	// Every statement below targets the same rows: non-admin-owned shares that
 	// are still pending or active. Written out in full rather than assembled
@@ -764,7 +764,7 @@ function sft_enforce_share_limits(): int {
  * @param object $share Share row.
  * @return string One of: pending | active | limit_reached | expired | revoked
  */
-function sft_share_display_state( object $share ): string {
+function folio_drawbridge_share_display_state( object $share ): string {
 	if ( $share->status === 'revoked' ) {
 		return 'revoked';
 	}
@@ -783,9 +783,9 @@ function sft_share_display_state( object $share ): string {
 }
 
 /**
- * Human-readable label for a state from sft_share_display_state().
+ * Human-readable label for a state from folio_drawbridge_share_display_state().
  */
-function sft_share_state_label( string $state ): string {
+function folio_drawbridge_share_state_label( string $state ): string {
 	$labels = [
 		'pending'       => 'Pending',
 		'active'        => 'Active',
@@ -805,7 +805,7 @@ function sft_share_state_label( string $state ): string {
  * within that session even though the limit is now spent; the file and ZIP
  * endpoints use this check for exactly that reason.
  */
-function sft_share_is_live( object $share ): bool {
+function folio_drawbridge_share_is_live( object $share ): bool {
 	if ( ! in_array( $share->status, [ 'pending', 'active' ], true ) ) {
 		return false;
 	}
@@ -822,11 +822,11 @@ function sft_share_is_live( object $share ): bool {
  * download limit has not been reached.
  *
  * Use this to decide whether someone may start a session (share page, OTP
- * request, OTP verification). Use sft_share_is_live() for requests that carry
+ * request, OTP verification). Use folio_drawbridge_share_is_live() for requests that carry
  * an already-issued download session.
  */
-function sft_share_is_accessible( object $share ): bool {
-	if ( ! sft_share_is_live( $share ) ) {
+function folio_drawbridge_share_is_accessible( object $share ): bool {
+	if ( ! folio_drawbridge_share_is_live( $share ) ) {
 		return false;
 	}
 
