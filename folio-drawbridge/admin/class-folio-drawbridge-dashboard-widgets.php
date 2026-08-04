@@ -13,6 +13,31 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped. Only \$wpdb->prefix table names are interpolated; all values go through \$wpdb->prepare().
 
+add_action( 'admin_enqueue_scripts', 'folio_drawbridge_enqueue_widget_assets' );
+
+/**
+ * Loads widget styles on the dashboard only.
+ *
+ * Both widgets scope their rules to their own widget id, so this sheet cannot
+ * affect anything else on the screen.
+ */
+function folio_drawbridge_enqueue_widget_assets( string $hook ): void {
+	if ( 'index.php' !== $hook ) {
+		return;
+	}
+
+	if ( ! folio_drawbridge_is_admin() && ! folio_drawbridge_user_can_use() ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'folio-drawbridge-widgets',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/css/widgets.css',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION
+	);
+}
+
 add_action( 'wp_dashboard_setup', 'folio_drawbridge_register_dashboard_widgets' );
 
 function folio_drawbridge_register_dashboard_widgets(): void {
@@ -27,7 +52,7 @@ function folio_drawbridge_register_dashboard_widgets(): void {
 	if ( folio_drawbridge_user_can_use() ) {
 		wp_add_dashboard_widget(
 			'folio_drawbridge_my_vaults_summary',
-			'Secure File Transfer — My Vaults',
+			'Folio Drawbridge — My Vaults',
 			'folio_drawbridge_render_user_vaults_widget'
 		);
 	}
@@ -71,15 +96,6 @@ function folio_drawbridge_render_admin_overview_widget(): void {
 	$panel_url = admin_url( 'admin.php?page=folio-drawbridge' );
 
 	?>
-	<style>
-		#folio_drawbridge_admin_overview .folio-drawbridge-dw-stats { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
-		#folio_drawbridge_admin_overview .folio-drawbridge-dw-stat { flex:1; min-width:90px; background:#f9fafc; border:1px solid #e2e4e7;
-		                                   border-radius:4px; padding:10px 12px; text-align:center; }
-		#folio_drawbridge_admin_overview .folio-drawbridge-dw-num  { font-size:22px; font-weight:700; color:#2271b1; line-height:1.2; }
-		#folio_drawbridge_admin_overview .folio-drawbridge-dw-lbl  { font-size:11px; color:#666; margin-top:2px; }
-		#folio_drawbridge_admin_overview .folio-drawbridge-dw-alert { color:#d63638; font-weight:600; }
-		#folio_drawbridge_admin_overview .folio-drawbridge-dw-footer { border-top:1px solid #f0f2f5; padding-top:10px; font-size:12px; color:#888; }
-	</style>
 	<div class="folio-drawbridge-dw-stats">
 		<div class="folio-drawbridge-dw-stat">
 			<div class="folio-drawbridge-dw-num"><?php echo esc_html( $total_vaults ); ?></div>
@@ -177,18 +193,6 @@ function folio_drawbridge_render_user_vaults_widget(): void {
 	];
 
 	?>
-	<style>
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-stats { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-stat  { flex:1; min-width:90px; background:#f9fafc; border:1px solid #e2e4e7;
-		                                        border-radius:4px; padding:10px 12px; text-align:center; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-num   { font-size:22px; font-weight:700; color:#2271b1; line-height:1.2; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-lbl   { font-size:11px; color:#666; margin-top:2px; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-recent { font-size:12px; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-recent table { width:100%; border-collapse:collapse; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-recent td { padding:4px 6px; border-bottom:1px solid #f0f2f5; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-recent td:last-child { color:#888; text-align:right; white-space:nowrap; }
-		#folio_drawbridge_my_vaults_summary .folio-drawbridge-dw-footer { border-top:1px solid #f0f2f5; padding-top:10px; font-size:12px; color:#888; margin-top:10px; }
-	</style>
 	<div class="folio-drawbridge-dw-stats">
 		<div class="folio-drawbridge-dw-stat">
 			<div class="folio-drawbridge-dw-num"><?php echo esc_html( $total_vaults ); ?></div>

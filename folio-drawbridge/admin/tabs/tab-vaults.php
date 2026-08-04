@@ -279,7 +279,7 @@ function folio_drawbridge_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $files ) : ?>
 				<p style="color:#888;font-size:13px;">No files in this vault.</p>
 			<?php else : ?>
-				<table id="folio-drawbridge-insp-files-<?php echo (int) $vault_id; ?>" class="folio-drawbridge-table widefat">
+				<table id="folio-drawbridge-insp-files-<?php echo (int) $vault_id; ?>" data-folio-drawbridge-sortable class="folio-drawbridge-table widefat">
 					<thead><tr>
 						<th>Filename</th><th>Size</th><th>Uploaded By</th><th>Date</th><th data-nosort>Actions</th>
 					</tr></thead>
@@ -317,7 +317,7 @@ function folio_drawbridge_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $shares ) : ?>
 				<p style="color:#888;font-size:13px;">No shares created for this vault.</p>
 			<?php else : ?>
-				<table id="folio-drawbridge-insp-shares-<?php echo (int) $vault_id; ?>" class="folio-drawbridge-table widefat">
+				<table id="folio-drawbridge-insp-shares-<?php echo (int) $vault_id; ?>" data-folio-drawbridge-sortable class="folio-drawbridge-table widefat">
 					<thead><tr>
 						<th>Recipient</th><th>Status</th><th>Created By</th><th>Downloads</th>
 						<th>Expires</th><th>Last Access</th><th data-nosort>Actions</th>
@@ -413,7 +413,7 @@ function folio_drawbridge_render_vault_inspector( int $vault_id ): void {
 			<?php if ( ! $audit_rows ) : ?>
 				<p style="color:#888;font-size:13px;">No audit events recorded for this vault.</p>
 			<?php else : ?>
-				<table id="folio-drawbridge-insp-audit-<?php echo (int) $vault_id; ?>" class="folio-drawbridge-table widefat striped">
+				<table id="folio-drawbridge-insp-audit-<?php echo (int) $vault_id; ?>" data-folio-drawbridge-sortable class="folio-drawbridge-table widefat striped">
 					<thead><tr>
 						<th>Event</th><th>Actor</th><th>IP</th><th data-nosort>Details</th><th>Time</th>
 					</tr></thead>
@@ -443,16 +443,5 @@ function folio_drawbridge_render_vault_inspector( int $vault_id ): void {
 			<?php endif; ?>
 		</div>
 	</div>
-	<script>
-	function folioDrawbridgeAdmToggle(id) {
-		var el = document.getElementById(id);
-		el.style.display = el.style.display === 'none' ? '' : 'none';
-	}
-	document.addEventListener('DOMContentLoaded', function() {
-		folioDrawbridgeSortTable('folio-drawbridge-insp-files-<?php echo (int) $vault_id; ?>');
-		folioDrawbridgeSortTable('folio-drawbridge-insp-shares-<?php echo (int) $vault_id; ?>');
-		folioDrawbridgeSortTable('folio-drawbridge-insp-audit-<?php echo (int) $vault_id; ?>');
-	});
-	</script>
 	<?php
 }

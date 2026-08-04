@@ -83,6 +83,11 @@ function folio_drawbridge_template_redirect(): void {
 	$file_id     = get_query_var( 'folio_drawbridge_download' );
 
 	if ( $share_token ) {
+		// Registered here rather than unconditionally on wp_enqueue_scripts: that
+		// hook fires from inside wp_head(), which this page does call, so assets
+		// still print — but enqueueing globally would put share-page CSS on every
+		// front-end request.
+		add_action( 'wp_enqueue_scripts', 'folio_drawbridge_enqueue_share_assets' );
 		folio_drawbridge_render_share_page( sanitize_text_field( $share_token ) );
 		exit;
 	}
@@ -91,6 +96,44 @@ function folio_drawbridge_template_redirect(): void {
 		folio_drawbridge_handle_file_download( (int) $file_id );
 		exit;
 	}
+}
+
+/**
+ * Loads the share page's stylesheet and script.
+ *
+ * The page builds its own document but calls wp_head() and wp_footer(), so the
+ * normal enqueue pipeline works. Data the script cannot derive is localised;
+ * the download-session token is not among it, because it only exists after the
+ * recipient passes OTP verification and arrives in that AJAX response.
+ */
+function folio_drawbridge_enqueue_share_assets(): void {
+	wp_enqueue_style(
+		'folio-drawbridge-share',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/css/share.css',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION
+	);
+
+	wp_enqueue_script(
+		'folio-drawbridge-share',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/js/share.js',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION,
+		true
+	);
+
+	$share = folio_drawbridge_get_share_by_token( sanitize_text_field( (string) get_query_var( 'folio_drawbridge_share' ) ) );
+
+	wp_localize_script(
+		'folio-drawbridge-share',
+		'folioDrawbridgeData',
+		[
+			'ajaxUrl'  => folio_drawbridge_root_relative_url( admin_url( 'admin-ajax.php' ) ),
+			'homeBase' => folio_drawbridge_root_relative_url( home_url( '/' ) ),
+			'nonce'    => wp_create_nonce( 'folio_drawbridge_public_nonce' ),
+			'shareId'  => $share ? (int) $share->id : 0,
+		]
+	);
 }
 
 // ─── Public share access page ─────────────────────────────────────────────────
@@ -181,137 +224,6 @@ function folio_drawbridge_render_share_page( string $token ): void {
 		</div>
 	</div>
 
-	<script>
-	var folioDrawbridgeData = {
-		ajaxUrl:  <?php echo wp_json_encode( $ajax_url ); ?>,
-		homeBase: <?php echo wp_json_encode( $home_base ); ?>,
-		nonce:    <?php echo wp_json_encode( $nonce ); ?>,
-		shareId:  <?php echo (int) $share_id; ?>,
-		dlToken:  null
-	};
-
-	function folioDrawbridgeRequestOtp() {
-		var email = document.getElementById('folio-drawbridge-email').value.trim();
-		if (!email) { folioDrawbridgeShowError('folio-drawbridge-email-error', 'Please enter your email address.'); return; }
-		folioDrawbridgeHideError('folio-drawbridge-email-error');
-		folioDrawbridgePost({ action: 'folio_drawbridge_request_otp', share_id: folioDrawbridgeData.shareId, email: email, _wpnonce: folioDrawbridgeData.nonce })
-			.then(function(r) {
-				if (r.success) {
-					document.getElementById('folio-drawbridge-step-email').style.display = 'none';
-					document.getElementById('folio-drawbridge-step-otp').style.display   = '';
-				} else {
-					folioDrawbridgeShowError('folio-drawbridge-email-error', r.data || 'An error occurred.');
-				}
-			});
-	}
-
-	function folioDrawbridgeVerifyOtp() {
-		var email = document.getElementById('folio-drawbridge-email').value.trim();
-		var otp   = document.getElementById('folio-drawbridge-otp').value.trim();
-		if (!otp)  { folioDrawbridgeShowError('folio-drawbridge-otp-error', 'Please enter the verification code.'); return; }
-		folioDrawbridgeHideError('folio-drawbridge-otp-error');
-		folioDrawbridgePost({ action: 'folio_drawbridge_verify_otp', share_id: folioDrawbridgeData.shareId, email: email, otp: otp, _wpnonce: folioDrawbridgeData.nonce })
-			.then(function(r) {
-				if (r.success) {
-					folioDrawbridgeData.dlToken = r.data.download_token;
-					folioDrawbridgeRenderFiles(r.data);
-					document.getElementById('folio-drawbridge-step-otp').style.display   = 'none';
-					document.getElementById('folio-drawbridge-step-files').style.display  = '';
-				} else {
-					folioDrawbridgeShowError('folio-drawbridge-otp-error', r.data || 'Verification failed.');
-				}
-			});
-	}
-
-	/**
-	 * Builds the file list from the verified-OTP response.
-	 * Uses textContent throughout so a filename can never inject markup.
-	 */
-	function folioDrawbridgeRenderFiles(data) {
-		var ul = document.getElementById('folio-drawbridge-file-list');
-		ul.innerHTML = '';
-
-		var files = data.files || [];
-		document.getElementById('folio-drawbridge-no-files').style.display = files.length ? 'none' : '';
-
-		if (data.limit_note) {
-			var note = document.getElementById('folio-drawbridge-dl-limit');
-			note.textContent = data.limit_note;
-			note.style.display = '';
-		}
-
-		files.forEach(function(f) {
-			var li = document.createElement('li');
-
-			var nameEl = document.createElement('span');
-			nameEl.className = 'folio-drawbridge-file-name';
-			nameEl.textContent = f.name;
-
-			var sizeEl = document.createElement('span');
-			sizeEl.className = 'folio-drawbridge-file-size';
-			sizeEl.textContent = f.size;
-
-			var btn = document.createElement('a');
-			btn.className = 'folio-drawbridge-btn folio-drawbridge-btn-sm';
-			btn.href = '#';
-			btn.id = 'folio-drawbridge-dl-' + f.id;
-			btn.textContent = 'Download';
-			btn.onclick = function() { folioDrawbridgeDownload(f.id, f.name); return false; };
-
-			li.appendChild(nameEl);
-			li.appendChild(sizeEl);
-			li.appendChild(btn);
-			ul.appendChild(li);
-		});
-
-		folioDrawbridgeData.zipName = data.zip_name || '';
-		document.getElementById('folio-drawbridge-zip-wrap').style.display = data.zip_available ? '' : 'none';
-	}
-
-	function folioDrawbridgeBackToEmail() {
-		document.getElementById('folio-drawbridge-step-otp').style.display   = 'none';
-		document.getElementById('folio-drawbridge-step-email').style.display  = '';
-		document.getElementById('folio-drawbridge-otp').value = '';
-		folioDrawbridgeHideError('folio-drawbridge-otp-error');
-	}
-
-	function folioDrawbridgeTriggerDownload(url, fileName) {
-		var a = document.createElement('a');
-		a.href = url;
-		// An explicit name beats an empty download attribute, which makes the
-		// browser guess from the URL path (giving "download" / "admin-ajax").
-		if (fileName) { a.download = fileName; }
-		a.style.display = 'none';
-		document.body.appendChild(a); a.click(); document.body.removeChild(a);
-	}
-
-	function folioDrawbridgeDownload(fileId, fileName) {
-		if (!folioDrawbridgeData.dlToken) return;
-		folioDrawbridgeTriggerDownload(
-			folioDrawbridgeData.homeBase + '?folio_drawbridge_download=' + fileId + '&dt=' + encodeURIComponent(folioDrawbridgeData.dlToken),
-			fileName
-		);
-	}
-
-	function folioDrawbridgeDownloadZip() {
-		if (!folioDrawbridgeData.dlToken) return;
-		folioDrawbridgeTriggerDownload(
-			folioDrawbridgeData.ajaxUrl + '?action=folio_drawbridge_zip_download&dt=' + encodeURIComponent(folioDrawbridgeData.dlToken),
-			folioDrawbridgeData.zipName
-		);
-	}
-
-	function folioDrawbridgePost(data) {
-		var body = new URLSearchParams();
-		Object.keys(data).forEach(function(k){ body.append(k, data[k]); });
-		return fetch(folioDrawbridgeData.ajaxUrl, { method: 'POST', body: body,
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-		}).then(function(r){ return r.json(); });
-	}
-
-	function folioDrawbridgeShowError(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = ''; }
-	function folioDrawbridgeHideError(id) { document.getElementById(id).style.display = 'none'; }
-	</script>
 	<?php
 	folio_drawbridge_share_page_footer();
 }
@@ -324,36 +236,6 @@ function folio_drawbridge_share_page_header( string $site_name, string $home_url
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Secure File Access &mdash; <?php echo esc_html( $site_name ); ?></title>
 <?php wp_head(); ?>
-<style>
-*{box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:40px 16px;color:#1a1a2e}
-.folio-drawbridge-wrap{max-width:560px;margin:0 auto}
-.folio-drawbridge-logo{text-align:center;margin-bottom:24px}
-.folio-drawbridge-logo a{color:#1a1a2e;text-decoration:none;font-weight:700;font-size:18px}
-.folio-drawbridge-card{background:#fff;border-radius:10px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:32px}
-.folio-drawbridge-card h2{margin:0 0 8px;font-size:20px;color:#1a1a2e}
-.folio-drawbridge-desc{color:#666;margin:0 0 24px;font-size:14px}
-.folio-drawbridge-step label{display:block;font-weight:600;margin:0 0 6px;font-size:14px}
-.folio-drawbridge-input{display:block;width:100%;padding:10px 14px;border:1px solid #d0d5dd;border-radius:6px;font-size:15px;margin-bottom:12px;outline:none;transition:border .15s}
-.folio-drawbridge-input:focus{border-color:#2271b1}
-.folio-drawbridge-btn{display:inline-block;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:background .15s}
-.folio-drawbridge-btn-primary{background:#2271b1;color:#fff;width:100%;text-align:center}
-.folio-drawbridge-btn-primary:hover{background:#135e96}
-.folio-drawbridge-btn-secondary{background:#f0f2f5;color:#2271b1;width:100%;text-align:center;border:1px solid #d0d5dd}
-.folio-drawbridge-btn-sm{background:#2271b1;color:#fff;padding:5px 12px;font-size:12px}
-.folio-drawbridge-btn-sm:hover{background:#135e96;color:#fff}
-.folio-drawbridge-alert{padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:14px}
-.folio-drawbridge-alert-error{background:#fef0f0;border:1px solid #f5c6cb;color:#721c24}
-.folio-drawbridge-success-note{color:#1a5c2e;background:#d1e7dd;padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:14px}
-.folio-drawbridge-note{color:#666;font-size:13px;margin:0 0 16px}
-.folio-drawbridge-file-list{list-style:none;padding:0;margin:0}
-.folio-drawbridge-file-list li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5}
-.folio-drawbridge-file-list li:last-child{border-bottom:none}
-.folio-drawbridge-file-name{flex:1;font-size:14px;word-break:break-all}
-.folio-drawbridge-file-size{color:#888;font-size:12px;white-space:nowrap}
-.folio-drawbridge-footer{text-align:center;margin-top:24px;font-size:12px;color:#999}
-.folio-drawbridge-footer a{color:#999}
-</style>
 </head>
 <body>
 <div class="folio-drawbridge-wrap">
@@ -655,55 +537,47 @@ function folio_drawbridge_render_my_vaults_shortcode(): string {
 	$sc_expiry_required = ( ! $sc_is_admin && ! $sc_allow_no_expiry ) ? 'required' : '';
 	$sc_expiry_max_ts   = ( ! $sc_is_admin && $sc_max_expiry > 0 ) ? strtotime( "+{$sc_max_expiry} days" ) : 0;
 
-	// Pre-fill defaults as JS-safe values.
-	$sc_js_defaults = wp_json_encode( [
-		'defaultDl'      => $sc_default_dl,
-		'dlMin'          => $sc_dl_min,
-		'dlMax'          => $sc_dl_max,
-		'expiryRequired' => (bool) $sc_expiry_required,
-		'defaultExpiry'  => $sc_default_expiry > 0 ? gmdate( 'Y-m-d\TH:i', strtotime( "+{$sc_default_expiry} days" ) ) : '',
-		'expiryMax'      => $sc_expiry_max_ts > 0 ? gmdate( 'Y-m-d\TH:i', $sc_expiry_max_ts ) : '',
-	] );
+	// Enqueued from inside the shortcode so the assets load only on pages that
+	// actually render it. WordPress prints assets requested this late in the
+	// footer, which is where this script wants to be anyway.
+	wp_enqueue_style(
+		'folio-drawbridge-vaults',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/css/vaults.css',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION
+	);
+
+	wp_enqueue_script(
+		'folio-drawbridge-vaults',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/js/vaults.js',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION,
+		true
+	);
+
+	wp_localize_script(
+		'folio-drawbridge-vaults',
+		'folioDrawbridgeUserData',
+		[
+			'ajaxUrl'      => $ajax_url,
+			'nonce'        => $nonce,
+			'chunkSize'    => folio_drawbridge_chunk_size_bytes(),
+			// Share-form limits, pre-resolved so the form can apply them without
+			// another request.
+			'shareLimits'  => [
+				'defaultDl'      => $sc_default_dl,
+				'dlMin'          => $sc_dl_min,
+				'dlMax'          => $sc_dl_max,
+				'expiryRequired' => (bool) $sc_expiry_required,
+				'defaultExpiry'  => $sc_default_expiry > 0 ? gmdate( 'Y-m-d\TH:i', strtotime( "+{$sc_default_expiry} days" ) ) : '',
+				'expiryMax'      => $sc_expiry_max_ts > 0 ? gmdate( 'Y-m-d\TH:i', $sc_expiry_max_ts ) : '',
+			],
+		]
+	);
 
 	ob_start();
 	?>
 <div class="folio-drawbridge-vaults" id="folio-drawbridge-vaults">
-<style>
-.folio-drawbridge-vaults *{box-sizing:border-box}
-.folio-drawbridge-vaults{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a2e;max-width:860px}
-.folio-drawbridge-mv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.folio-drawbridge-mv-header h2{margin:0;font-size:22px}
-.folio-drawbridge-mv-btn{display:inline-block;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:background .15s}
-.folio-drawbridge-mv-btn-primary{background:#2271b1;color:#fff}
-.folio-drawbridge-mv-btn-primary:hover{background:#135e96;color:#fff}
-.folio-drawbridge-mv-btn-danger{background:#fff;color:#d63638;border:1px solid #d63638}
-.folio-drawbridge-mv-btn-sm{padding:5px 10px;font-size:12px}
-.folio-drawbridge-mv-vault{background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;margin-bottom:16px}
-.folio-drawbridge-mv-vault-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
-.folio-drawbridge-mv-vault-title{font-size:17px;font-weight:700;margin:0 0 4px}
-.folio-drawbridge-mv-meta{font-size:12px;color:#888;margin:0 0 12px}
-.folio-drawbridge-mv-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px}
-.folio-drawbridge-badge-active{background:#d1e7dd;color:#0a3622}
-.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked{background:#f8d7da;color:#58151c}
-.folio-drawbridge-badge-archived{background:#e2e3e5;color:#41464b}
-.folio-drawbridge-mv-section{margin-top:12px;padding-top:12px;border-top:1px solid #f0f2f5}
-.folio-drawbridge-mv-section h4{margin:0 0 8px;font-size:13px;font-weight:700;text-transform:uppercase;color:#888;letter-spacing:.5px}
-.folio-drawbridge-mv-file-list,.folio-drawbridge-mv-share-list{list-style:none;padding:0;margin:0}
-.folio-drawbridge-mv-file-list li,.folio-drawbridge-mv-share-list li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f8f9fa;font-size:13px}
-.folio-drawbridge-mv-file-list li:last-child,.folio-drawbridge-mv-share-list li:last-child{border-bottom:none}
-.folio-drawbridge-mv-file-name,.folio-drawbridge-mv-share-email{flex:1;word-break:break-all}
-.folio-drawbridge-mv-file-size{color:#aaa;font-size:11px;white-space:nowrap}
-.folio-drawbridge-mv-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;display:flex;align-items:center;justify-content:center}
-.folio-drawbridge-mv-modal{background:#fff;border-radius:10px;padding:28px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;z-index:9999}
-.folio-drawbridge-mv-modal h3{margin:0 0 16px;font-size:18px}
-.folio-drawbridge-mv-modal label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
-.folio-drawbridge-mv-modal input,.folio-drawbridge-mv-modal textarea,.folio-drawbridge-mv-modal select{width:100%;padding:8px 12px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px}
-.folio-drawbridge-mv-modal .folio-drawbridge-mv-actions{display:flex;gap:10px;margin-top:20px}
-.folio-drawbridge-mv-alert{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px}
-.folio-drawbridge-mv-alert-error{background:#fef0f0;border:1px solid #f5c6cb;color:#721c24}
-.folio-drawbridge-mv-alert-success{background:#d1e7dd;border:1px solid #a3cfbb;color:#0a3622}
-.folio-drawbridge-mv-empty{color:#888;font-size:13px;font-style:italic}
-</style>
 
 <div class="folio-drawbridge-mv-header">
 	<h2>My Secure Vaults</h2>
@@ -849,205 +723,6 @@ function folio_drawbridge_render_my_vaults_shortcode(): string {
 	</div>
 </div>
 
-<script>
-var folioDrawbridgeUserData = {
-	ajaxUrl:    <?php echo wp_json_encode( $ajax_url ); ?>,
-	nonce:      <?php echo wp_json_encode( $nonce ); ?>,
-	chunkSize:  <?php echo (int) folio_drawbridge_chunk_size_bytes(); ?>,
-	activeVaultId: null,
-	shareLimits: <?php echo $sc_js_defaults; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_json_encode() output. ?>
-};
-
-function folioDrawbridgeOpenNewVaultModal() {
-	document.getElementById('folio-drawbridge-vault-name').value='';
-	document.getElementById('folio-drawbridge-vault-desc').value='';
-	document.getElementById('folio-drawbridge-vault-expires').value='';
-	folioDrawbridgeHideError2('folio-drawbridge-vault-modal-error');
-	document.getElementById('folio-drawbridge-modal-vault').style.display='flex';
-}
-function folioDrawbridgeOpenUploadModal(vaultId) {
-	folioDrawbridgeUserData.activeVaultId = vaultId;
-	document.getElementById('folio-drawbridge-file-input').value='';
-	document.getElementById('folio-drawbridge-upload-queue').innerHTML='';
-	document.getElementById('folio-drawbridge-upload-btn').disabled=false;
-	document.getElementById('folio-drawbridge-upload-cancel-btn').disabled=false;
-	folioDrawbridgeHideError2('folio-drawbridge-upload-modal-error');
-	document.getElementById('folio-drawbridge-modal-upload').style.display='flex';
-}
-function folioDrawbridgeOpenShareModal(vaultId) {
-	folioDrawbridgeUserData.activeVaultId = vaultId;
-	var lim = folioDrawbridgeUserData.shareLimits;
-	var dlEl = document.getElementById('folio-drawbridge-share-maxdl');
-	var exEl = document.getElementById('folio-drawbridge-share-expires');
-	document.getElementById('folio-drawbridge-share-email').value = '';
-	dlEl.value = lim.defaultDl;
-	dlEl.min   = lim.dlMin;
-	if (lim.dlMax > 0) { dlEl.max = lim.dlMax; } else { dlEl.removeAttribute('max'); }
-	exEl.value = lim.defaultExpiry ? lim.defaultExpiry.substring(0,10) : '';
-	if (lim.expiryMax) { exEl.max = lim.expiryMax.substring(0,10); } else { exEl.removeAttribute('max'); }
-	if (lim.expiryRequired) { exEl.setAttribute('required',''); } else { exEl.removeAttribute('required'); }
-	folioDrawbridgeHideError2('folio-drawbridge-share-modal-error');
-	document.getElementById('folio-drawbridge-modal-share').style.display='flex';
-}
-function folioDrawbridgeCloseModal(id) { document.getElementById(id).style.display='none'; }
-
-function folioDrawbridgeCreateVault() {
-	var name    = document.getElementById('folio-drawbridge-vault-name').value.trim();
-	var desc    = document.getElementById('folio-drawbridge-vault-desc').value.trim();
-	var expires = document.getElementById('folio-drawbridge-vault-expires').value;
-	if (!name) { folioDrawbridgeShowError2('folio-drawbridge-vault-modal-error','Vault name is required.'); return; }
-	folioDrawbridgeUserPost({ action:'folio_drawbridge_create_vault', name:name, desc:desc, expires_at:expires, _wpnonce:folioDrawbridgeUserData.nonce })
-		.then(function(r) {
-			if (r.success) { folioDrawbridgeCloseModal('folio-drawbridge-modal-vault'); folioDrawbridgeShowNotice('Vault created. Reloading…','success'); setTimeout(function(){ location.reload(); },1200); }
-			else { folioDrawbridgeShowError2('folio-drawbridge-vault-modal-error', r.data||'Error creating vault.'); }
-		});
-}
-
-function folioDrawbridgeGenerateUploadId() {
-	return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-		.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
-}
-
-function folioDrawbridgeMvEsc(s) {
-	return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function folioDrawbridgeMvMakeQueueRow(fileName) {
-	var row = document.createElement('div');
-	row.style.cssText = 'margin-bottom:6px;padding:7px 10px;background:#f6f7f7;border-radius:4px;font-size:12px;';
-	row.innerHTML =
-		'<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
-		+ '<span style="font-weight:600;word-break:break-all;">' + folioDrawbridgeMvEsc(fileName) + '</span>'
-		+ '<span class="folio-drawbridge-mv-qlbl" style="color:#888;white-space:nowrap;margin-left:8px;">Queued</span></div>'
-		+ '<div style="background:#e0e0e0;border-radius:3px;height:7px;overflow:hidden;">'
-		+ '<div class="folio-drawbridge-mv-qbar" style="background:#2271b1;height:100%;width:0%;transition:width .15s;"></div></div>';
-	return row;
-}
-
-async function folioDrawbridgeUploadOneFile(file, rowEl) {
-	var bar   = rowEl.querySelector('.folio-drawbridge-mv-qbar');
-	var lbl   = rowEl.querySelector('.folio-drawbridge-mv-qlbl');
-	var CHUNK = folioDrawbridgeUserData.chunkSize;
-	var total = Math.ceil(file.size / CHUNK) || 1;
-	var uid   = folioDrawbridgeGenerateUploadId();
-	lbl.textContent = 'Uploading…';
-	for (var i = 0; i < total; i++) {
-		var start = i * CHUNK;
-		var fd    = new FormData();
-		fd.append('action',       'folio_drawbridge_upload_chunk');
-		fd.append('_wpnonce',     folioDrawbridgeUserData.nonce);
-		fd.append('vault_id',     folioDrawbridgeUserData.activeVaultId);
-		fd.append('upload_id',    uid);
-		fd.append('chunk_index',  i);
-		fd.append('total_chunks', total);
-		fd.append('file_name',    file.name);
-		fd.append('total_size',   file.size);
-		fd.append('chunk',        file.slice(start, Math.min(start + CHUNK, file.size)), file.name);
-		var r = await fetch(folioDrawbridgeUserData.ajaxUrl, {method:'POST', body:fd});
-		var j = await r.json();
-		if (!j.success) throw new Error(j.data || 'Upload failed.');
-		var pct = Math.round((i + 1) / total * 100);
-		bar.style.width = pct + '%';
-		lbl.textContent = j.data.complete ? 'Done' : pct + '%';
-	}
-}
-
-async function folioDrawbridgeUploadFile() {
-	var input   = document.getElementById('folio-drawbridge-file-input');
-	var queueEl = document.getElementById('folio-drawbridge-upload-queue');
-	folioDrawbridgeHideError2('folio-drawbridge-upload-modal-error');
-	if (!input.files.length) { folioDrawbridgeShowError2('folio-drawbridge-upload-modal-error','Please select at least one file.'); return; }
-
-	var btn = document.getElementById('folio-drawbridge-upload-btn');
-	var ccl = document.getElementById('folio-drawbridge-upload-cancel-btn');
-	btn.disabled = true;
-	ccl.disabled = true;
-	queueEl.innerHTML = '';
-
-	var files = Array.from(input.files);
-	var rows  = files.map(function(f) {
-		var row = folioDrawbridgeMvMakeQueueRow(f.name);
-		queueEl.appendChild(row);
-		return row;
-	});
-
-	var hasError = false;
-	for (var i = 0; i < files.length; i++) {
-		try {
-			await folioDrawbridgeUploadOneFile(files[i], rows[i]);
-			rows[i].querySelector('.folio-drawbridge-mv-qlbl').style.color = '#0a3622';
-		} catch(e) {
-			var lbl = rows[i].querySelector('.folio-drawbridge-mv-qlbl');
-			lbl.textContent = 'Error: ' + e.message;
-			lbl.style.color = '#d63638';
-			hasError = true;
-		}
-	}
-
-	if (!hasError) {
-		folioDrawbridgeCloseModal('folio-drawbridge-modal-upload');
-		folioDrawbridgeShowNotice(files.length + ' file(s) encrypted and uploaded. Reloading…', 'success');
-		setTimeout(function(){ location.reload(); }, 1400);
-	} else {
-		btn.disabled = false;
-		ccl.disabled = false;
-	}
-}
-
-function folioDrawbridgeCreateShare() {
-	var email      = document.getElementById('folio-drawbridge-share-email').value.trim();
-	var maxdl      = document.getElementById('folio-drawbridge-share-maxdl').value;
-	var expiresRaw = document.getElementById('folio-drawbridge-share-expires').value;
-	var expires    = expiresRaw ? expiresRaw + ' 23:59:59' : '';
-	if (!email) { folioDrawbridgeShowError2('folio-drawbridge-share-modal-error','Recipient email is required.'); return; }
-	folioDrawbridgeUserPost({ action:'folio_drawbridge_create_share', vault_id:folioDrawbridgeUserData.activeVaultId, email:email, max_downloads:maxdl, expires_at:expires, _wpnonce:folioDrawbridgeUserData.nonce })
-		.then(function(r) {
-			if (r.success) { folioDrawbridgeCloseModal('folio-drawbridge-modal-share'); folioDrawbridgeShowNotice('Share invite sent to '+email+'.','success'); setTimeout(function(){ location.reload(); },1500); }
-			else { folioDrawbridgeShowError2('folio-drawbridge-share-modal-error', r.data||'Error creating share.'); }
-		});
-}
-
-function folioDrawbridgeDeleteFile(fileId, vaultId) {
-	if (!confirm('Permanently delete this file? This cannot be undone.')) return;
-	folioDrawbridgeUserPost({ action:'folio_drawbridge_delete_file', file_id:fileId, vault_id:vaultId, _wpnonce:folioDrawbridgeUserData.nonce })
-		.then(function(r) {
-			if (r.success) { folioDrawbridgeShowNotice('File deleted.','success'); setTimeout(function(){ location.reload(); },800); }
-			else { folioDrawbridgeShowNotice(r.data||'Error deleting file.','error'); }
-		});
-}
-
-function folioDrawbridgeDeleteVault(vaultId, name) {
-	if (!confirm('Permanently delete vault "'+name+'" and all its files? This cannot be undone.')) return;
-	folioDrawbridgeUserPost({ action:'folio_drawbridge_delete_vault', vault_id:vaultId, _wpnonce:folioDrawbridgeUserData.nonce })
-		.then(function(r) {
-			if (r.success) { folioDrawbridgeShowNotice('Vault deleted. Reloading…','success'); setTimeout(function(){ location.reload(); },900); }
-			else { folioDrawbridgeShowNotice(r.data||'Error deleting vault.','error'); }
-		});
-}
-
-function folioDrawbridgeRevokeShare(shareId, vaultId) {
-	if (!confirm('Revoke this share? The recipient will immediately lose access.')) return;
-	folioDrawbridgeUserPost({ action:'folio_drawbridge_revoke_share', share_id:shareId, vault_id:vaultId, _wpnonce:folioDrawbridgeUserData.nonce })
-		.then(function(r) {
-			if (r.success) { folioDrawbridgeShowNotice('Share revoked. Reloading…','success'); setTimeout(function(){ location.reload(); },900); }
-			else { folioDrawbridgeShowNotice(r.data||'Error revoking share.','error'); }
-		});
-}
-
-function folioDrawbridgeUserPost(data) {
-	var body = new URLSearchParams();
-	Object.keys(data).forEach(function(k){ body.append(k, data[k]); });
-	return fetch(folioDrawbridgeUserData.ajaxUrl,{method:'POST',body:body,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();});
-}
-function folioDrawbridgeShowError2(id, msg) { var el=document.getElementById(id); el.textContent=msg; el.style.display=''; }
-function folioDrawbridgeHideError2(id) { document.getElementById(id).style.display='none'; }
-function folioDrawbridgeShowNotice(msg,type) {
-	var el=document.getElementById('folio-drawbridge-mv-notice');
-	el.className='folio-drawbridge-mv-alert folio-drawbridge-mv-alert-'+(type==='success'?'success':'error');
-	el.textContent=msg; el.style.display='';
-	setTimeout(function(){ el.style.display='none'; },4000);
-}
-</script>
 </div>
 	<?php
 	return ob_get_clean();

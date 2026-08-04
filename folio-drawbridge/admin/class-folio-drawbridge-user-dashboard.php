@@ -134,118 +134,46 @@ function folio_drawbridge_enqueue_user_dashboard_assets( string $hook ): void {
 		return;
 	}
 
-	wp_register_style( 'folio-drawbridge-user-dash', false, [], FOLIO_DRAWBRIDGE_VERSION );
-	wp_enqueue_style( 'folio-drawbridge-user-dash' );
+	wp_enqueue_style(
+		'folio-drawbridge-user-dash',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/css/user-dashboard.css',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION
+	);
 
-	// Reuse the same shared CSS variables as the admin panel plus a few extras.
-	wp_add_inline_style( 'folio-drawbridge-user-dash', '
-		.folio-drawbridge-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
-		           cursor:pointer; font-size:12px; color:#2271b1; text-decoration:none; display:inline-block; }
-		.folio-drawbridge-btn:hover { background:#f0f6fb; }
-		.folio-drawbridge-danger { color:#d63638; border-color:#d63638; }
-		.folio-drawbridge-danger:hover { background:#fef0f0; }
-		.folio-drawbridge-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
-		.folio-drawbridge-primary:hover { background:#135e96; color:#fff; }
-		.folio-drawbridge-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
-		.folio-drawbridge-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
-		.folio-drawbridge-badge-active  { background:#d1e7dd; color:#0a3622; }
-		.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked,.folio-drawbridge-badge-limit_reached { background:#f8d7da; color:#58151c; }
-		.folio-drawbridge-badge-archived,.folio-drawbridge-badge-pending { background:#e2e3e5; color:#41464b; }
-		.folio-drawbridge-table { width:100%; border-collapse:collapse; }
-		.folio-drawbridge-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
-		.folio-drawbridge-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
-		.folio-drawbridge-table tr:hover td { background:#f9fafc; }
-		.folio-drawbridge-form-row { margin-bottom:12px; }
-		.folio-drawbridge-form-row label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; }
-		.folio-drawbridge-form-row input[type=text],
-		.folio-drawbridge-form-row input[type=email],
-		.folio-drawbridge-form-row input[type=date],
-		.folio-drawbridge-form-row input[type=number],
-		.folio-drawbridge-form-row input[type=datetime-local],
-		.folio-drawbridge-form-row textarea,
-		.folio-drawbridge-form-row select { width:100%; padding:7px 10px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px; }
-		.folio-drawbridge-form-actions { margin-top:16px; display:flex; gap:8px; }
-		.folio-drawbridge-notice-success { background:#d1e7dd; border-left:4px solid #0a3622; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
-		.folio-drawbridge-notice-error   { background:#f8d7da; border-left:4px solid #d63638; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
+	// Shared table sorting and the inline-edit toggles.
+	wp_enqueue_script(
+		'folio-drawbridge-admin',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/admin.js',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION,
+		true
+	);
 
-		/* ── Sortable columns ── */
-		.folio-drawbridge-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
-		.folio-drawbridge-table th[data-sortable] { cursor:pointer; user-select:none; }
-		.folio-drawbridge-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
-		.folio-drawbridge-sort-ind.active { color:#2271b1; }
+	// The chunked-upload client is only needed on a vault's detail view.
+	$vault_id = absint( wp_unslash( $_GET['vault_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view selector.
+	if ( $vault_id > 0 ) {
+		wp_enqueue_script(
+			'folio-drawbridge-vault-detail',
+			FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/vault-detail.js',
+			[ 'folio-drawbridge-admin' ],
+			FOLIO_DRAWBRIDGE_VERSION,
+			true
+		);
 
-		/* ── Pagination ── */
-		.folio-drawbridge-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
-		.folio-drawbridge-pagination a, .folio-drawbridge-pagination span { display:inline-flex; align-items:center; justify-content:center;
-		    min-width:32px; height:32px; padding:0 8px; border:1px solid #ccd0d4; border-radius:6px;
-		    font-size:13px; text-decoration:none; color:#2271b1; background:#fff; }
-		.folio-drawbridge-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
-		.folio-drawbridge-pagination a:hover { background:#f0f6fb; }
-		.folio-drawbridge-pagination .dots { border:none; background:none; color:#999; }
-	' );
-
-	add_action( 'admin_head', 'folio_drawbridge_user_dashboard_inline_js' );
+		wp_localize_script(
+			'folio-drawbridge-vault-detail',
+			'folioDrawbridgeUd',
+			[
+				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+				'nonce'     => wp_create_nonce( 'folio_drawbridge_user_nonce' ),
+				'vaultId'   => $vault_id,
+				'chunkSize' => folio_drawbridge_chunk_size_bytes(),
+			]
+		);
+	}
 }
 
-function folio_drawbridge_user_dashboard_inline_js(): void {
-	if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== 'folio-drawbridge-vaults' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page gate for inline JS.
-		return;
-	}
-	?>
-	<script>
-	function folioDrawbridgeSortTable(tableId) {
-		var tbl = document.getElementById(tableId);
-		if (!tbl) return;
-		var headers = tbl.querySelectorAll('thead th');
-		headers.forEach(function(th, colIdx) {
-			if (th.dataset.nosort !== undefined) return;
-			th.style.cursor = 'pointer';
-			th.style.userSelect = 'none';
-			var ind = document.createElement('span');
-			ind.className = 'folio-drawbridge-sort-ind';
-			ind.textContent = ' ↕';
-			th.appendChild(ind);
-			var asc = true;
-			th.addEventListener('click', function() {
-				headers.forEach(function(h) {
-					var i = h.querySelector('.folio-drawbridge-sort-ind');
-					if (i) { i.textContent = ' ↕'; i.classList.remove('active'); }
-				});
-				ind.textContent = asc ? ' ↑' : ' ↓';
-				ind.classList.add('active');
-
-				var tbody = tbl.querySelector('tbody') || tbl;
-				var allRows = Array.from(tbody.querySelectorAll('tr'));
-				var groups = [];
-				allRows.forEach(function(row) {
-					if (row.dataset.subrow !== undefined) {
-						if (groups.length) groups[groups.length - 1].sub.push(row);
-					} else {
-						groups.push({ row: row, sub: [] });
-					}
-				});
-
-				groups.sort(function(a, b) {
-					var ca = a.row.cells[colIdx] ? a.row.cells[colIdx].textContent.trim() : '';
-					var cb = b.row.cells[colIdx] ? b.row.cells[colIdx].textContent.trim() : '';
-					var na = parseFloat(ca.replace(/[^0-9.\-]/g, ''));
-					var nb = parseFloat(cb.replace(/[^0-9.\-]/g, ''));
-					if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
-					return asc ? ca.localeCompare(cb) : cb.localeCompare(ca);
-				});
-
-				groups.forEach(function(g) {
-					tbody.appendChild(g.row);
-					g.sub.forEach(function(s) { tbody.appendChild(s); });
-				});
-
-				asc = !asc;
-			});
-		});
-	}
-	</script>
-	<?php
-}
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
