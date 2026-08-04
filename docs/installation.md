@@ -26,8 +26,8 @@ var_dump( extension_loaded('openssl'), extension_loaded('mbstring') );
 
 On first activation the plugin automatically:
 - Creates five database tables (`folio_drawbridge_vaults`, `folio_drawbridge_files`, `folio_drawbridge_shares`, `folio_drawbridge_otps`, `folio_drawbridge_audit`).
-- Creates `wp-content/uploads/folio-drawbridge-vaults/` with an `.htaccess` file blocking direct HTTP access.
-- Creates `wp-content/uploads/folio-drawbridge-chunks/` (chunked upload staging area, also `.htaccess` protected).
+- Creates `wp-content/uploads/folio-drawbridge/vaults/` with an `.htaccess` file blocking direct HTTP access.
+- Creates `wp-content/uploads/folio-drawbridge/chunks/` (chunked upload staging area, also `.htaccess` protected).
 - Schedules the hourly lifecycle cron event (`folio_drawbridge_hourly_lifecycle`).
 
 ---

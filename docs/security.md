@@ -34,7 +34,7 @@ Files are processed in 1 MB chunks to avoid PHP memory exhaustion on large files
 
 ## File Storage Security
 
-- All encrypted files are written to `wp-content/uploads/folio-drawbridge-vaults/{vault_id}/{random}.enc`
+- All encrypted files are written to `wp-content/uploads/folio-drawbridge/vaults/{vault_id}/{random}.enc`
 - The directory root is protected by `.htaccess` (`Deny from all` / `<FilesMatch>` deny)
 - Files are **never served directly** — all downloads route through PHP, which decrypts on the fly
 - Chunked upload staging (`folio-drawbridge-chunks/`) is also `.htaccess` protected and cleaned up hourly by WP-Cron

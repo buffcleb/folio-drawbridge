@@ -80,6 +80,17 @@ function folio_drawbridge_handle_admin_post(): void {
 		// Storage quotas.
 		$storage_quota_mb = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_storage_quota_mb'] ?? 0 ) ) );
 
+		// Storage folder. Sanitised the same way the resolver sanitises on read,
+		// so a value that survives here cannot introduce path separators and
+		// relocate writes outside the uploads directory. An empty or fully
+		// stripped value falls back to the default rather than being stored blank.
+		$storage_dir = sanitize_text_field( wp_unslash( $_POST['folio_drawbridge_storage_dir'] ?? '' ) );
+		$storage_dir = str_replace( [ '/', '\\', '.' ], '', sanitize_file_name( trim( $storage_dir ) ) );
+		if ( $storage_dir === '' ) {
+			$storage_dir = FOLIO_DRAWBRIDGE_DEFAULT_STORAGE_DIR;
+		}
+		$storage_dir_changed = $storage_dir !== folio_drawbridge_storage_dir_name();
+
 		// Email templates.
 		$email_template_types = [ 'invite', 'otp', 'download_notification', 'expiry_warning' ];
 		$email_template_data  = [];
@@ -122,6 +133,7 @@ function folio_drawbridge_handle_admin_post(): void {
 		update_option( 'folio_drawbridge_expiry_warning_days',         $expiry_warning_days );
 		update_option( 'folio_drawbridge_allowed_file_extensions',     $allowed_extensions );
 		update_option( 'folio_drawbridge_storage_quota_mb',            $storage_quota_mb );
+		update_option( 'folio_drawbridge_storage_dir',                 $storage_dir );
 		foreach ( $email_template_data as $type => $tmpl ) {
 			update_option( "folio_drawbridge_email_{$type}_subject", $tmpl['subject'] );
 			update_option( "folio_drawbridge_email_{$type}_body",    $tmpl['body'] );
@@ -133,7 +145,17 @@ function folio_drawbridge_handle_admin_post(): void {
 			'otp_max_attempts' => $otp_max_attempts,
 		] );
 
+		// Create and protect the new location straight away, so a misconfigured
+		// or unwritable folder surfaces here rather than on the next upload.
+		if ( $storage_dir_changed ) {
+			folio_drawbridge_ensure_vault_dir();
+		}
+
 		$notice = 'Settings saved.';
+		if ( $storage_dir_changed ) {
+			$notice .= ' Storage folder changed to <strong>' . esc_html( $storage_dir )
+				. '</strong> — files already stored under the previous folder were not moved.';
+		}
 		if ( isset( $_POST['folio_drawbridge_apply_to_existing_dl'] ) || isset( $_POST['folio_drawbridge_apply_to_existing_expiry'] ) ) {
 			$enforced = folio_drawbridge_enforce_share_limits();
 			if ( $enforced > 0 ) {

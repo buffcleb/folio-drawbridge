@@ -8,7 +8,7 @@
  *
  * When enabled, this deletes:
  *   - All five database tables (vaults, files, shares, otps, audit)
- *   - All encrypted files in FOLIO_DRAWBRIDGE_VAULT_DIR
+ *   - All encrypted files in the plugin's uploads storage directory
  *   - The encrypted master key stored in wp_options (folio_drawbridge_master_key)
  *   - All other plugin options
  *
@@ -33,42 +33,36 @@ if ( $delete !== '1' ) {
 	return; // Data preserved — nothing to do.
 }
 
-// ─── Delete encrypted vault files and chunk staging area from disk ───────────
+// ─── Delete this plugin's storage directory from disk ────────────────────────
 
-$vault_dir = WP_CONTENT_DIR . '/uploads/folio-drawbridge-vaults/';
-
-if ( is_dir( $vault_dir ) ) {
-	$files = new RecursiveIteratorIterator(
-		new RecursiveDirectoryIterator( $vault_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
-		RecursiveIteratorIterator::CHILD_FIRST
-	);
-
-	foreach ( $files as $entry ) {
-		if ( $entry->isFile() ) {
-			unlink( $entry->getPathname() );
-		} elseif ( $entry->isDir() ) {
-			rmdir( $entry->getPathname() );
-		}
-	}
-
-	rmdir( $vault_dir );
+// The main plugin file is not loaded during uninstall, so the storage path is
+// resolved here rather than through folio_drawbridge_storage_dir(). The logic is
+// deliberately kept identical to that function: same option, same default, same
+// sanitising — a divergence would leave encrypted files behind.
+$folder = (string) get_option( 'folio_drawbridge_storage_dir', 'folio-drawbridge' );
+$folder = str_replace( [ '/', '\\', '.' ], '', sanitize_file_name( trim( $folder ) ) );
+if ( $folder === '' ) {
+	$folder = 'folio-drawbridge';
 }
 
-// Delete orphaned chunk upload staging area.
-$chunks_dir = WP_CONTENT_DIR . '/uploads/folio-drawbridge-chunks/';
-if ( is_dir( $chunks_dir ) ) {
-	$chunk_files = new RecursiveIteratorIterator(
-		new RecursiveDirectoryIterator( $chunks_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
+$uploads     = wp_get_upload_dir();
+$storage_dir = trailingslashit( $uploads['basedir'] ) . $folder . '/';
+
+if ( is_dir( $storage_dir ) ) {
+	$entries = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator( $storage_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
 		RecursiveIteratorIterator::CHILD_FIRST
 	);
-	foreach ( $chunk_files as $entry ) {
-		if ( $entry->isFile() ) {
+
+	foreach ( $entries as $entry ) {
+		if ( $entry->isFile() || $entry->isLink() ) {
 			unlink( $entry->getPathname() );
 		} elseif ( $entry->isDir() ) {
 			rmdir( $entry->getPathname() );
 		}
 	}
-	rmdir( $chunks_dir );
+
+	rmdir( $storage_dir );
 }
 
 // ─── Drop all plugin database tables ─────────────────────────────────────────
@@ -126,6 +120,8 @@ $options = [
 	'folio_drawbridge_email_download_notification_body',
 	'folio_drawbridge_email_expiry_warning_subject',
 	'folio_drawbridge_email_expiry_warning_body',
+	// Storage.
+	'folio_drawbridge_storage_dir',
 	// Data & privacy.
 	'folio_drawbridge_delete_on_uninstall',
 ];

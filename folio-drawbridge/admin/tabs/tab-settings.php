@@ -437,11 +437,28 @@ function folio_drawbridge_render_tab_settings(): void {
 			<h2 style="margin-top:0;">Storage</h2>
 			<table class="form-table" style="margin-top:0;">
 				<tr>
+					<th><label for="folio_drawbridge_storage_dir">Storage Folder</label></th>
+					<td>
+						<code><?php echo esc_html( trailingslashit( wp_get_upload_dir()['basedir'] ) ); ?></code>
+						<input type="text" id="folio_drawbridge_storage_dir" name="folio_drawbridge_storage_dir"
+						       value="<?php echo esc_attr( folio_drawbridge_storage_dir_name() ); ?>"
+						       style="width:220px;" placeholder="folio-drawbridge">
+						<p class="description">
+							Folder inside your uploads directory holding all encrypted files, upload staging,
+							and logs. Letters, numbers, and hyphens only.
+						</p>
+						<p class="description" style="color:#d63638;">
+							<strong>Changing this does not move existing files.</strong> Vaults created under the
+							previous folder become unreadable until their files are moved across by hand.
+						</p>
+					</td>
+				</tr>
+				<tr>
 					<th>Encrypted file storage</th>
 					<td>
-						<code><?php echo esc_html( FOLIO_DRAWBRIDGE_VAULT_DIR ); ?></code>
+						<code><?php echo esc_html( folio_drawbridge_vault_dir() ); ?></code>
 						<?php
-						$htaccess = FOLIO_DRAWBRIDGE_VAULT_DIR . '.htaccess';
+						$htaccess = folio_drawbridge_vault_dir() . '.htaccess';
 						if ( file_exists( $htaccess ) ) {
 							echo '<span style="color:#0a3622;background:#d1e7dd;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:8px;">✓ .htaccess protected</span>';
 						} else {
@@ -453,7 +470,7 @@ function folio_drawbridge_render_tab_settings(): void {
 				<tr>
 					<th>Directory writable</th>
 					<td>
-						<?php if ( is_writable( FOLIO_DRAWBRIDGE_VAULT_DIR ) ) : // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- read-only status display of the storage directory. ?>
+						<?php if ( is_writable( folio_drawbridge_vault_dir() ) ) : // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- read-only status display of the storage directory. ?>
 							<span style="color:#0a3622;">✓ Writable</span>
 						<?php else : ?>
 							<span style="color:#d63638;">✗ Not writable — uploads will fail.</span>

@@ -26,7 +26,6 @@ define( 'FOLIO_DRAWBRIDGE_DB_VERSION',       '1.2.1' ); // bump to apply the fol
 define( 'FOLIO_DRAWBRIDGE_PLUGIN_DIR',       plugin_dir_path( __FILE__ ) );
 define( 'FOLIO_DRAWBRIDGE_PLUGIN_URL',       plugin_dir_url( __FILE__ ) );
 define( 'FOLIO_DRAWBRIDGE_PLUGIN_BASENAME',  plugin_basename( __FILE__ ) );
-define( 'FOLIO_DRAWBRIDGE_VAULT_DIR',        WP_CONTENT_DIR . '/uploads/folio-drawbridge-vaults/' );
 
 // Administrators can define FOLIO_DRAWBRIDGE_MASTER_KEY as 64 hex chars in wp-config.php
 // to keep the encryption master key out of the database entirely.

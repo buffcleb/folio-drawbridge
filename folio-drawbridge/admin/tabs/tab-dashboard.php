@@ -201,7 +201,7 @@ function folio_drawbridge_render_tab_dashboard(): void {
 			<li>Master encryption key source: <strong><?php echo esc_html( $master_key_source ); ?></strong></li>
 			<li>Encryption algorithm: <strong>AES-256-CBC</strong> with per-file random IV and per-vault derived key</li>
 			<li>OTP validity: <strong><?php echo (int) get_option( 'folio_drawbridge_otp_ttl_minutes', 15 ); ?> minutes</strong>, max 5 attempts</li>
-			<li>File storage: <strong><?php echo esc_html( FOLIO_DRAWBRIDGE_VAULT_DIR ); ?></strong> (HTTP-blocked)</li>
+			<li>File storage: <strong><?php echo esc_html( folio_drawbridge_vault_dir() ); ?></strong> (HTTP-blocked)</li>
 			<li>WP-Cron lifecycle: <strong><?php echo wp_next_scheduled( 'folio_drawbridge_lifecycle_sweep' ) ? 'scheduled' : '⚠ not scheduled — reactivate plugin'; ?></strong></li>
 		</ul>
 	</div>
