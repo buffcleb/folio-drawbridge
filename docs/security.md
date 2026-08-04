@@ -86,7 +86,7 @@ Every form submission and AJAX action is protected by a WordPress nonce:
 
 ### Path Traversal
 
-- SIEM log path is validated to be absolute and must not contain `..` segments before being stored
+- The SIEM log is written inside the uploads directory by default, guarded from direct web access. An operator may redirect it with the `FOLIO_DRAWBRIDGE_SIEM_PATH` constant in `wp-config.php`; that path is validated as absolute, traversal-free, outside the WordPress directory, and non-executable before every append
 - Encrypted file paths are constructed from database-stored integer IDs and random hex strings — no user-provided path components
 
 ### Direct File Access

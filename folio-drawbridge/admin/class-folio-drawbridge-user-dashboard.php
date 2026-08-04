@@ -410,7 +410,7 @@ function folio_drawbridge_ud_show_notice(): void {
 	printf(
 		'<div class="folio-drawbridge-notice-%s" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $notice['type'] ),
-		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by folio_drawbridge_set_notice() callers before storage.
+		wp_kses( $notice['message'], folio_drawbridge_notice_allowed_html() )
 	);
 }
 

@@ -91,13 +91,13 @@ function folio_drawbridge_render_vault_list(): void {
 			<p style="color:#888;font-size:13px;margin:0 0 8px;"><?php echo esc_html( number_format( $total ) ); ?> vault<?php echo $total !== 1 ? 's' : ''; ?> found</p>
 			<table class="folio-drawbridge-table widefat striped">
 				<thead><tr>
-					<?php echo folio_drawbridge_sortable_th( 'Vault Name', 'name',       $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Vault Name', 'name',       $f_orderby, $f_order, $sort_base ); ?>
 					<th data-nosort>Owner</th>
-					<?php echo folio_drawbridge_sortable_th( 'Status',     'status',     $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Status',     'status',     $f_orderby, $f_order, $sort_base ); ?>
 					<th data-nosort>Files</th>
 					<th data-nosort>Shares</th>
-					<?php echo folio_drawbridge_sortable_th( 'Created',    'created_at', $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo folio_drawbridge_sortable_th( 'Expires',    'expires_at', $f_orderby, $f_order, $sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Created',    'created_at', $f_orderby, $f_order, $sort_base ); ?>
+					<?php folio_drawbridge_sortable_th( 'Expires',    'expires_at', $f_orderby, $f_order, $sort_base ); ?>
 					<th data-nosort>Actions</th>
 				</tr></thead>
 				<tbody>

@@ -102,14 +102,6 @@ function folio_drawbridge_handle_admin_post(): void {
 
 		// SIEM logging.
 		$siem_enabled    = isset( $_POST['folio_drawbridge_siem_enabled'] ) ? '1' : '0';
-		$siem_log_path   = sanitize_text_field( wp_unslash( $_POST['folio_drawbridge_siem_log_path'] ?? '' ) );
-		// The rule itself lives with the writer (folio_drawbridge_siem_path_error), so the
-		// check made here and the check made on every append can never drift.
-		$siem_path_error = folio_drawbridge_siem_path_error( $siem_log_path );
-		if ( $siem_path_error !== '' ) {
-			$siem_log_path    = get_option( 'folio_drawbridge_siem_log_path', '' ); // keep previous value
-			$siem_path_error .= ' Previous value retained.';
-		}
 		$siem_format = sanitize_key( wp_unslash( $_POST['folio_drawbridge_siem_format'] ?? 'json' ) );
 		$siem_format = in_array( $siem_format, [ 'json', 'csv' ], true ) ? $siem_format : 'json';
 
@@ -127,7 +119,6 @@ function folio_drawbridge_handle_admin_post(): void {
 		update_option( 'folio_drawbridge_audit_prune_days',            $prune_days );
 		update_option( 'folio_drawbridge_delete_on_uninstall',         $delete_on_uninstall );
 		update_option( 'folio_drawbridge_siem_enabled',                $siem_enabled );
-		update_option( 'folio_drawbridge_siem_log_path',               $siem_log_path );
 		update_option( 'folio_drawbridge_siem_format',                 $siem_format );
 		update_option( 'folio_drawbridge_notify_on_download',          $notify_on_download );
 		update_option( 'folio_drawbridge_expiry_warning_days',         $expiry_warning_days );
@@ -166,11 +157,8 @@ function folio_drawbridge_handle_admin_post(): void {
 				);
 			}
 		}
-		if ( $siem_path_error ) {
-			$notice .= ' ' . $siem_path_error;
-		}
 
-		folio_drawbridge_set_notice( $notice, $siem_path_error ? 'warning' : 'success' );
+		folio_drawbridge_set_notice( $notice, 'success' );
 		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
@@ -815,6 +803,27 @@ function folio_drawbridge_set_notice( string $message, string $type = 'success' 
 	set_transient( 'folio_drawbridge_admin_notice_' . get_current_user_id(), compact( 'message', 'type' ), 30 );
 }
 
+/**
+ * Tags permitted in an admin notice.
+ *
+ * Notices are composed by callers and legitimately carry light emphasis — a
+ * vault name in bold, a count in strong. Passing them through wp_kses() with
+ * this list keeps that formatting while guaranteeing the output is escaped,
+ * which is what the previous "trust the caller" comment could not promise:
+ * several callers interpolate upload error text that never passes through an
+ * escaping function.
+ *
+ * @return array<string,array<string,bool>>
+ */
+function folio_drawbridge_notice_allowed_html(): array {
+	return [
+		'strong' => [],
+		'em'     => [],
+		'code'   => [],
+		'br'     => [],
+	];
+}
+
 function folio_drawbridge_show_notice(): void {
 	$key    = 'folio_drawbridge_admin_notice_' . get_current_user_id();
 	$notice = get_transient( $key );
@@ -830,7 +839,7 @@ function folio_drawbridge_show_notice(): void {
 	printf(
 		'<div class="notice %s is-dismissible" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $class ),
-		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by folio_drawbridge_set_notice() callers before storage.
+		wp_kses( $notice['message'], folio_drawbridge_notice_allowed_html() )
 	);
 }
 
@@ -845,19 +854,30 @@ function folio_drawbridge_show_notice(): void {
  * @param string $cur_order   Current sort direction (ASC|DESC).
  * @param array  $url_args    Base query args (page, tab, filters, etc.) merged into the sort URL.
  * @param bool   $nosort      Pass true to render a plain unsortable <th>.
+ *
+ * Prints directly; nothing is returned.
  */
-function folio_drawbridge_sortable_th( string $label, string $col, string $cur_col, string $cur_order, array $url_args, bool $nosort = false ): string {
+function folio_drawbridge_sortable_th( string $label, string $col, string $cur_col, string $cur_order, array $url_args, bool $nosort = false ): void {
 	if ( $nosort ) {
-		return '<th>' . esc_html( $label ) . '</th>';
+		echo '<th>' . esc_html( $label ) . '</th>';
+		return;
 	}
+
 	$active    = $cur_col === $col;
 	$new_order = ( $active && $cur_order === 'ASC' ) ? 'DESC' : 'ASC';
 	$url       = add_query_arg( array_merge( $url_args, [ 'orderby' => $col, 'order' => $new_order ] ), admin_url( 'admin.php' ) );
-	$indicator = $active
-		? '<span class="folio-drawbridge-sort-ind" style="color:#2271b1;"> ' . ( $cur_order === 'ASC' ? '↑' : '↓' ) . '</span>'
-		: '<span class="folio-drawbridge-sort-ind"> ↕</span>';
-	return '<th><a href="' . esc_url( $url ) . '" style="text-decoration:none;color:inherit;white-space:nowrap;">'
-		. esc_html( $label ) . $indicator . '</a></th>';
+	$arrow     = $active ? ( $cur_order === 'ASC' ? '↑' : '↓' ) : '↕';
+	$ind_style = $active ? 'color:#2271b1;' : '';
+
+	// Printed here rather than returned so no call site has to echo unescaped
+	// markup — every part is escaped at the point it is emitted.
+	printf(
+		'<th><a href="%s" style="text-decoration:none;color:inherit;white-space:nowrap;">%s<span class="folio-drawbridge-sort-ind" style="%s"> %s</span></a></th>',
+		esc_url( $url ),
+		esc_html( $label ),
+		esc_attr( $ind_style ),
+		esc_html( $arrow )
+	);
 }
 
 // ─── Shared pagination helper ─────────────────────────────────────────────────

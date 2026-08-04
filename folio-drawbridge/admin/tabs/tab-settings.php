@@ -54,9 +54,12 @@ function folio_drawbridge_render_tab_settings(): void {
 	// still be sitting in the options table; the writer refuses it, so say so
 	// here rather than leaving an administrator to wonder why the feed is empty.
 	$siem_enabled      = get_option( 'folio_drawbridge_siem_enabled', '0' );
-	$siem_log_path     = (string) get_option( 'folio_drawbridge_siem_log_path', '' );
+	$siem_log_file     = folio_drawbridge_siem_log_file();
 	$siem_format       = get_option( 'folio_drawbridge_siem_format', 'json' );
-	$siem_stored_error = folio_drawbridge_siem_path_error( $siem_log_path );
+	// Only a wp-config-defined path can be invalid; the default always resolves.
+	$siem_constant_error = defined( 'FOLIO_DRAWBRIDGE_SIEM_PATH' )
+		? folio_drawbridge_siem_path_error( (string) FOLIO_DRAWBRIDGE_SIEM_PATH )
+		: '';
 
 	$form_url = add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'settings' ], admin_url( 'admin.php' ) );
 	$ajax_url = admin_url( 'admin-ajax.php' );
@@ -276,20 +279,24 @@ function folio_drawbridge_render_tab_settings(): void {
 					</td>
 				</tr>
 				<tr>
-					<th><label for="folio_drawbridge_siem_log_path">Log File Path</label></th>
+					<th>Log File</th>
 					<td>
-						<input type="text" id="folio_drawbridge_siem_log_path" name="folio_drawbridge_siem_log_path"
-						       value="<?php echo esc_attr( $siem_log_path ); ?>"
-						       style="width:100%;max-width:520px;" placeholder="/var/log/folio-drawbridge-audit.json">
-						<?php if ( $siem_stored_error !== '' ) : ?>
+						<code><?php echo esc_html( $siem_log_file ); ?></code>
+						<?php if ( $siem_constant_error !== '' ) : ?>
 							<p style="margin:6px 0;color:#d63638;">
-								<strong>Nothing is being written to this path.</strong>
-								<?php echo esc_html( $siem_stored_error ); ?>
+								<strong>Nothing is being written.</strong>
+								<?php echo esc_html( $siem_constant_error ); ?>
 							</p>
 						<?php endif; ?>
 						<p class="description">
-							Absolute path to the log file on the server, <strong>outside</strong> the WordPress directory, with a non-executable extension.
-							The web server process must have write permission. Example: <code>/var/log/folio-drawbridge-audit.log</code>
+							Written inside your uploads directory, protected from direct web access by the
+							same rules as the encrypted vaults. Point your SIEM agent at this file.
+						</p>
+						<p class="description">
+							To write somewhere else — a path your collector already tails, for instance —
+							define <code>FOLIO_DRAWBRIDGE_SIEM_PATH</code> in <code>wp-config.php</code>.
+							It must be an absolute path outside the WordPress directory with a
+							non-executable extension.
 						</p>
 					</td>
 				</tr>
