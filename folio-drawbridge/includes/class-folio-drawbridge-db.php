@@ -137,33 +137,111 @@ function folio_drawbridge_create_tables() {
 	dbDelta( [ $sql_vaults, $sql_files, $sql_shares, $sql_otps, $sql_audit ] );
 }
 
-// ─── Vault storage directory ──────────────────────────────────────────────────
+// ─── Storage directories ──────────────────────────────────────────────────────
 
-function folio_drawbridge_ensure_vault_dir() {
-	if ( ! is_dir( FOLIO_DRAWBRIDGE_VAULT_DIR ) ) {
-		wp_mkdir_p( FOLIO_DRAWBRIDGE_VAULT_DIR );
+/** Folder name used when the site owner has not chosen one. */
+const FOLIO_DRAWBRIDGE_DEFAULT_STORAGE_DIR = 'folio-drawbridge';
+
+/**
+ * Returns the folder name, directly under the uploads directory, that holds
+ * everything this plugin writes.
+ *
+ * Site owners may change it, so the value is sanitised on the way out as well as
+ * on the way in: a stored value predating validation, or one edited directly in
+ * the database, must not be able to introduce path separators and escape the
+ * uploads directory.
+ */
+function folio_drawbridge_storage_dir_name(): string {
+	$name = (string) get_option( 'folio_drawbridge_storage_dir', FOLIO_DRAWBRIDGE_DEFAULT_STORAGE_DIR );
+	$name = sanitize_file_name( trim( $name ) );
+
+	// sanitize_file_name() strips slashes, but be explicit — this is the only
+	// thing standing between an option value and an arbitrary write location.
+	$name = str_replace( [ '/', '\\', '.' ], '', $name );
+
+	return $name !== '' ? $name : FOLIO_DRAWBRIDGE_DEFAULT_STORAGE_DIR;
+}
+
+/**
+ * Absolute path to this plugin's storage root, with a trailing slash.
+ *
+ * Resolved at runtime through wp_get_upload_dir() rather than built from
+ * WP_CONTENT_DIR, because the uploads location is not fixed: it moves with the
+ * UPLOADS constant, with a custom upload_path option, and per-site on multisite
+ * (uploads/sites/N/). wp_get_upload_dir() is the non-creating variant, so
+ * simply asking for the path has no side effects.
+ */
+function folio_drawbridge_storage_dir(): string {
+	$uploads = wp_get_upload_dir();
+
+	return trailingslashit( $uploads['basedir'] ) . folio_drawbridge_storage_dir_name() . '/';
+}
+
+/** Absolute path to the encrypted-file store, with a trailing slash. */
+function folio_drawbridge_vault_dir(): string {
+	return folio_drawbridge_storage_dir() . 'vaults/';
+}
+
+/** Absolute path to the chunked-upload staging area, with a trailing slash. */
+function folio_drawbridge_chunks_dir(): string {
+	return folio_drawbridge_storage_dir() . 'chunks/';
+}
+
+/** Absolute path to the SIEM log directory, with a trailing slash. */
+function folio_drawbridge_logs_dir(): string {
+	return folio_drawbridge_storage_dir() . 'logs/';
+}
+
+/**
+ * Creates a storage directory and blocks direct HTTP access to it.
+ *
+ * Both server syntaxes are written: `Require all denied` is Apache 2.4, while
+ * `Deny from all` covers 2.2. Sending only the latter — as this plugin did
+ * previously — is silently ineffective on any modern Apache. Neither helps on
+ * nginx, so the index.php stub and the fact that filenames are unguessable
+ * random tokens remain the backstop there.
+ *
+ * @param string $dir Absolute directory path, trailing slash included.
+ */
+function folio_drawbridge_ensure_protected_dir( string $dir ): void {
+	if ( ! is_dir( $dir ) ) {
+		wp_mkdir_p( $dir );
 	}
 
-	// Block all direct HTTP access — encrypted files must only be served by PHP.
-	$htaccess = FOLIO_DRAWBRIDGE_VAULT_DIR . '.htaccess';
+	$htaccess = $dir . '.htaccess';
 	if ( ! file_exists( $htaccess ) ) {
-		file_put_contents( $htaccess, "Deny from all\n" );
+		file_put_contents(
+			$htaccess,
+			"<IfModule mod_authz_core.c>\n\tRequire all denied\n</IfModule>\n"
+			. "<IfModule !mod_authz_core.c>\n\tDeny from all\n</IfModule>\n"
+		);
 	}
 
-	// Prevent directory listing.
-	$index = FOLIO_DRAWBRIDGE_VAULT_DIR . 'index.php';
+	// Prevent directory listing where .htaccess is not honoured.
+	$index = $dir . 'index.php';
 	if ( ! file_exists( $index ) ) {
 		file_put_contents( $index, "<?php // Silence is golden.\n" );
 	}
 }
 
 /**
+ * Creates the storage root and the vault directory, both protected.
+ *
+ * The root is guarded too, so a server that ignores the nested .htaccess still
+ * refuses the parent.
+ */
+function folio_drawbridge_ensure_vault_dir() {
+	folio_drawbridge_ensure_protected_dir( folio_drawbridge_storage_dir() );
+	folio_drawbridge_ensure_protected_dir( folio_drawbridge_vault_dir() );
+}
+
+/**
  * Ensures the per-vault subdirectory exists and returns its path.
- * Encrypted files are stored in FOLIO_DRAWBRIDGE_VAULT_DIR/{vault_id}/ for isolation.
+ * Encrypted files are stored in <vaults>/{vault_id}/ for isolation.
  */
 function folio_drawbridge_ensure_vault_subdir( int $vault_id ): string {
 	folio_drawbridge_ensure_vault_dir();
-	$dir = FOLIO_DRAWBRIDGE_VAULT_DIR . $vault_id . '/';
+	$dir = folio_drawbridge_vault_dir() . $vault_id . '/';
 	if ( ! is_dir( $dir ) ) {
 		wp_mkdir_p( $dir );
 	}
@@ -175,7 +253,7 @@ function folio_drawbridge_ensure_vault_subdir( int $vault_id ): string {
  * Single source of truth for file path construction.
  */
 function folio_drawbridge_vault_file_path( int $vault_id, string $stored_name ): string {
-	return FOLIO_DRAWBRIDGE_VAULT_DIR . $vault_id . '/' . $stored_name;
+	return folio_drawbridge_vault_dir() . $vault_id . '/' . $stored_name;
 }
 
 // ─── DB version migration ─────────────────────────────────────────────────────

@@ -315,7 +315,7 @@ function folio_drawbridge_delete_vault( int $vault_id ): bool {
 	}
 
 	// Remove the now-empty vault subdirectory.
-	$subdir = FOLIO_DRAWBRIDGE_VAULT_DIR . $vault_id . '/';
+	$subdir = folio_drawbridge_vault_dir() . $vault_id . '/';
 	if ( is_dir( $subdir ) ) {
 		rmdir( $subdir );
 	}
@@ -669,21 +669,8 @@ function folio_drawbridge_chunk_size_bytes(): int {
  * Returns the absolute path with trailing slash.
  */
 function folio_drawbridge_ensure_chunks_dir(): string {
-	$dir = WP_CONTENT_DIR . '/uploads/folio-drawbridge-chunks/';
-
-	if ( ! is_dir( $dir ) ) {
-		wp_mkdir_p( $dir );
-	}
-
-	$htaccess = $dir . '.htaccess';
-	if ( ! file_exists( $htaccess ) ) {
-		file_put_contents( $htaccess, "Deny from all\n" );
-	}
-
-	$index = $dir . 'index.php';
-	if ( ! file_exists( $index ) ) {
-		file_put_contents( $index, "<?php // Silence is golden.\n" );
-	}
+	$dir = folio_drawbridge_chunks_dir();
+	folio_drawbridge_ensure_protected_dir( $dir );
 
 	return $dir;
 }
@@ -695,7 +682,7 @@ function folio_drawbridge_ensure_chunks_dir(): string {
  * @return int Number of directories removed.
  */
 function folio_drawbridge_cleanup_orphaned_chunks( int $max_age = 86400 ): int {
-	$base  = WP_CONTENT_DIR . '/uploads/folio-drawbridge-chunks/';
+	$base  = folio_drawbridge_chunks_dir();
 	$count = 0;
 
 	if ( ! is_dir( $base ) ) {

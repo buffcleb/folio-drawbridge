@@ -13,7 +13,7 @@
  * File encryption:
  *   Algorithm   — AES-256-CBC via PHP's openssl extension.
  *   IV          — 16 random bytes generated per file, stored as hex in folio_drawbridge_files.
- *   Storage     — Ciphertext written to FOLIO_DRAWBRIDGE_VAULT_DIR/{stored_name}; the dir is
+ *   Storage     — Ciphertext written to <uploads>/<storage>/vaults/{vault_id}/{stored_name}; the dir is
  *                 protected by .htaccess (Deny from all) so files cannot be
  *                 downloaded directly — they must be served through PHP.
  *
