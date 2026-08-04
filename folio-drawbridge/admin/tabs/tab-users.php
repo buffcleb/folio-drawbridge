@@ -166,7 +166,7 @@ function folio_drawbridge_render_tab_users(): void {
 			<?php if ( ! $folio_drawbridge_admin_users ) : ?>
 				<p style="color:#888;font-size:13px;margin-bottom:20px;">No Drawbridge admins designated yet.</p>
 			<?php else : ?>
-				<table id="folio-drawbridge-admins-table" class="folio-drawbridge-table widefat striped" style="margin-bottom:24px;">
+				<table id="folio-drawbridge-admins-table" data-folio-drawbridge-sortable class="folio-drawbridge-table widefat striped" style="margin-bottom:24px;">
 					<thead><tr>
 						<th>User</th>
 						<th>Email</th>
@@ -216,7 +216,7 @@ function folio_drawbridge_render_tab_users(): void {
 			<?php if ( ! $vault_users ) : ?>
 				<p style="color:#888;font-size:13px;">No users have vault access yet.</p>
 			<?php else : ?>
-				<table id="folio-drawbridge-vault-users-table" class="folio-drawbridge-table widefat striped">
+				<table id="folio-drawbridge-vault-users-table" data-folio-drawbridge-sortable class="folio-drawbridge-table widefat striped">
 					<thead><tr>
 						<th>User</th>
 						<th>Email</th>
@@ -259,22 +259,5 @@ function folio_drawbridge_render_tab_users(): void {
 			<?php endif; ?>
 		</div>
 	</div>
-	<script>
-	document.addEventListener('DOMContentLoaded', function() {
-		folioDrawbridgeSortTable('folio-drawbridge-admins-table');
-		folioDrawbridgeSortTable('folio-drawbridge-vault-users-table');
-	});
-
-	// Expand/collapse the vault list sub-row beneath a user row.
-	function folioDrawbridgeToggleUserVaults(userId, link) {
-		var row = document.getElementById('folio-drawbridge-user-vaults-' + userId);
-		if (!row) return false;
-		var open = row.style.display !== 'none';
-		row.style.display = open ? 'none' : '';
-		var arrow = link.querySelector('span');
-		if (arrow) arrow.textContent = open ? '▸' : '▾';
-		return false;
-	}
-	</script>
 	<?php
 }

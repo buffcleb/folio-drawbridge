@@ -710,143 +710,54 @@ function folio_drawbridge_enqueue_admin_assets( string $hook ): void {
 		return;
 	}
 
-	// Admin file download (multipart) — handled inline; we also need to handle
-	// admin vault file serving via a direct AJAX action.
-	add_action( 'admin_head', 'folio_drawbridge_admin_inline_js' );
+	wp_enqueue_style(
+		'folio-drawbridge-admin',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/css/admin.css',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION
+	);
 
-	wp_register_style( 'folio-drawbridge-admin', false, [], FOLIO_DRAWBRIDGE_VERSION );
-	wp_enqueue_style( 'folio-drawbridge-admin' );
+	wp_enqueue_script(
+		'folio-drawbridge-admin',
+		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/admin.js',
+		[],
+		FOLIO_DRAWBRIDGE_VERSION,
+		true
+	);
 
-	wp_add_inline_style( 'folio-drawbridge-admin', '
-		/* ── Buttons ── */
-		.folio-drawbridge-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
-		           cursor:pointer; font-size:12px; color:#2271b1; text-decoration:none; display:inline-block; }
-		.folio-drawbridge-btn:hover { background:#f0f6fb; color:#2271b1; }
-		.folio-drawbridge-danger { color:#d63638; border-color:#d63638; }
-		.folio-drawbridge-danger:hover { background:#fef0f0; }
-		.folio-drawbridge-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
-		.folio-drawbridge-primary:hover { background:#135e96; color:#fff; }
+	// The download endpoint and its nonce are the only values the script cannot
+	// know on its own.
+	wp_localize_script(
+		'folio-drawbridge-admin',
+		'folioDrawbridgeAdmin',
+		[
+			'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+			'downloadNonce' => wp_create_nonce( 'folio_drawbridge_admin_download' ),
+		]
+	);
 
-		/* ── Cards ── */
-		.folio-drawbridge-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
+	// The Settings tab alone needs the key-generator modal.
+	$tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector.
+	if ( 'settings' === $tab ) {
+		wp_enqueue_script(
+			'folio-drawbridge-settings',
+			FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/settings.js',
+			[ 'folio-drawbridge-admin' ],
+			FOLIO_DRAWBRIDGE_VERSION,
+			true
+		);
 
-		/* ── Stat cards (dashboard) ── */
-		.folio-drawbridge-stats { display:flex; gap:16px; flex-wrap:wrap; margin-top:20px; }
-		.folio-drawbridge-stat { flex:1; min-width:130px; background:#fff; border:1px solid #ccd0d4;
-		            border-radius:4px; padding:16px; text-align:center; }
-		.folio-drawbridge-stat-num { font-size:32px; font-weight:700; line-height:1.2; color:#2271b1; }
-		.folio-drawbridge-stat-label { font-size:12px; color:#666; margin-top:4px; }
-
-		/* ── Status badges ── */
-		.folio-drawbridge-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
-		.folio-drawbridge-badge-active  { background:#d1e7dd; color:#0a3622; }
-		.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked,.folio-drawbridge-badge-limit_reached { background:#f8d7da; color:#58151c; }
-		.folio-drawbridge-badge-archived,.folio-drawbridge-badge-pending { background:#e2e3e5; color:#41464b; }
-
-		/* ── Tables ── */
-		.folio-drawbridge-table { width:100%; border-collapse:collapse; }
-		.folio-drawbridge-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
-		.folio-drawbridge-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
-		.folio-drawbridge-table tr:hover td { background:#f9fafc; }
-
-		/* ── Vault inspector header ── */
-		.folio-drawbridge-vault-inspector { margin-top:20px; }
-		.folio-drawbridge-vault-inspector h2 { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
-		.folio-drawbridge-vault-meta { color:#888; font-size:13px; margin:0 0 16px; }
-
-		/* ── Pagination ── */
-		.folio-drawbridge-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
-		.folio-drawbridge-pagination a, .folio-drawbridge-pagination span { display:inline-flex; align-items:center; justify-content:center;
-		    min-width:32px; height:32px; padding:0 8px; border:1px solid #ccd0d4; border-radius:6px;
-		    font-size:13px; text-decoration:none; color:#2271b1; background:#fff; transition:background .15s; }
-		.folio-drawbridge-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
-		.folio-drawbridge-pagination a:hover { background:#f0f6fb; }
-		.folio-drawbridge-pagination .dots { border:none; background:none; color:#999; }
-
-		/* ── Filter panel ── */
-		.folio-drawbridge-filter-wrap { display:flex; gap:20px; align-items:flex-start; margin-top:20px; }
-		.folio-drawbridge-filter-panel { flex:0 0 220px; }
-		.folio-drawbridge-filter-body { flex:1; min-width:0; }
-
-		/* ── Sortable columns ── */
-		.folio-drawbridge-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
-		.folio-drawbridge-table th[data-sortable] { cursor:pointer; user-select:none; }
-		.folio-drawbridge-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
-		.folio-drawbridge-sort-ind.active { color:#2271b1; }
-	' );
+		wp_localize_script(
+			'folio-drawbridge-settings',
+			'folioDrawbridgeSettings',
+			[
+				'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
+				'keyNonce' => wp_create_nonce( 'folio_drawbridge_generate_key_preview' ),
+			]
+		);
+	}
 }
 
-function folio_drawbridge_admin_inline_js(): void {
-	?>
-	<script>
-	function folioDrawbridgeAdminDownload(fileId) {
-		var url = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>'
-			+ '?action=folio_drawbridge_admin_download&file_id=' + fileId
-			+ '&_wpnonce=' + encodeURIComponent('<?php echo esc_js( wp_create_nonce( 'folio_drawbridge_admin_download' ) ); ?>');
-		window.location.href = url;
-	}
-
-	/**
-	 * Client-side table sort. Keeps data-subrow rows paired with their parent.
-	 * Call after DOM ready: folioDrawbridgeSortTable('my-table-id')
-	 */
-	function folioDrawbridgeSortTable(tableId) {
-		var tbl = document.getElementById(tableId);
-		if (!tbl) return;
-		var headers = tbl.querySelectorAll('thead th');
-		headers.forEach(function(th, colIdx) {
-			if (th.dataset.nosort !== undefined) return;
-			th.style.cursor = 'pointer';
-			th.style.userSelect = 'none';
-			var ind = document.createElement('span');
-			ind.className = 'folio-drawbridge-sort-ind';
-			ind.textContent = ' ↕';
-			th.appendChild(ind);
-			var asc = true;
-			th.addEventListener('click', function() {
-				// Reset all indicators.
-				headers.forEach(function(h) {
-					var i = h.querySelector('.folio-drawbridge-sort-ind');
-					if (i) { i.textContent = ' ↕'; i.classList.remove('active'); }
-				});
-				ind.textContent = asc ? ' ↑' : ' ↓';
-				ind.classList.add('active');
-
-				// Collect primary rows (not data-subrow), each with its trailing sub-rows.
-				var tbody = tbl.querySelector('tbody') || tbl;
-				var allRows = Array.from(tbody.querySelectorAll('tr'));
-				var groups = [];
-				allRows.forEach(function(row) {
-					if (row.dataset.subrow !== undefined) {
-						if (groups.length) groups[groups.length - 1].sub.push(row);
-					} else {
-						groups.push({ row: row, sub: [] });
-					}
-				});
-
-				// Sort groups by cell text, numeric if possible.
-				groups.sort(function(a, b) {
-					var ca = a.row.cells[colIdx] ? a.row.cells[colIdx].textContent.trim() : '';
-					var cb = b.row.cells[colIdx] ? b.row.cells[colIdx].textContent.trim() : '';
-					var na = parseFloat(ca.replace(/[^0-9.\-]/g, ''));
-					var nb = parseFloat(cb.replace(/[^0-9.\-]/g, ''));
-					if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
-					return asc ? ca.localeCompare(cb) : cb.localeCompare(ca);
-				});
-
-				// Re-append rows in sorted order.
-				groups.forEach(function(g) {
-					tbody.appendChild(g.row);
-					g.sub.forEach(function(s) { tbody.appendChild(s); });
-				});
-
-				asc = !asc;
-			});
-		});
-	}
-	</script>
-	<?php
-}
 
 // ─── Admin file download ──────────────────────────────────────────────────────
 

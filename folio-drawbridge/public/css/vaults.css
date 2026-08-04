@@ -1,0 +1,40 @@
+/*
+ * Folio Drawbridge — [folio_drawbridge_vaults] shortcode.
+ *
+ * Extracted from inline output so the plugin can enqueue assets properly.
+ */
+
+.folio-drawbridge-vaults *{box-sizing:border-box}
+.folio-drawbridge-vaults{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a2e;max-width:860px}
+.folio-drawbridge-mv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.folio-drawbridge-mv-header h2{margin:0;font-size:22px}
+.folio-drawbridge-mv-btn{display:inline-block;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:background .15s}
+.folio-drawbridge-mv-btn-primary{background:#2271b1;color:#fff}
+.folio-drawbridge-mv-btn-primary:hover{background:#135e96;color:#fff}
+.folio-drawbridge-mv-btn-danger{background:#fff;color:#d63638;border:1px solid #d63638}
+.folio-drawbridge-mv-btn-sm{padding:5px 10px;font-size:12px}
+.folio-drawbridge-mv-vault{background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;margin-bottom:16px}
+.folio-drawbridge-mv-vault-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.folio-drawbridge-mv-vault-title{font-size:17px;font-weight:700;margin:0 0 4px}
+.folio-drawbridge-mv-meta{font-size:12px;color:#888;margin:0 0 12px}
+.folio-drawbridge-mv-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px}
+.folio-drawbridge-badge-active{background:#d1e7dd;color:#0a3622}
+.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked{background:#f8d7da;color:#58151c}
+.folio-drawbridge-badge-archived{background:#e2e3e5;color:#41464b}
+.folio-drawbridge-mv-section{margin-top:12px;padding-top:12px;border-top:1px solid #f0f2f5}
+.folio-drawbridge-mv-section h4{margin:0 0 8px;font-size:13px;font-weight:700;text-transform:uppercase;color:#888;letter-spacing:.5px}
+.folio-drawbridge-mv-file-list,.folio-drawbridge-mv-share-list{list-style:none;padding:0;margin:0}
+.folio-drawbridge-mv-file-list li,.folio-drawbridge-mv-share-list li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f8f9fa;font-size:13px}
+.folio-drawbridge-mv-file-list li:last-child,.folio-drawbridge-mv-share-list li:last-child{border-bottom:none}
+.folio-drawbridge-mv-file-name,.folio-drawbridge-mv-share-email{flex:1;word-break:break-all}
+.folio-drawbridge-mv-file-size{color:#aaa;font-size:11px;white-space:nowrap}
+.folio-drawbridge-mv-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;display:flex;align-items:center;justify-content:center}
+.folio-drawbridge-mv-modal{background:#fff;border-radius:10px;padding:28px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;z-index:9999}
+.folio-drawbridge-mv-modal h3{margin:0 0 16px;font-size:18px}
+.folio-drawbridge-mv-modal label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+.folio-drawbridge-mv-modal input,.folio-drawbridge-mv-modal textarea,.folio-drawbridge-mv-modal select{width:100%;padding:8px 12px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px}
+.folio-drawbridge-mv-modal .folio-drawbridge-mv-actions{display:flex;gap:10px;margin-top:20px}
+.folio-drawbridge-mv-alert{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px}
+.folio-drawbridge-mv-alert-error{background:#fef0f0;border:1px solid #f5c6cb;color:#721c24}
+.folio-drawbridge-mv-alert-success{background:#d1e7dd;border:1px solid #a3cfbb;color:#0a3622}
+.folio-drawbridge-mv-empty{color:#888;font-size:13px;font-style:italic}

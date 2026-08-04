@@ -1,0 +1,55 @@
+/*
+ * Folio Drawbridge — My Vaults styles.
+ *
+ * Overlaps admin.css substantially. Kept as a separate sheet because the two
+ * screens never render together, so the duplication costs nothing at runtime,
+ * and extracting them 1:1 guarantees this refactor changes no pixels. Merging
+ * them is a CSS-only change best done on its own.
+ *
+ * Extracted from inline output so the plugin can enqueue assets properly.
+ */
+
+.folio-drawbridge-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
+           cursor:pointer; font-size:12px; color:#2271b1; text-decoration:none; display:inline-block; }
+.folio-drawbridge-btn:hover { background:#f0f6fb; }
+.folio-drawbridge-danger { color:#d63638; border-color:#d63638; }
+.folio-drawbridge-danger:hover { background:#fef0f0; }
+.folio-drawbridge-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
+.folio-drawbridge-primary:hover { background:#135e96; color:#fff; }
+.folio-drawbridge-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
+.folio-drawbridge-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+.folio-drawbridge-badge-active  { background:#d1e7dd; color:#0a3622; }
+.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked,.folio-drawbridge-badge-limit_reached { background:#f8d7da; color:#58151c; }
+.folio-drawbridge-badge-archived,.folio-drawbridge-badge-pending { background:#e2e3e5; color:#41464b; }
+.folio-drawbridge-table { width:100%; border-collapse:collapse; }
+.folio-drawbridge-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
+.folio-drawbridge-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
+.folio-drawbridge-table tr:hover td { background:#f9fafc; }
+.folio-drawbridge-form-row { margin-bottom:12px; }
+.folio-drawbridge-form-row label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; }
+.folio-drawbridge-form-row input[type=text],
+.folio-drawbridge-form-row input[type=email],
+.folio-drawbridge-form-row input[type=date],
+.folio-drawbridge-form-row input[type=number],
+.folio-drawbridge-form-row input[type=datetime-local],
+.folio-drawbridge-form-row textarea,
+.folio-drawbridge-form-row select { width:100%; padding:7px 10px; border:1px solid #d0d5dd; border-radius:4px; font-size:13px; }
+.folio-drawbridge-form-actions { margin-top:16px; display:flex; gap:8px; }
+.folio-drawbridge-notice-success { background:#d1e7dd; border-left:4px solid #0a3622; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
+.folio-drawbridge-notice-error   { background:#f8d7da; border-left:4px solid #d63638; padding:10px 14px; border-radius:4px; margin-top:15px; font-size:13px; }
+
+/* ── Sortable columns ── */
+.folio-drawbridge-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
+.folio-drawbridge-table th[data-sortable] { cursor:pointer; user-select:none; }
+.folio-drawbridge-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
+.folio-drawbridge-sort-ind.active { color:#2271b1; }
+
+/* ── Pagination ── */
+.folio-drawbridge-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
+.folio-drawbridge-pagination a, .folio-drawbridge-pagination span { display:inline-flex; align-items:center; justify-content:center;
+    min-width:32px; height:32px; padding:0 8px; border:1px solid #ccd0d4; border-radius:6px;
+    font-size:13px; text-decoration:none; color:#2271b1; background:#fff; }
+.folio-drawbridge-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
+.folio-drawbridge-pagination a:hover { background:#f0f6fb; }
+.folio-drawbridge-pagination .dots { border:none; background:none; color:#999; }
+
