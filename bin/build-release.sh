@@ -2,9 +2,11 @@
 #
 # Builds the distributable Folio Drawbridge plugin zip.
 #
-# Files come from git rather than the working directory, so nothing uncommitted,
-# ignored, or merely lying around can end up in a release. Exclusions live in
-# .gitattributes as export-ignore entries.
+# The shipped plugin is the folio-drawbridge/ subdirectory; this archives that
+# subtree from git rather than the working directory, so nothing uncommitted,
+# ignored, or merely lying around can reach a release. Repository-root content
+# (wordpress.org assets, tooling, developer docs) is outside the package by
+# construction rather than by exclusion rules.
 #
 # Usage:
 #   bin/build-release.sh            # build from HEAD
@@ -19,12 +21,15 @@ cd "$ROOT"
 
 # Version comes from the plugin header, which is the value WordPress and the
 # plugin directory actually read.
-VERSION="$(git show "${REF}:${SLUG}.php" | sed -n 's/^ \* Version:[[:space:]]*//p' | tr -d '[:space:]')"
-[ -n "$VERSION" ] || { echo "error: could not read Version from ${SLUG}.php at ${REF}" >&2; exit 1; }
+# SRC is the path of the shipped subtree within the repository.
+SRC="${SLUG}"
+
+VERSION="$(git show "${REF}:${SRC}/${SLUG}.php" | sed -n 's/^ \* Version:[[:space:]]*//p' | tr -d '[:space:]')"
+[ -n "$VERSION" ] || { echo "error: could not read Version from ${SRC}/${SLUG}.php at ${REF}" >&2; exit 1; }
 
 # readme.txt's Stable tag must match the plugin header, or the directory will
 # serve a different version than the one being uploaded.
-STABLE="$(git show "${REF}:readme.txt" | sed -n 's/^Stable tag:[[:space:]]*//p' | tr -d '[:space:]')"
+STABLE="$(git show "${REF}:${SRC}/readme.txt" | sed -n 's/^Stable tag:[[:space:]]*//p' | tr -d '[:space:]')"
 if [ "$STABLE" != "$VERSION" ]; then
 	echo "error: readme.txt Stable tag ($STABLE) does not match plugin header Version ($VERSION)" >&2
 	exit 1
@@ -35,9 +40,10 @@ ZIP="${OUT_DIR}/${SLUG}-${VERSION}.zip"
 mkdir -p "$OUT_DIR"
 rm -f "$ZIP"
 
-# --prefix puts everything under a folio-drawbridge/ directory, which is what
-# WordPress expects when a zip is installed through the admin uploader.
-git archive --format=zip --prefix="${SLUG}/" --output="$ZIP" "$REF"
+# Archiving "$REF:$SRC" takes the subtree, and --prefix re-roots it under a
+# folio-drawbridge/ directory, which is what WordPress expects when a zip is
+# installed through the admin uploader.
+git archive --format=zip --prefix="${SLUG}/" --output="$ZIP" "${REF}:${SRC}"
 
 echo "built: ${ZIP}"
 echo "version: ${VERSION} (stable tag matches)"

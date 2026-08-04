@@ -1,24 +1,10 @@
-# Paths excluded from the distributable plugin package.
+# The distributable plugin is the folio-drawbridge/ subdirectory, and
+# bin/build-release.sh archives that subtree directly. Everything at the
+# repository root — wordpress.org assets, tooling, developer documentation — is
+# therefore outside the package by construction, with no export-ignore needed.
 #
-# `git archive` honours export-ignore, so bin/build-release.sh produces a zip
-# containing only what a WordPress.org reviewer and end users should receive.
-# Building from git rather than the working directory also guarantees that
-# uncommitted or untracked local files can never end up in a release.
+# This layout matches Folio Gatehouse, which is already published.
+#
+# Entries below apply within the shipped subtree only.
 
-# WordPress.org takes banners, icons, and screenshots from the svn /assets/
-# directory, which is a sibling of /trunk/ — they must not ship inside the
-# plugin itself, where they would only bloat every install.
-assets/          export-ignore
-
-# Developer-facing documentation. readme.txt is the user-facing manual that
-# WordPress.org renders; these are for people working on the source.
-docs/            export-ignore
-images/          export-ignore
-README.md        export-ignore
-
-# Tooling and repository metadata.
-bin/             export-ignore
 .gitattributes   export-ignore
-.gitignore       export-ignore
-.github/         export-ignore
-.claude/         export-ignore
