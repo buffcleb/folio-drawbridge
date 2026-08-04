@@ -9,7 +9,7 @@
  *   Audit Log  — filterable, paginated event log for all plugin activity
  *   Settings   — OTP TTL, max file size, audit retention, and data deletion policy
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -18,124 +18,124 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── Load tab renderers ───────────────────────────────────────────────────────
 
-require_once SFT_DIR . 'admin/tabs/tab-dashboard.php';
-require_once SFT_DIR . 'admin/tabs/tab-vaults.php';
-require_once SFT_DIR . 'admin/tabs/tab-audit.php';
-require_once SFT_DIR . 'admin/tabs/tab-settings.php';
-require_once SFT_DIR . 'admin/tabs/tab-users.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/tabs/tab-dashboard.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/tabs/tab-vaults.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/tabs/tab-audit.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/tabs/tab-settings.php';
+require_once FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'admin/tabs/tab-users.php';
 
 // ─── POST handler (admin_init — before any HTML output) ───────────────────────
 
-add_action( 'admin_init', 'sft_handle_admin_post' );
+add_action( 'admin_init', 'folio_drawbridge_handle_admin_post' );
 
-function sft_handle_admin_post(): void {
-	if ( ! isset( $_POST['sft_nonce'] ) ) {
+function folio_drawbridge_handle_admin_post(): void {
+	if ( ! isset( $_POST['folio_drawbridge_nonce'] ) ) {
 		return;
 	}
-	if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== 'sft-pro' ) {
+	if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== 'folio-drawbridge' ) {
 		return;
 	}
-	if ( ! sft_is_admin() ) {
+	if ( ! folio_drawbridge_is_admin() ) {
 		wp_die( esc_html__( 'You do not have permission to perform this action.', 'folio-drawbridge' ) );
 	}
 
-	check_admin_referer( 'sft_admin_action', 'sft_nonce' );
+	check_admin_referer( 'folio_drawbridge_admin_action', 'folio_drawbridge_nonce' );
 
 	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector for rendering.
 
 	// ── Settings save ────────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_save_settings'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_save_settings'] ) ) {
 		// Two-factor.
-		$otp_ttl          = max( 5, min( 60, absint( wp_unslash( $_POST['sft_otp_ttl_minutes'] ?? 15 ) ) ) );
-		$otp_max_attempts = max( 1, min( 20, absint( wp_unslash( $_POST['sft_otp_max_attempts'] ?? 5 ) ) ) );
-		$otp_cooldown     = max( 0, min( 300, absint( wp_unslash( $_POST['sft_otp_cooldown_seconds'] ?? 60 ) ) ) );
+		$otp_ttl          = max( 5, min( 60, absint( wp_unslash( $_POST['folio_drawbridge_otp_ttl_minutes'] ?? 15 ) ) ) );
+		$otp_max_attempts = max( 1, min( 20, absint( wp_unslash( $_POST['folio_drawbridge_otp_max_attempts'] ?? 5 ) ) ) );
+		$otp_cooldown     = max( 0, min( 300, absint( wp_unslash( $_POST['folio_drawbridge_otp_cooldown_seconds'] ?? 60 ) ) ) );
 
 		// Download limits.
-		$allow_unlimited_downloads = isset( $_POST['sft_allow_unlimited_downloads'] ) ? '1' : '0';
-		$default_max_downloads     = max( 0, absint( wp_unslash( $_POST['sft_default_max_downloads'] ?? 0 ) ) );
-		$max_download_limit        = max( 0, absint( wp_unslash( $_POST['sft_max_download_limit'] ?? 0 ) ) );
+		$allow_unlimited_downloads = isset( $_POST['folio_drawbridge_allow_unlimited_downloads'] ) ? '1' : '0';
+		$default_max_downloads     = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_default_max_downloads'] ?? 0 ) ) );
+		$max_download_limit        = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_max_download_limit'] ?? 0 ) ) );
 
 		// Link expiration.
-		$allow_no_expiry     = isset( $_POST['sft_allow_no_expiry'] ) ? '1' : '0';
-		$default_expiry_days = max( 0, absint( wp_unslash( $_POST['sft_default_expiry_days'] ?? 0 ) ) );
-		$max_expiry_days     = max( 0, absint( wp_unslash( $_POST['sft_max_expiry_days'] ?? 0 ) ) );
+		$allow_no_expiry     = isset( $_POST['folio_drawbridge_allow_no_expiry'] ) ? '1' : '0';
+		$default_expiry_days = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_default_expiry_days'] ?? 0 ) ) );
+		$max_expiry_days     = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_max_expiry_days'] ?? 0 ) ) );
 
 		// File uploads.
-		$max_file_mb = max( 1, absint( wp_unslash( $_POST['sft_max_file_mb'] ?? 50 ) ) );
+		$max_file_mb = max( 1, absint( wp_unslash( $_POST['folio_drawbridge_max_file_mb'] ?? 50 ) ) );
 
 		// Audit log retention.
-		$prune_enabled       = isset( $_POST['sft_audit_prune_enabled'] ) ? '1' : '0';
-		$prune_days          = max( 30, absint( wp_unslash( $_POST['sft_audit_prune_days'] ?? 365 ) ) );
+		$prune_enabled       = isset( $_POST['folio_drawbridge_audit_prune_enabled'] ) ? '1' : '0';
+		$prune_days          = max( 30, absint( wp_unslash( $_POST['folio_drawbridge_audit_prune_days'] ?? 365 ) ) );
 
 		// Data & privacy.
-		$delete_on_uninstall = isset( $_POST['sft_delete_on_uninstall'] ) ? '1' : '0';
+		$delete_on_uninstall = isset( $_POST['folio_drawbridge_delete_on_uninstall'] ) ? '1' : '0';
 
 		// Notifications.
-		$notify_on_download  = isset( $_POST['sft_notify_on_download'] ) ? '1' : '0';
-		$expiry_warning_days = max( 0, absint( wp_unslash( $_POST['sft_expiry_warning_days'] ?? 0 ) ) );
+		$notify_on_download  = isset( $_POST['folio_drawbridge_notify_on_download'] ) ? '1' : '0';
+		$expiry_warning_days = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_expiry_warning_days'] ?? 0 ) ) );
 
 		// File type restrictions.
-		$allowed_extensions = sanitize_text_field( wp_unslash( $_POST['sft_allowed_file_extensions'] ?? '' ) );
+		$allowed_extensions = sanitize_text_field( wp_unslash( $_POST['folio_drawbridge_allowed_file_extensions'] ?? '' ) );
 
 		// Storage quotas.
-		$storage_quota_mb = max( 0, absint( wp_unslash( $_POST['sft_storage_quota_mb'] ?? 0 ) ) );
+		$storage_quota_mb = max( 0, absint( wp_unslash( $_POST['folio_drawbridge_storage_quota_mb'] ?? 0 ) ) );
 
 		// Email templates.
 		$email_template_types = [ 'invite', 'otp', 'download_notification', 'expiry_warning' ];
 		$email_template_data  = [];
 		foreach ( $email_template_types as $type ) {
-			$subject = sanitize_text_field( wp_unslash( $_POST[ "sft_email_{$type}_subject" ] ?? '' ) );
-			$body    = sanitize_textarea_field( wp_unslash( $_POST[ "sft_email_{$type}_body" ] ?? '' ) );
+			$subject = sanitize_text_field( wp_unslash( $_POST[ "folio_drawbridge_email_{$type}_subject" ] ?? '' ) );
+			$body    = sanitize_textarea_field( wp_unslash( $_POST[ "folio_drawbridge_email_{$type}_body" ] ?? '' ) );
 			$email_template_data[ $type ] = compact( 'subject', 'body' );
 		}
 
 		// SIEM logging.
-		$siem_enabled    = isset( $_POST['sft_siem_enabled'] ) ? '1' : '0';
-		$siem_log_path   = sanitize_text_field( wp_unslash( $_POST['sft_siem_log_path'] ?? '' ) );
-		// The rule itself lives with the writer (sft_siem_path_error), so the
+		$siem_enabled    = isset( $_POST['folio_drawbridge_siem_enabled'] ) ? '1' : '0';
+		$siem_log_path   = sanitize_text_field( wp_unslash( $_POST['folio_drawbridge_siem_log_path'] ?? '' ) );
+		// The rule itself lives with the writer (folio_drawbridge_siem_path_error), so the
 		// check made here and the check made on every append can never drift.
-		$siem_path_error = sft_siem_path_error( $siem_log_path );
+		$siem_path_error = folio_drawbridge_siem_path_error( $siem_log_path );
 		if ( $siem_path_error !== '' ) {
-			$siem_log_path    = get_option( 'sft_siem_log_path', '' ); // keep previous value
+			$siem_log_path    = get_option( 'folio_drawbridge_siem_log_path', '' ); // keep previous value
 			$siem_path_error .= ' Previous value retained.';
 		}
-		$siem_format = sanitize_key( wp_unslash( $_POST['sft_siem_format'] ?? 'json' ) );
+		$siem_format = sanitize_key( wp_unslash( $_POST['folio_drawbridge_siem_format'] ?? 'json' ) );
 		$siem_format = in_array( $siem_format, [ 'json', 'csv' ], true ) ? $siem_format : 'json';
 
-		update_option( 'sft_otp_ttl_minutes',            $otp_ttl );
-		update_option( 'sft_otp_max_attempts',            $otp_max_attempts );
-		update_option( 'sft_otp_cooldown_seconds',        $otp_cooldown );
-		update_option( 'sft_allow_unlimited_downloads',   $allow_unlimited_downloads );
-		update_option( 'sft_default_max_downloads',       $default_max_downloads );
-		update_option( 'sft_max_download_limit',          $max_download_limit );
-		update_option( 'sft_allow_no_expiry',             $allow_no_expiry );
-		update_option( 'sft_default_expiry_days',         $default_expiry_days );
-		update_option( 'sft_max_expiry_days',             $max_expiry_days );
-		update_option( 'sft_max_file_mb',                 $max_file_mb );
-		update_option( 'sft_audit_prune_enabled',         $prune_enabled );
-		update_option( 'sft_audit_prune_days',            $prune_days );
-		update_option( 'sft_delete_on_uninstall',         $delete_on_uninstall );
-		update_option( 'sft_siem_enabled',                $siem_enabled );
-		update_option( 'sft_siem_log_path',               $siem_log_path );
-		update_option( 'sft_siem_format',                 $siem_format );
-		update_option( 'sft_notify_on_download',          $notify_on_download );
-		update_option( 'sft_expiry_warning_days',         $expiry_warning_days );
-		update_option( 'sft_allowed_file_extensions',     $allowed_extensions );
-		update_option( 'sft_storage_quota_mb',            $storage_quota_mb );
+		update_option( 'folio_drawbridge_otp_ttl_minutes',            $otp_ttl );
+		update_option( 'folio_drawbridge_otp_max_attempts',            $otp_max_attempts );
+		update_option( 'folio_drawbridge_otp_cooldown_seconds',        $otp_cooldown );
+		update_option( 'folio_drawbridge_allow_unlimited_downloads',   $allow_unlimited_downloads );
+		update_option( 'folio_drawbridge_default_max_downloads',       $default_max_downloads );
+		update_option( 'folio_drawbridge_max_download_limit',          $max_download_limit );
+		update_option( 'folio_drawbridge_allow_no_expiry',             $allow_no_expiry );
+		update_option( 'folio_drawbridge_default_expiry_days',         $default_expiry_days );
+		update_option( 'folio_drawbridge_max_expiry_days',             $max_expiry_days );
+		update_option( 'folio_drawbridge_max_file_mb',                 $max_file_mb );
+		update_option( 'folio_drawbridge_audit_prune_enabled',         $prune_enabled );
+		update_option( 'folio_drawbridge_audit_prune_days',            $prune_days );
+		update_option( 'folio_drawbridge_delete_on_uninstall',         $delete_on_uninstall );
+		update_option( 'folio_drawbridge_siem_enabled',                $siem_enabled );
+		update_option( 'folio_drawbridge_siem_log_path',               $siem_log_path );
+		update_option( 'folio_drawbridge_siem_format',                 $siem_format );
+		update_option( 'folio_drawbridge_notify_on_download',          $notify_on_download );
+		update_option( 'folio_drawbridge_expiry_warning_days',         $expiry_warning_days );
+		update_option( 'folio_drawbridge_allowed_file_extensions',     $allowed_extensions );
+		update_option( 'folio_drawbridge_storage_quota_mb',            $storage_quota_mb );
 		foreach ( $email_template_data as $type => $tmpl ) {
-			update_option( "sft_email_{$type}_subject", $tmpl['subject'] );
-			update_option( "sft_email_{$type}_body",    $tmpl['body'] );
+			update_option( "folio_drawbridge_email_{$type}_subject", $tmpl['subject'] );
+			update_option( "folio_drawbridge_email_{$type}_body",    $tmpl['body'] );
 		}
 
-		sft_log( SFT_EVT_SETTINGS_SAVED, null, null, [
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED, null, null, [
 			'otp_ttl_minutes'  => $otp_ttl,
 			'max_file_mb'      => $max_file_mb,
 			'otp_max_attempts' => $otp_max_attempts,
 		] );
 
 		$notice = 'Settings saved.';
-		if ( isset( $_POST['sft_apply_to_existing_dl'] ) || isset( $_POST['sft_apply_to_existing_expiry'] ) ) {
-			$enforced = sft_enforce_share_limits();
+		if ( isset( $_POST['folio_drawbridge_apply_to_existing_dl'] ) || isset( $_POST['folio_drawbridge_apply_to_existing_expiry'] ) ) {
+			$enforced = folio_drawbridge_enforce_share_limits();
 			if ( $enforced > 0 ) {
 				$notice .= sprintf(
 					' <strong>%d</strong> existing share%s updated to match the new limits.',
@@ -148,97 +148,97 @@ function sft_handle_admin_post(): void {
 			$notice .= ' ' . $siem_path_error;
 		}
 
-		sft_set_notice( $notice, $siem_path_error ? 'warning' : 'success' );
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
+		folio_drawbridge_set_notice( $notice, $siem_path_error ? 'warning' : 'success' );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Enforce share limits on existing shares ───────────────────────────────
-	if ( isset( $_POST['sft_enforce_share_limits'] ) ) {
-		$updated = sft_enforce_share_limits();
-		sft_set_notice(
+	if ( isset( $_POST['folio_drawbridge_enforce_share_limits'] ) ) {
+		$updated = folio_drawbridge_enforce_share_limits();
+		folio_drawbridge_set_notice(
 			sprintf( 'Share limits enforced. <strong>%d</strong> share%s updated.', $updated, $updated === 1 ? '' : 's' ),
 			'success'
 		);
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'settings' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Manual audit prune ───────────────────────────────────────────────────
-	if ( isset( $_POST['sft_manual_prune'] ) ) {
-		$days    = max( 1, absint( wp_unslash( $_POST['sft_prune_days_manual'] ?? 365 ) ) );
-		$deleted = sft_prune_audit_log( $days );
-		sft_set_notice( sprintf( 'Pruned <strong>%d</strong> audit log entr%s older than %d days.', $deleted, $deleted === 1 ? 'y' : 'ies', $days ), 'success' );
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) );
+	if ( isset( $_POST['folio_drawbridge_manual_prune'] ) ) {
+		$days    = max( 1, absint( wp_unslash( $_POST['folio_drawbridge_prune_days_manual'] ?? 365 ) ) );
+		$deleted = folio_drawbridge_prune_audit_log( $days );
+		folio_drawbridge_set_notice( sprintf( 'Pruned <strong>%d</strong> audit log entr%s older than %d days.', $deleted, $deleted === 1 ? 'y' : 'ies', $days ), 'success' );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: revoke share ──────────────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_revoke_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_revoke_share'] ) ) {
 		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		if ( $share_id ) {
-			sft_revoke_share( $share_id, get_current_user_id() );
-			sft_set_notice( 'Share revoked.', 'success' );
+			folio_drawbridge_revoke_share( $share_id, get_current_user_id() );
+			folio_drawbridge_set_notice( 'Share revoked.', 'success' );
 		}
 		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: resend share invite ────────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_resend_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_resend_share'] ) ) {
 		$share_id = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		if ( $share_id ) {
-			$result = sft_resend_share_invite( $share_id, get_current_user_id() );
+			$result = folio_drawbridge_resend_share_invite( $share_id, get_current_user_id() );
 			if ( is_wp_error( $result ) ) {
-				sft_set_notice( 'Could not resend invite: ' . esc_html( $result->get_error_message() ), 'error' );
+				folio_drawbridge_set_notice( 'Could not resend invite: ' . esc_html( $result->get_error_message() ), 'error' );
 			} else {
-				sft_set_notice( 'Invite email resent.', 'success' );
+				folio_drawbridge_set_notice( 'Invite email resent.', 'success' );
 			}
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: change vault status ───────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_vault_status'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_vault_status'] ) ) {
 		$vault_id   = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$new_status = sanitize_key( wp_unslash( $_POST['new_status'] ?? '' ) );
 		if ( $vault_id && $new_status ) {
-			sft_update_vault_status( $vault_id, $new_status, get_current_user_id() );
-			sft_set_notice( 'Vault status updated to <strong>' . esc_html( $new_status ) . '</strong>.', 'success' );
+			folio_drawbridge_update_vault_status( $vault_id, $new_status, get_current_user_id() );
+			folio_drawbridge_set_notice( 'Vault status updated to <strong>' . esc_html( $new_status ) . '</strong>.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: delete vault ───────────────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_delete_vault'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_delete_vault'] ) ) {
 		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		if ( $vault_id ) {
-			sft_delete_vault( $vault_id );
-			sft_set_notice( 'Vault permanently deleted.', 'success' );
+			folio_drawbridge_delete_vault( $vault_id );
+			folio_drawbridge_set_notice( 'Vault permanently deleted.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: transfer vault ownership ──────────────────────────────────────
-	if ( isset( $_POST['sft_admin_transfer_vault'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_transfer_vault'] ) ) {
 		$vault_id   = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$new_login  = sanitize_text_field( wp_unslash( $_POST['new_owner_login'] ?? '' ) );
 		$new_user   = $new_login ? ( get_user_by( 'login', $new_login ) ?: get_user_by( 'email', $new_login ) ) : null;
-		$redirect   = add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) );
+		$redirect   = add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) );
 
 		if ( ! $vault_id || ! $new_user ) {
-			sft_set_notice( 'User not found: "' . esc_html( $new_login ) . '". Check the login name or email and try again.', 'error' );
+			folio_drawbridge_set_notice( 'User not found: "' . esc_html( $new_login ) . '". Check the login name or email and try again.', 'error' );
 		} else {
-			$result = sft_transfer_vault( $vault_id, (int) $new_user->ID, get_current_user_id() );
+			$result = folio_drawbridge_transfer_vault( $vault_id, (int) $new_user->ID, get_current_user_id() );
 			if ( is_wp_error( $result ) ) {
-				sft_set_notice( $result->get_error_message(), 'error' );
+				folio_drawbridge_set_notice( $result->get_error_message(), 'error' );
 			} else {
-				sft_set_notice( 'Vault transferred to ' . esc_html( $new_user->user_login ) . '.', 'success' );
+				folio_drawbridge_set_notice( 'Vault transferred to ' . esc_html( $new_user->user_login ) . '.', 'success' );
 			}
 		}
 
@@ -247,167 +247,167 @@ function sft_handle_admin_post(): void {
 	}
 
 	// ── Admin: delete file ────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_delete_file'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_delete_file'] ) ) {
 		$file_id  = absint( wp_unslash( $_POST['file_id'] ?? 0 ) );
 		$vault_id = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		if ( $file_id ) {
-			sft_delete_file( $file_id, get_current_user_id() );
-			sft_set_notice( 'File deleted.', 'success' );
+			folio_drawbridge_delete_file( $file_id, get_current_user_id() );
+			folio_drawbridge_set_notice( 'File deleted.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Grant vault (User) access ────────────────────────────────────────────
-	if ( isset( $_POST['sft_grant_user'] ) ) {
-		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
+	if ( isset( $_POST['folio_drawbridge_grant_user'] ) ) {
+		$user_id = absint( wp_unslash( $_POST['folio_drawbridge_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
-			$user->add_cap( 'use_sft_vaults', true );
-			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
+			$user->add_cap( 'folio_drawbridge_use_vaults', true );
+			folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED, null, null,
 				[ 'action' => 'grant_vault_access', 'target_user' => $user->user_login ],
 				get_current_user_id() );
-			sft_set_notice( 'Vault access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
+			folio_drawbridge_set_notice( 'Vault access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
-	// ── Grant SFT Admin access ───────────────────────────────────────────────
-	if ( isset( $_POST['sft_grant_sft_admin'] ) ) {
-		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
+	// ── Grant Drawbridge Admin access ───────────────────────────────────────────────
+	if ( isset( $_POST['folio_drawbridge_grant_drawbridge_admin'] ) ) {
+		$user_id = absint( wp_unslash( $_POST['folio_drawbridge_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
-			$user->add_cap( 'sft_admin', true );
-			$user->add_cap( 'use_sft_vaults', true );
-			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
-				[ 'action' => 'grant_sft_admin', 'target_user' => $user->user_login ],
+			$user->add_cap( 'folio_drawbridge_manage_vaults', true );
+			$user->add_cap( 'folio_drawbridge_use_vaults', true );
+			folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED, null, null,
+				[ 'action' => 'grant_drawbridge_admin', 'target_user' => $user->user_login ],
 				get_current_user_id() );
-			sft_set_notice( 'SFT Admin access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
+			folio_drawbridge_set_notice( 'Drawbridge Admin access granted to <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
-	// ── Promote vault user to SFT Admin ─────────────────────────────────────
-	if ( isset( $_POST['sft_promote_sft_admin'] ) ) {
-		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
+	// ── Promote vault user to Drawbridge Admin ─────────────────────────────────────
+	if ( isset( $_POST['folio_drawbridge_promote_drawbridge_admin'] ) ) {
+		$user_id = absint( wp_unslash( $_POST['folio_drawbridge_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
-			$user->add_cap( 'sft_admin', true );
-			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
-				[ 'action' => 'promote_to_sft_admin', 'target_user' => $user->user_login ],
+			$user->add_cap( 'folio_drawbridge_manage_vaults', true );
+			folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED, null, null,
+				[ 'action' => 'promote_to_drawbridge_admin', 'target_user' => $user->user_login ],
 				get_current_user_id() );
-			sft_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> promoted to SFT Admin.', 'success' );
+			folio_drawbridge_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> promoted to Drawbridge Admin.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
-	// ── Demote SFT Admin to vault user ──────────────────────────────────────
-	if ( isset( $_POST['sft_demote_sft_admin'] ) ) {
-		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
+	// ── Demote Drawbridge Admin to vault user ──────────────────────────────────────
+	if ( isset( $_POST['folio_drawbridge_demote_drawbridge_admin'] ) ) {
+		$user_id = absint( wp_unslash( $_POST['folio_drawbridge_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
-			$user->remove_cap( 'sft_admin' );
-			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
-				[ 'action' => 'demote_sft_admin', 'target_user' => $user->user_login ],
+			$user->remove_cap( 'folio_drawbridge_manage_vaults' );
+			folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED, null, null,
+				[ 'action' => 'demote_drawbridge_admin', 'target_user' => $user->user_login ],
 				get_current_user_id() );
-			sft_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> demoted to Vault User.', 'success' );
+			folio_drawbridge_set_notice( '<strong>' . esc_html( $user->display_name ) . '</strong> demoted to Vault User.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
-	// ── Revoke all SFT access from a user ────────────────────────────────────
-	if ( isset( $_POST['sft_revoke_user'] ) ) {
-		$user_id = absint( wp_unslash( $_POST['sft_user_id'] ?? 0 ) );
+	// ── Revoke all Drawbridge access from a user ────────────────────────────────────
+	if ( isset( $_POST['folio_drawbridge_revoke_user'] ) ) {
+		$user_id = absint( wp_unslash( $_POST['folio_drawbridge_user_id'] ?? 0 ) );
 		$user    = $user_id ? get_userdata( $user_id ) : null;
 		if ( $user && ! $user->has_cap( 'manage_options' ) ) {
-			$user->remove_cap( 'use_sft_vaults' );
-			$user->remove_cap( 'sft_admin' );
-			sft_log( SFT_EVT_SETTINGS_SAVED, null, null,
+			$user->remove_cap( 'folio_drawbridge_use_vaults' );
+			$user->remove_cap( 'folio_drawbridge_manage_vaults' );
+			folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_SETTINGS_SAVED, null, null,
 				[ 'action' => 'revoke_all_access', 'target_user' => $user->user_login ],
 				get_current_user_id() );
-			sft_set_notice( 'All SFT access revoked for <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
+			folio_drawbridge_set_notice( 'All Drawbridge access revoked for <strong>' . esc_html( $user->display_name ) . '</strong>.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'users' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: edit vault expiry ─────────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_edit_vault_expiry'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_edit_vault_expiry'] ) ) {
 		$vault_id   = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$raw_date   = sanitize_text_field( wp_unslash( $_POST['vault_new_expires'] ?? '' ) );
 		$expires_at = $raw_date ? $raw_date . ' 23:59:59' : '';
 		if ( $vault_id ) {
-			sft_update_vault_expiry( $vault_id, $expires_at, get_current_user_id() );
-			sft_set_notice( $expires_at ? 'Vault expiry updated.' : 'Vault expiry cleared.', 'success' );
+			folio_drawbridge_update_vault_expiry( $vault_id, $expires_at, get_current_user_id() );
+			folio_drawbridge_set_notice( $expires_at ? 'Vault expiry updated.' : 'Vault expiry cleared.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: edit vault name/description ──────────────────────────────────
-	if ( isset( $_POST['sft_admin_edit_vault_meta'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_edit_vault_meta'] ) ) {
 		$vault_id    = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$name        = sanitize_text_field( wp_unslash( $_POST['vault_new_name'] ?? '' ) );
 		$description = sanitize_textarea_field( wp_unslash( $_POST['vault_new_description'] ?? '' ) );
 		if ( $vault_id ) {
-			$result = sft_update_vault_meta( $vault_id, $name, $description, get_current_user_id() );
+			$result = folio_drawbridge_update_vault_meta( $vault_id, $name, $description, get_current_user_id() );
 			if ( is_wp_error( $result ) ) {
-				sft_set_notice( $result->get_error_message(), 'error' );
+				folio_drawbridge_set_notice( $result->get_error_message(), 'error' );
 			} else {
-				sft_set_notice( 'Vault name and description updated.', 'success' );
+				folio_drawbridge_set_notice( 'Vault name and description updated.', 'success' );
 			}
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
 	// ── Admin: edit share ────────────────────────────────────────────────────
-	if ( isset( $_POST['sft_admin_edit_share'] ) ) {
+	if ( isset( $_POST['folio_drawbridge_admin_edit_share'] ) ) {
 		$share_id      = absint( wp_unslash( $_POST['share_id'] ?? 0 ) );
 		$vault_id      = absint( wp_unslash( $_POST['vault_id'] ?? 0 ) );
 		$max_downloads = max( 0, absint( wp_unslash( $_POST['share_max_downloads'] ?? 0 ) ) );
 		$raw_date      = sanitize_text_field( wp_unslash( $_POST['share_new_expires'] ?? '' ) );
 		$expires_at    = $raw_date ? $raw_date . ' 23:59:59' : '';
 		if ( $share_id ) {
-			sft_update_share( $share_id, $max_downloads, $expires_at, get_current_user_id() );
-			sft_set_notice( 'Share updated.', 'success' );
+			folio_drawbridge_update_share( $share_id, $max_downloads, $expires_at, get_current_user_id() );
+			folio_drawbridge_set_notice( 'Share updated.', 'success' );
 		}
-		wp_safe_redirect( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => $vault_id ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 }
 
 // ─── Menu registration ────────────────────────────────────────────────────────
 
-add_action( 'admin_menu', 'sft_register_admin_menu' );
+add_action( 'admin_menu', 'folio_drawbridge_register_admin_menu' );
 
-function sft_register_admin_menu(): void {
-	// sft_admin, not manage_options: delegated SFT admins are non-administrator
+function folio_drawbridge_register_admin_menu(): void {
+	// folio_drawbridge_admin, not manage_options: delegated Drawbridge admins are non-administrator
 	// users who must still reach this panel. WordPress administrators receive
-	// sft_admin implicitly via the user_has_cap filter in the main plugin file.
-	Folio_Drawbridge_Hub::ensure_parent( 'sft_admin' );
+	// folio_drawbridge_admin implicitly via the user_has_cap filter in the main plugin file.
+	Folio_Drawbridge_Hub::ensure_parent( 'folio_drawbridge_manage_vaults' );
 
 	$hook = add_submenu_page(
 		Folio_Drawbridge_Hub::SLUG,
 		'Folio Drawbridge',
 		'Drawbridge',
-		'sft_admin',
-		'sft-pro',
-		'sft_admin_page'
+		'folio_drawbridge_manage_vaults',
+		'folio-drawbridge',
+		'folio_drawbridge_admin_page'
 	);
 
 	if ( $hook ) {
-		add_action( "load-{$hook}", 'sft_register_admin_help_tabs' );
+		add_action( "load-{$hook}", 'folio_drawbridge_register_admin_help_tabs' );
 	}
 }
 
 // ─── Contextual help ──────────────────────────────────────────────────────────
 
-function sft_register_admin_help_tabs(): void {
+function folio_drawbridge_register_admin_help_tabs(): void {
 	$screen = get_current_screen();
 	$tab    = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector for contextual help.
 
@@ -415,7 +415,7 @@ function sft_register_admin_help_tabs(): void {
 
 		case 'dashboard':
 			$screen->add_help_tab( [
-				'id'      => 'sft-dash-overview',
+				'id'      => 'folio-drawbridge-dash-overview',
 				'title'   => 'Dashboard Overview',
 				'content' =>
 					'<p>The Dashboard gives you a real-time summary of everything happening across all vaults.</p>' .
@@ -431,7 +431,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>The <strong>Recent Activity</strong> table lists the 10 most recent audit events site-wide.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-dash-security',
+				'id'      => 'folio-drawbridge-dash-security',
 				'title'   => 'Security Status',
 				'content' =>
 					'<p>The Security Status card at the bottom of the Dashboard shows the current state of key security controls:</p>' .
@@ -447,7 +447,7 @@ function sft_register_admin_help_tabs(): void {
 
 		case 'vaults':
 			$screen->add_help_tab( [
-				'id'      => 'sft-vaults-browse',
+				'id'      => 'folio-drawbridge-vaults-browse',
 				'title'   => 'Browsing Vaults',
 				'content' =>
 					'<p>The Vaults tab lists every vault created on this site, across all users.</p>' .
@@ -456,7 +456,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>Click a vault name or the <strong>Inspect</strong> button to open the vault inspector, which shows all files, shares, and the vault\'s own audit trail.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-vaults-actions',
+				'id'      => 'folio-drawbridge-vaults-actions',
 				'title'   => 'Vault Actions',
 				'content' =>
 					'<p>Inside the vault inspector you can:</p>' .
@@ -468,7 +468,7 @@ function sft_register_admin_help_tabs(): void {
 					'<li><strong>Revoke a share</strong> — immediately blocks the recipient from accessing the vault, even if they have an active download session.</li>' .
 					'<li><strong>Edit vault expiry</strong> — change or clear the vault\'s expiry date inline.</li>' .
 					'<li><strong>Edit name &amp; description</strong> — rename the vault or update its description without affecting files or shares.</li>' .
-					'<li><strong>Transfer ownership</strong> — reassign the vault to any user who already has Vault User or SFT Admin access. The original owner loses access; the new owner immediately sees it in their vault list.</li>' .
+					'<li><strong>Transfer ownership</strong> — reassign the vault to any user who already has Vault User or Drawbridge Admin access. The original owner loses access; the new owner immediately sees it in their vault list.</li>' .
 					'<li><strong>Change vault status</strong> — set a vault to active, expired, revoked, or archived. Non-active vaults cannot be shared or uploaded to.</li>' .
 					'<li><strong>Delete vault</strong> — permanently removes all files, shares, and the vault record. This cannot be undone.</li>' .
 					'</ul>' .
@@ -478,7 +478,7 @@ function sft_register_admin_help_tabs(): void {
 
 		case 'audit':
 			$screen->add_help_tab( [
-				'id'      => 'sft-audit-filter',
+				'id'      => 'folio-drawbridge-audit-filter',
 				'title'   => 'Filtering Events',
 				'content' =>
 					'<p>The Audit Log records every security-relevant action taken by users, recipients, and the system.</p>' .
@@ -493,7 +493,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>Click any sortable column header (Event, Vault, Share, Actor, Date/Time) to sort the results. Sort direction and all active filters are preserved in the URL, so you can bookmark specific views or share them with colleagues.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-audit-export',
+				'id'      => 'folio-drawbridge-audit-export',
 				'title'   => 'Exporting & Pruning',
 				'content' =>
 					'<p><strong>Export to CSV</strong> downloads the current filtered result set as a CSV file. The export respects all active filters, so you can export a targeted subset of events.</p>' .
@@ -504,36 +504,36 @@ function sft_register_admin_help_tabs(): void {
 
 		case 'users':
 			$screen->add_help_tab( [
-				'id'      => 'sft-users-roles',
+				'id'      => 'folio-drawbridge-users-roles',
 				'title'   => 'Access Roles',
 				'content' =>
 					'<p>There are two levels of access below WordPress administrator:</p>' .
 					'<ul>' .
-					'<li><strong>SFT Admin</strong> — full access to the Folio Drawbridge admin panel: all tabs, the vault inspector, audit log export, settings, and the Users tab. Does not require WordPress administrator privileges.</li>' .
+					'<li><strong>Drawbridge Admin</strong> — full access to the Folio Drawbridge admin panel: all tabs, the vault inspector, audit log export, settings, and the Users tab. Does not require WordPress administrator privileges.</li>' .
 					'<li><strong>Vault User</strong> — access to <strong>My Vaults</strong> only. Can create vaults, upload and delete files, create and revoke share links, and view their own activity log. Has no visibility into other users\' vaults or any admin panel tabs.</li>' .
 					'</ul>' .
-					'<p>WordPress administrators (<em>manage_options</em>) always have full SFT Admin access implicitly and do not appear in either list.</p>' .
+					'<p>WordPress administrators (<em>manage_options</em>) always have full Drawbridge Admin access implicitly and do not appear in either list.</p>' .
 					'<p>Columns in both tables are sortable by clicking the column header. Click the number in the <strong>Vaults</strong> column to expand a list of that user\'s vaults — each links straight to the vault inspector.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-users-grant',
+				'id'      => 'folio-drawbridge-users-grant',
 				'title'   => 'Granting & Promoting',
 				'content' =>
-					'<p>Search for any non-administrator user by their WordPress username or email address. The search panel shows the user\'s current SFT status and presents contextual action buttons:</p>' .
+					'<p>Search for any non-administrator user by their WordPress username or email address. The search panel shows the user\'s current Drawbridge status and presents contextual action buttons:</p>' .
 					'<ul>' .
 					'<li><strong>Grant Vault Access</strong> — gives the user Vault User access. They immediately see <strong>My Vaults</strong> in their wp-admin sidebar.</li>' .
-					'<li><strong>Grant SFT Admin Access</strong> — gives the user full SFT Admin access without promoting them to WordPress administrator.</li>' .
-					'<li><strong>Promote to SFT Admin</strong> — upgrades an existing Vault User to SFT Admin.</li>' .
+					'<li><strong>Grant Drawbridge Admin Access</strong> — gives the user full Drawbridge Admin access without promoting them to WordPress administrator.</li>' .
+					'<li><strong>Promote to Drawbridge Admin</strong> — upgrades an existing Vault User to Drawbridge Admin.</li>' .
 					'</ul>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-users-revoke',
+				'id'      => 'folio-drawbridge-users-revoke',
 				'title'   => 'Demoting & Revoking',
 				'content' =>
-					'<p>Actions available from the SFT Admins and Vault Users tables:</p>' .
+					'<p>Actions available from the Drawbridge Admins and Vault Users tables:</p>' .
 					'<ul>' .
-					'<li><strong>Demote to User</strong> — removes SFT Admin access but retains Vault User access. The user keeps their vaults.</li>' .
-					'<li><strong>Revoke</strong> / <strong>Remove All</strong> — removes all SFT access (both capabilities). Existing vaults and files are preserved; the user simply cannot log in to manage them. Administrators can still inspect the vaults from the Vaults tab.</li>' .
+					'<li><strong>Demote to User</strong> — removes Drawbridge Admin access but retains Vault User access. The user keeps their vaults.</li>' .
+					'<li><strong>Revoke</strong> / <strong>Remove All</strong> — removes all Drawbridge access (both capabilities). Existing vaults and files are preserved; the user simply cannot log in to manage them. Administrators can still inspect the vaults from the Vaults tab.</li>' .
 					'</ul>' .
 					'<p>All grant, promote, demote, and revoke actions are recorded in the audit log.</p>',
 			] );
@@ -541,7 +541,7 @@ function sft_register_admin_help_tabs(): void {
 
 		case 'settings':
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-twofactor',
+				'id'      => 'folio-drawbridge-settings-twofactor',
 				'title'   => 'Two-Factor Verification',
 				'content' =>
 					'<p>These settings control the one-time code (OTP) sent to share recipients as the second factor of authentication before they can download files.</p>' .
@@ -550,7 +550,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p><strong>OTP Cooldown</strong> — minimum number of seconds a recipient must wait before they can request a new verification code. This prevents automated code-request flooding. Set to 0 to disable the cooldown.</p>' .'<p>Independently of this setting, a fixed ceiling of 10 codes per share per hour always applies. Because the attempt limit resets with each new code, that ceiling is what keeps guessing a six-digit code impractical even when the cooldown is 0.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-dl-limits',
+				'id'      => 'folio-drawbridge-settings-dl-limits',
 				'title'   => 'Download Limits',
 				'content' =>
 					'<p>These settings cap how many times a single share link can be used to collect a vault. All limits apply only to non-administrator users — administrators are always exempt.</p>' .'<p><strong>What counts as one download:</strong> one successful verification. After entering their one-time code the recipient may retrieve every file in the vault — individually or as a ZIP — for the life of that download session. Files are not counted separately, so a limit of 1 on a ten-file vault still delivers all ten files, once.</p>' .
@@ -562,7 +562,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>When you change these values, a checkbox appears offering to retroactively apply the new limits to existing active and pending shares that currently exceed them. Shares already within the limits and administrator shares are always skipped.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-expiration',
+				'id'      => 'folio-drawbridge-settings-expiration',
 				'title'   => 'Link Expiration',
 				'content' =>
 					'<p>These settings control when share links automatically expire. All limits apply only to non-administrator users — administrators are always exempt.</p>' .
@@ -575,14 +575,14 @@ function sft_register_admin_help_tabs(): void {
 					'<p>When you change these values, a checkbox appears offering to retroactively apply the new limits to existing active and pending shares that currently exceed them.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-uploads',
+				'id'      => 'folio-drawbridge-settings-uploads',
 				'title'   => 'File Uploads',
 				'content' =>
 					'<p><strong>Maximum File Size</strong> — the plugin-level ceiling on uploaded files, in megabytes.</p>' .
 					'<p>Unlike a standard WordPress file upload, this plugin splits files into small chunks on the client before sending them to the server. Each chunk is sized to fit within your server\'s <code>upload_max_filesize</code> and <code>post_max_size</code> PHP limits, and the chunks are reassembled into the complete file server-side. This means the plugin-level maximum can safely <strong>exceed</strong> those server limits — for example, you can accept 2 GB files even if <code>upload_max_filesize</code> is set to 8M.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-siem',
+				'id'      => 'folio-drawbridge-settings-siem',
 				'title'   => 'SIEM Logging',
 				'content' =>
 					'<p>When enabled, every audit event is appended to a log file on the server in addition to being stored in the database. This allows external security information and event management (SIEM) tools such as Splunk, Datadog, or the ELK stack to ingest plugin activity in real time.</p>' .
@@ -595,7 +595,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>Both formats include: timestamp (UTC), event type, vault ID, share ID, actor ID, IP address, event details, and site URL.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-audit-retention',
+				'id'      => 'folio-drawbridge-settings-audit-retention',
 				'title'   => 'Audit Log Retention',
 				'content' =>
 					'<p>The audit log grows over time. These settings help manage its size.</p>' .
@@ -604,17 +604,17 @@ function sft_register_admin_help_tabs(): void {
 					'<p>You can also prune manually at any time from the <strong>Audit Log</strong> tab using the Manual Prune panel in the filter sidebar. The manual prune respects the same day threshold but runs immediately rather than waiting for cron.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-key',
+				'id'      => 'folio-drawbridge-settings-key',
 				'title'   => 'Encryption Key',
 				'content' =>
 					'<p>The master encryption key is the root secret from which every vault\'s unique per-vault encryption key is derived. All files are encrypted with AES-256-CBC. The key must be a 64-character hexadecimal string (32 raw bytes).</p>' .
 					'<p>The most secure configuration is to define the key as a PHP constant in <code>wp-config.php</code> so it is never stored in the database:</p>' .
-					'<pre><code>define( \'SFT_MASTER_KEY\', \'your-64-hex-char-key\' );</code></pre>' .
+					'<pre><code>define( \'FOLIO_DRAWBRIDGE_MASTER_KEY\', \'your-64-hex-char-key\' );</code></pre>' .
 					'<p>Use the <strong>Generate New Key</strong> button to produce a cryptographically secure key server-side. The key is shown once and never stored by the plugin — copy it immediately into <code>wp-config.php</code>.</p>' .
 					'<p><strong>Warning:</strong> Replacing an existing key will permanently break decryption of all files already uploaded. Only generate a new key on a fresh installation with no uploaded files.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-notifications',
+				'id'      => 'folio-drawbridge-settings-notifications',
 				'title'   => 'Notifications',
 				'content' =>
 					'<p>These settings control automated email alerts sent to vault owners.</p>' .
@@ -625,7 +625,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>Both notification types use the customisable email templates in the <strong>Email Templates</strong> section below.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-filetypes',
+				'id'      => 'folio-drawbridge-settings-filetypes',
 				'title'   => 'File Type Restrictions',
 				'content' =>
 					'<p><strong>Allowed File Extensions</strong> — a comma-separated list of extensions that vault users are permitted to upload (e.g. <code>pdf, docx, xlsx, png</code>). Leave blank to allow all file types.</p>' .
@@ -633,7 +633,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>This setting applies to vault users only. WordPress administrators are not restricted by it.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-quotas',
+				'id'      => 'folio-drawbridge-settings-quotas',
 				'title'   => 'Storage Quotas',
 				'content' =>
 					'<p><strong>Per-User Storage Quota (MB)</strong> — the maximum total encrypted storage a single vault user may consume across all their vaults. Set to 0 for no limit.</p>' .
@@ -641,7 +641,7 @@ function sft_register_admin_help_tabs(): void {
 					'<p>Administrators are not subject to quotas.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-templates',
+				'id'      => 'folio-drawbridge-settings-templates',
 				'title'   => 'Email Templates',
 				'content' =>
 					'<p>Customise the subject line and body of every automated email sent by the plugin. Four templates are available:</p>' .
@@ -655,11 +655,11 @@ function sft_register_admin_help_tabs(): void {
 					'<p>Leave the subject or body blank to restore the built-in default for that field.</p>',
 			] );
 			$screen->add_help_tab( [
-				'id'      => 'sft-settings-data',
+				'id'      => 'folio-drawbridge-settings-data',
 				'title'   => 'Data & Privacy / Storage',
 				'content' =>
 					'<p><strong>Delete all plugin data on uninstall</strong> — when checked, removing the plugin from the Plugins screen permanently drops all five database tables, deletes all encrypted files from disk, and removes all plugin options and transients. This is irreversible. Leave unchecked if you want to preserve data across a reinstall.</p>' .
-					'<p><strong>Encrypted file storage</strong> — shows the directory where encrypted vault files are written (<code>wp-content/uploads/sft-vaults/</code>). The directory is protected by an <code>.htaccess</code> file that blocks direct HTTP access. Files are never served directly — all downloads go through PHP, which decrypts them on the fly.</p>' .
+					'<p><strong>Encrypted file storage</strong> — shows the directory where encrypted vault files are written (<code>wp-content/uploads/folio-drawbridge-vaults/</code>). The directory is protected by an <code>.htaccess</code> file that blocks direct HTTP access. Files are never served directly — all downloads go through PHP, which decrypts them on the fly.</p>' .
 					'<p>The storage status indicator confirms whether the directory exists, is protected by <code>.htaccess</code>, and is writable by the web server.</p>',
 			] );
 			break;
@@ -667,7 +667,7 @@ function sft_register_admin_help_tabs(): void {
 
 	$screen->set_help_sidebar(
 		'<p><strong>Folio Drawbridge</strong></p>' .
-		'<p>Version ' . SFT_VERSION . '</p>' .
+		'<p>Version ' . FOLIO_DRAWBRIDGE_VERSION . '</p>' .
 		'<hr>' .
 		'<p>Encrypted vault storage with two-factor external sharing and full audit logging.</p>'
 	);
@@ -675,97 +675,100 @@ function sft_register_admin_help_tabs(): void {
 
 // ─── Admin asset enqueueing ───────────────────────────────────────────────────
 
-add_action( 'admin_enqueue_scripts', 'sft_enqueue_admin_assets' );
+add_action( 'admin_enqueue_scripts', 'folio_drawbridge_enqueue_admin_assets' );
 
-function sft_enqueue_admin_assets( string $hook ): void {
+function folio_drawbridge_enqueue_admin_assets( string $hook ): void {
 	// The page lives under the shared Folio parent menu, so the hook is
-	// '{parent}_page_sft-pro' (e.g. 'folio_page_sft-pro') rather than
-	// 'toplevel_page_sft-pro'. Match on the suffix so the parent can vary.
-	if ( substr( $hook, -13 ) !== '_page_sft-pro' ) {
+	// '{parent}_page_folio-drawbridge' (e.g. 'folio_page_folio-drawbridge') rather
+	// than 'toplevel_page_folio-drawbridge'. Match on the suffix so the parent can
+	// vary, deriving the length from the string rather than hardcoding it — a
+	// literal offset silently stops matching the moment the slug changes.
+	$suffix = '_page_folio-drawbridge';
+	if ( substr( $hook, -strlen( $suffix ) ) !== $suffix ) {
 		return;
 	}
 
 	// Admin file download (multipart) — handled inline; we also need to handle
 	// admin vault file serving via a direct AJAX action.
-	add_action( 'admin_head', 'sft_admin_inline_js' );
+	add_action( 'admin_head', 'folio_drawbridge_admin_inline_js' );
 
-	wp_register_style( 'sft-admin', false, [], SFT_VERSION );
-	wp_enqueue_style( 'sft-admin' );
+	wp_register_style( 'folio-drawbridge-admin', false, [], FOLIO_DRAWBRIDGE_VERSION );
+	wp_enqueue_style( 'folio-drawbridge-admin' );
 
-	wp_add_inline_style( 'sft-admin', '
+	wp_add_inline_style( 'folio-drawbridge-admin', '
 		/* ── Buttons ── */
-		.sft-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
+		.folio-drawbridge-btn { background:#fff; border:1px solid #ccd0d4; padding:5px 12px; border-radius:4px;
 		           cursor:pointer; font-size:12px; color:#2271b1; text-decoration:none; display:inline-block; }
-		.sft-btn:hover { background:#f0f6fb; color:#2271b1; }
-		.sft-danger { color:#d63638; border-color:#d63638; }
-		.sft-danger:hover { background:#fef0f0; }
-		.sft-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
-		.sft-primary:hover { background:#135e96; color:#fff; }
+		.folio-drawbridge-btn:hover { background:#f0f6fb; color:#2271b1; }
+		.folio-drawbridge-danger { color:#d63638; border-color:#d63638; }
+		.folio-drawbridge-danger:hover { background:#fef0f0; }
+		.folio-drawbridge-primary { background:#2271b1; color:#fff; border-color:#2271b1; }
+		.folio-drawbridge-primary:hover { background:#135e96; color:#fff; }
 
 		/* ── Cards ── */
-		.sft-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
+		.folio-drawbridge-card { background:#fff; border:1px solid #ccd0d4; padding:20px; border-radius:4px; margin-top:20px; }
 
 		/* ── Stat cards (dashboard) ── */
-		.sft-stats { display:flex; gap:16px; flex-wrap:wrap; margin-top:20px; }
-		.sft-stat { flex:1; min-width:130px; background:#fff; border:1px solid #ccd0d4;
+		.folio-drawbridge-stats { display:flex; gap:16px; flex-wrap:wrap; margin-top:20px; }
+		.folio-drawbridge-stat { flex:1; min-width:130px; background:#fff; border:1px solid #ccd0d4;
 		            border-radius:4px; padding:16px; text-align:center; }
-		.sft-stat-num { font-size:32px; font-weight:700; line-height:1.2; color:#2271b1; }
-		.sft-stat-label { font-size:12px; color:#666; margin-top:4px; }
+		.folio-drawbridge-stat-num { font-size:32px; font-weight:700; line-height:1.2; color:#2271b1; }
+		.folio-drawbridge-stat-label { font-size:12px; color:#666; margin-top:4px; }
 
 		/* ── Status badges ── */
-		.sft-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
-		.sft-badge-active  { background:#d1e7dd; color:#0a3622; }
-		.sft-badge-expired,.sft-badge-revoked,.sft-badge-limit_reached { background:#f8d7da; color:#58151c; }
-		.sft-badge-archived,.sft-badge-pending { background:#e2e3e5; color:#41464b; }
+		.folio-drawbridge-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+		.folio-drawbridge-badge-active  { background:#d1e7dd; color:#0a3622; }
+		.folio-drawbridge-badge-expired,.folio-drawbridge-badge-revoked,.folio-drawbridge-badge-limit_reached { background:#f8d7da; color:#58151c; }
+		.folio-drawbridge-badge-archived,.folio-drawbridge-badge-pending { background:#e2e3e5; color:#41464b; }
 
 		/* ── Tables ── */
-		.sft-table { width:100%; border-collapse:collapse; }
-		.sft-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
-		.sft-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
-		.sft-table tr:hover td { background:#f9fafc; }
+		.folio-drawbridge-table { width:100%; border-collapse:collapse; }
+		.folio-drawbridge-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #ddd; font-size:12px; }
+		.folio-drawbridge-table td { padding:8px 10px; border-bottom:1px solid #f0f2f5; font-size:13px; vertical-align:middle; }
+		.folio-drawbridge-table tr:hover td { background:#f9fafc; }
 
 		/* ── Vault inspector header ── */
-		.sft-vault-inspector { margin-top:20px; }
-		.sft-vault-inspector h2 { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
-		.sft-vault-meta { color:#888; font-size:13px; margin:0 0 16px; }
+		.folio-drawbridge-vault-inspector { margin-top:20px; }
+		.folio-drawbridge-vault-inspector h2 { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+		.folio-drawbridge-vault-meta { color:#888; font-size:13px; margin:0 0 16px; }
 
 		/* ── Pagination ── */
-		.sft-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
-		.sft-pagination a, .sft-pagination span { display:inline-flex; align-items:center; justify-content:center;
+		.folio-drawbridge-pagination { display:flex; align-items:center; justify-content:center; gap:4px; margin-top:16px; }
+		.folio-drawbridge-pagination a, .folio-drawbridge-pagination span { display:inline-flex; align-items:center; justify-content:center;
 		    min-width:32px; height:32px; padding:0 8px; border:1px solid #ccd0d4; border-radius:6px;
 		    font-size:13px; text-decoration:none; color:#2271b1; background:#fff; transition:background .15s; }
-		.sft-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
-		.sft-pagination a:hover { background:#f0f6fb; }
-		.sft-pagination .dots { border:none; background:none; color:#999; }
+		.folio-drawbridge-pagination .current { background:#2271b1; color:#fff; border-color:#2271b1; font-weight:600; }
+		.folio-drawbridge-pagination a:hover { background:#f0f6fb; }
+		.folio-drawbridge-pagination .dots { border:none; background:none; color:#999; }
 
 		/* ── Filter panel ── */
-		.sft-filter-wrap { display:flex; gap:20px; align-items:flex-start; margin-top:20px; }
-		.sft-filter-panel { flex:0 0 220px; }
-		.sft-filter-body { flex:1; min-width:0; }
+		.folio-drawbridge-filter-wrap { display:flex; gap:20px; align-items:flex-start; margin-top:20px; }
+		.folio-drawbridge-filter-panel { flex:0 0 220px; }
+		.folio-drawbridge-filter-body { flex:1; min-width:0; }
 
 		/* ── Sortable columns ── */
-		.sft-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
-		.sft-table th[data-sortable] { cursor:pointer; user-select:none; }
-		.sft-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
-		.sft-sort-ind.active { color:#2271b1; }
+		.folio-drawbridge-table th a { text-decoration:none; color:inherit; white-space:nowrap; }
+		.folio-drawbridge-table th[data-sortable] { cursor:pointer; user-select:none; }
+		.folio-drawbridge-sort-ind { font-size:10px; color:#bbb; margin-left:3px; }
+		.folio-drawbridge-sort-ind.active { color:#2271b1; }
 	' );
 }
 
-function sft_admin_inline_js(): void {
+function folio_drawbridge_admin_inline_js(): void {
 	?>
 	<script>
-	function sftAdminDownload(fileId) {
+	function folioDrawbridgeAdminDownload(fileId) {
 		var url = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>'
-			+ '?action=sft_admin_download&file_id=' + fileId
-			+ '&_wpnonce=' + encodeURIComponent('<?php echo esc_js( wp_create_nonce( 'sft_admin_download' ) ); ?>');
+			+ '?action=folio_drawbridge_admin_download&file_id=' + fileId
+			+ '&_wpnonce=' + encodeURIComponent('<?php echo esc_js( wp_create_nonce( 'folio_drawbridge_admin_download' ) ); ?>');
 		window.location.href = url;
 	}
 
 	/**
 	 * Client-side table sort. Keeps data-subrow rows paired with their parent.
-	 * Call after DOM ready: sftSortTable('my-table-id')
+	 * Call after DOM ready: folioDrawbridgeSortTable('my-table-id')
 	 */
-	function sftSortTable(tableId) {
+	function folioDrawbridgeSortTable(tableId) {
 		var tbl = document.getElementById(tableId);
 		if (!tbl) return;
 		var headers = tbl.querySelectorAll('thead th');
@@ -774,14 +777,14 @@ function sft_admin_inline_js(): void {
 			th.style.cursor = 'pointer';
 			th.style.userSelect = 'none';
 			var ind = document.createElement('span');
-			ind.className = 'sft-sort-ind';
+			ind.className = 'folio-drawbridge-sort-ind';
 			ind.textContent = ' ↕';
 			th.appendChild(ind);
 			var asc = true;
 			th.addEventListener('click', function() {
 				// Reset all indicators.
 				headers.forEach(function(h) {
-					var i = h.querySelector('.sft-sort-ind');
+					var i = h.querySelector('.folio-drawbridge-sort-ind');
 					if (i) { i.textContent = ' ↕'; i.classList.remove('active'); }
 				});
 				ind.textContent = asc ? ' ↑' : ' ↓';
@@ -825,46 +828,46 @@ function sft_admin_inline_js(): void {
 
 // ─── Admin file download ──────────────────────────────────────────────────────
 
-add_action( 'wp_ajax_sft_admin_download', 'sft_ajax_admin_download' );
+add_action( 'wp_ajax_folio_drawbridge_admin_download', 'folio_drawbridge_admin_download' );
 
-function sft_ajax_admin_download(): void {
-	if ( ! sft_is_admin() ) {
+function folio_drawbridge_admin_download(): void {
+	if ( ! folio_drawbridge_is_admin() ) {
 		wp_die( 'Access denied.', 403 );
 	}
 
-	check_ajax_referer( 'sft_admin_download', '_wpnonce' );
+	check_ajax_referer( 'folio_drawbridge_admin_download', '_wpnonce' );
 
 	$file_id = absint( wp_unslash( $_GET['file_id'] ?? 0 ) );
-	$file    = sft_get_file( $file_id );
+	$file    = folio_drawbridge_get_file( $file_id );
 
 	if ( ! $file ) {
 		wp_die( 'File not found.', 404 );
 	}
 
-	$vault = sft_get_vault( (int) $file->vault_id );
+	$vault = folio_drawbridge_get_vault( (int) $file->vault_id );
 	if ( ! $vault ) {
 		wp_die( 'Vault not found.', 404 );
 	}
 
 	// Log admin vault access before serving.
-	sft_log( SFT_EVT_ADMIN_VAULT_ACCESS, (int) $vault->id, null,
+	folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_ADMIN_VAULT_ACCESS, (int) $vault->id, null,
 		[ 'file_id' => $file_id, 'original_name' => $file->original_name ],
 		get_current_user_id()
 	);
 
-	sft_serve_file( $file, $vault, null, true );
+	folio_drawbridge_serve_file( $file, $vault, null, true );
 }
 
 // ─── Encryption key preview generator ────────────────────────────────────────
 
-add_action( 'wp_ajax_sft_generate_key_preview', 'sft_ajax_generate_key_preview' );
+add_action( 'wp_ajax_folio_drawbridge_generate_key_preview', 'folio_drawbridge_generate_key_preview' );
 
-function sft_ajax_generate_key_preview(): void {
-	if ( ! sft_is_admin() ) {
+function folio_drawbridge_generate_key_preview(): void {
+	if ( ! folio_drawbridge_is_admin() ) {
 		wp_send_json_error( 'Access denied.', 403 );
 	}
 
-	check_ajax_referer( 'sft_generate_key_preview', '_wpnonce' );
+	check_ajax_referer( 'folio_drawbridge_generate_key_preview', '_wpnonce' );
 
 	// Generate 32 cryptographically secure random bytes → 64-char hex string.
 	// Never stored — only returned for the admin to copy into wp-config.php.
@@ -875,12 +878,12 @@ function sft_ajax_generate_key_preview(): void {
 
 // ─── Admin notice helpers ─────────────────────────────────────────────────────
 
-function sft_set_notice( string $message, string $type = 'success' ): void {
-	set_transient( 'sft_admin_notice_' . get_current_user_id(), compact( 'message', 'type' ), 30 );
+function folio_drawbridge_set_notice( string $message, string $type = 'success' ): void {
+	set_transient( 'folio_drawbridge_admin_notice_' . get_current_user_id(), compact( 'message', 'type' ), 30 );
 }
 
-function sft_show_notice(): void {
-	$key    = 'sft_admin_notice_' . get_current_user_id();
+function folio_drawbridge_show_notice(): void {
+	$key    = 'folio_drawbridge_admin_notice_' . get_current_user_id();
 	$notice = get_transient( $key );
 	if ( ! $notice ) {
 		return;
@@ -894,7 +897,7 @@ function sft_show_notice(): void {
 	printf(
 		'<div class="notice %s is-dismissible" style="margin-top:15px;"><p>%s</p></div>',
 		esc_attr( $class ),
-		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by sft_set_notice() callers before storage.
+		$notice['message'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller-composed HTML; user-supplied parts are escaped by folio_drawbridge_set_notice() callers before storage.
 	);
 }
 
@@ -910,7 +913,7 @@ function sft_show_notice(): void {
  * @param array  $url_args    Base query args (page, tab, filters, etc.) merged into the sort URL.
  * @param bool   $nosort      Pass true to render a plain unsortable <th>.
  */
-function sft_sortable_th( string $label, string $col, string $cur_col, string $cur_order, array $url_args, bool $nosort = false ): string {
+function folio_drawbridge_sortable_th( string $label, string $col, string $cur_col, string $cur_order, array $url_args, bool $nosort = false ): string {
 	if ( $nosort ) {
 		return '<th>' . esc_html( $label ) . '</th>';
 	}
@@ -918,22 +921,22 @@ function sft_sortable_th( string $label, string $col, string $cur_col, string $c
 	$new_order = ( $active && $cur_order === 'ASC' ) ? 'DESC' : 'ASC';
 	$url       = add_query_arg( array_merge( $url_args, [ 'orderby' => $col, 'order' => $new_order ] ), admin_url( 'admin.php' ) );
 	$indicator = $active
-		? '<span class="sft-sort-ind" style="color:#2271b1;"> ' . ( $cur_order === 'ASC' ? '↑' : '↓' ) . '</span>'
-		: '<span class="sft-sort-ind"> ↕</span>';
+		? '<span class="folio-drawbridge-sort-ind" style="color:#2271b1;"> ' . ( $cur_order === 'ASC' ? '↑' : '↓' ) . '</span>'
+		: '<span class="folio-drawbridge-sort-ind"> ↕</span>';
 	return '<th><a href="' . esc_url( $url ) . '" style="text-decoration:none;color:inherit;white-space:nowrap;">'
 		. esc_html( $label ) . $indicator . '</a></th>';
 }
 
 // ─── Shared pagination helper ─────────────────────────────────────────────────
 
-function sft_render_pagination( int $current, int $total_pages, array $extra_args = [] ): void {
+function folio_drawbridge_render_pagination( int $current, int $total_pages, array $extra_args = [] ): void {
 	if ( $total_pages <= 1 ) {
 		return;
 	}
 
-	$base = array_merge( [ 'page' => 'sft-pro' ], $extra_args );
+	$base = array_merge( [ 'page' => 'folio-drawbridge' ], $extra_args );
 
-	echo '<div class="sft-pagination">';
+	echo '<div class="folio-drawbridge-pagination">';
 
 	if ( $current > 1 ) {
 		$url = add_query_arg( array_merge( $base, [ 'paged' => $current - 1 ] ), admin_url( 'admin.php' ) );
@@ -971,14 +974,14 @@ function sft_render_pagination( int $current, int $total_pages, array $extra_arg
 
 // ─── Main admin page callback ─────────────────────────────────────────────────
 
-function sft_admin_page(): void {
-	if ( ! sft_is_admin() ) {
+function folio_drawbridge_admin_page(): void {
+	if ( ! folio_drawbridge_is_admin() ) {
 		wp_die( esc_html__( 'You do not have permission to access this page.', 'folio-drawbridge' ) );
 	}
 
 	$current_tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'dashboard' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selector for rendering.
 
-	sft_show_notice();
+	folio_drawbridge_show_notice();
 
 	echo '<div class="wrap"><h1>Folio Drawbridge</h1>';
 	echo '<h2 class="nav-tab-wrapper">';
@@ -992,7 +995,7 @@ function sft_admin_page(): void {
 	];
 
 	foreach ( $tabs as $slug => $label ) {
-		$url   = add_query_arg( [ 'page' => 'sft-pro', 'tab' => $slug ], admin_url( 'admin.php' ) );
+		$url   = add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => $slug ], admin_url( 'admin.php' ) );
 		$class = $current_tab === $slug ? 'nav-tab nav-tab-active' : 'nav-tab';
 		echo '<a href="' . esc_url( $url ) . '" class="' . esc_attr( $class ) . '">' . esc_html( $label ) . '</a>';
 	}
@@ -1001,19 +1004,19 @@ function sft_admin_page(): void {
 
 	switch ( $current_tab ) {
 		case 'vaults':
-			sft_render_tab_vaults();
+			folio_drawbridge_render_tab_vaults();
 			break;
 		case 'audit':
-			sft_render_tab_audit();
+			folio_drawbridge_render_tab_audit();
 			break;
 		case 'users':
-			sft_render_tab_users();
+			folio_drawbridge_render_tab_users();
 			break;
 		case 'settings':
-			sft_render_tab_settings();
+			folio_drawbridge_render_tab_settings();
 			break;
 		default:
-			sft_render_tab_dashboard();
+			folio_drawbridge_render_tab_dashboard();
 	}
 
 	echo '</div>';

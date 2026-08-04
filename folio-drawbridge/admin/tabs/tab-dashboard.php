@@ -2,7 +2,7 @@
 /**
  * Dashboard tab — at-a-glance stats and recent activity.
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped.
 // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters here are read-only display filters and sort state; no state changes occur on GET.
 
-function sft_render_tab_dashboard(): void {
+function folio_drawbridge_render_tab_dashboard(): void {
 	global $wpdb;
 
 	// ── Counts ───────────────────────────────────────────────────────────────
@@ -20,19 +20,19 @@ function sft_render_tab_dashboard(): void {
 	// ~45 ms per render, most of it the unfiltered COUNT(*). Dashboard figures
 	// do not need to be second-accurate, so a short transient removes that cost
 	// from every page load while staying fresh enough to be useful.
-	$stats = get_transient( 'sft_dashboard_stats' );
+	$stats = get_transient( 'folio_drawbridge_dashboard_stats' );
 
 	if ( false === $stats ) {
 
-		$file_totals  = $wpdb->get_row( "SELECT COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b FROM {$wpdb->prefix}sft_files" );
+		$file_totals  = $wpdb->get_row( "SELECT COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b FROM {$wpdb->prefix}folio_drawbridge_files" );
 		$share_totals = $wpdb->get_row(
 			"SELECT COUNT(*) AS total,
 			        SUM(status IN('pending','active')) AS active,
 			        COALESCE(SUM(download_count),0) AS downloads
-			   FROM {$wpdb->prefix}sft_shares"
+			   FROM {$wpdb->prefix}folio_drawbridge_shares"
 		);
 		$vault_totals = $wpdb->get_row(
-			"SELECT COUNT(*) AS total, SUM(status='active') AS active FROM {$wpdb->prefix}sft_vaults"
+			"SELECT COUNT(*) AS total, SUM(status='active') AS active FROM {$wpdb->prefix}folio_drawbridge_vaults"
 		);
 
 		$stats = [
@@ -43,18 +43,18 @@ function sft_render_tab_dashboard(): void {
 			'total_shares'  => (int) $share_totals->total,
 			'active_shares' => (int) $share_totals->active,
 			'total_dl'      => (int) $share_totals->downloads,
-			'total_audit'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit" ),
+			'total_audit'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit" ),
 			// Bounded to 30 days to match what the Dashboard help tab describes,
 			// and so the event_created index can serve it instead of counting
 			// every otp_failed row ever recorded.
 			'otp_failures'  => (int) $wpdb->get_var(
-				"SELECT COUNT(*) FROM {$wpdb->prefix}sft_audit
+				"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit
 				  WHERE event_type='otp_failed'
 				    AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)"
 			),
 		];
 
-		set_transient( 'sft_dashboard_stats', $stats, 5 * MINUTE_IN_SECONDS );
+		set_transient( 'folio_drawbridge_dashboard_stats', $stats, 5 * MINUTE_IN_SECONDS );
 	}
 
 	$total_vaults  = $stats['total_vaults'];
@@ -71,13 +71,13 @@ function sft_render_tab_dashboard(): void {
 	// Ordered by id: append-only table, so identical to created_at order but
 	// served straight from the clustered index.
 	$recent = $wpdb->get_results(
-		"SELECT * FROM {$wpdb->prefix}sft_audit ORDER BY id DESC LIMIT 10"
+		"SELECT * FROM {$wpdb->prefix}folio_drawbridge_audit ORDER BY id DESC LIMIT 10"
 	) ?: [];
 
 	// ── 7-day download activity ───────────────────────────────────────────────
 	$dl_rows = $wpdb->get_results( "
 		SELECT DATE(created_at) as day, COUNT(*) as cnt
-		FROM {$wpdb->prefix}sft_audit
+		FROM {$wpdb->prefix}folio_drawbridge_audit
 		WHERE event_type IN ('file_downloaded','file_served_admin')
 		  AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
 		GROUP BY DATE(created_at)
@@ -97,37 +97,37 @@ function sft_render_tab_dashboard(): void {
 	?>
 
 	<!-- ── Stat cards ──────────────────────────────────────────────────────── -->
-	<div class="sft-stats">
-		<div class="sft-stat" style="border-top:3px solid #2271b1;">
-			<div class="sft-stat-num"><?php echo number_format( $active_vaults ); ?></div>
-			<div class="sft-stat-label">Active Vaults <span style="color:#aaa;">(<?php echo number_format( $total_vaults ); ?> total)</span></div>
+	<div class="folio-drawbridge-stats">
+		<div class="folio-drawbridge-stat" style="border-top:3px solid #2271b1;">
+			<div class="folio-drawbridge-stat-num"><?php echo number_format( $active_vaults ); ?></div>
+			<div class="folio-drawbridge-stat-label">Active Vaults <span style="color:#aaa;">(<?php echo number_format( $total_vaults ); ?> total)</span></div>
 		</div>
-		<div class="sft-stat" style="border-top:3px solid #0a3622;">
-			<div class="sft-stat-num"><?php echo number_format( $total_files ); ?></div>
-			<div class="sft-stat-label">Encrypted Files <span style="color:#aaa;"><?php echo esc_html( size_format( $total_storage ) ); ?></span></div>
+		<div class="folio-drawbridge-stat" style="border-top:3px solid #0a3622;">
+			<div class="folio-drawbridge-stat-num"><?php echo number_format( $total_files ); ?></div>
+			<div class="folio-drawbridge-stat-label">Encrypted Files <span style="color:#aaa;"><?php echo esc_html( size_format( $total_storage ) ); ?></span></div>
 		</div>
-		<div class="sft-stat" style="border-top:3px solid #6f42c1;">
-			<div class="sft-stat-num" style="color:#6f42c1;"><?php echo number_format( $active_shares ); ?></div>
-			<div class="sft-stat-label">Active Shares <span style="color:#aaa;">(<?php echo number_format( $total_shares ); ?> total)</span></div>
+		<div class="folio-drawbridge-stat" style="border-top:3px solid #6f42c1;">
+			<div class="folio-drawbridge-stat-num" style="color:#6f42c1;"><?php echo number_format( $active_shares ); ?></div>
+			<div class="folio-drawbridge-stat-label">Active Shares <span style="color:#aaa;">(<?php echo number_format( $total_shares ); ?> total)</span></div>
 		</div>
-		<div class="sft-stat" style="border-top:3px solid #fd7e14;">
-			<div class="sft-stat-num" style="color:#fd7e14;"><?php echo number_format( $total_dl ); ?></div>
-			<div class="sft-stat-label">Total Downloads</div>
+		<div class="folio-drawbridge-stat" style="border-top:3px solid #fd7e14;">
+			<div class="folio-drawbridge-stat-num" style="color:#fd7e14;"><?php echo number_format( $total_dl ); ?></div>
+			<div class="folio-drawbridge-stat-label">Total Downloads</div>
 		</div>
-		<div class="sft-stat" style="border-top:3px solid <?php echo $otp_failures > 0 ? '#d63638' : '#ccd0d4'; ?>;">
-			<div class="sft-stat-num" style="color:<?php echo $otp_failures > 0 ? '#d63638' : '#444'; ?>;"><?php echo number_format( $otp_failures ); ?></div>
-			<div class="sft-stat-label">OTP Failures <span style="color:#aaa;">(30 days)</span></div>
+		<div class="folio-drawbridge-stat" style="border-top:3px solid <?php echo $otp_failures > 0 ? '#d63638' : '#ccd0d4'; ?>;">
+			<div class="folio-drawbridge-stat-num" style="color:<?php echo $otp_failures > 0 ? '#d63638' : '#444'; ?>;"><?php echo number_format( $otp_failures ); ?></div>
+			<div class="folio-drawbridge-stat-label">OTP Failures <span style="color:#aaa;">(30 days)</span></div>
 		</div>
-		<div class="sft-stat" style="border-top:3px solid #6c757d;">
-			<div class="sft-stat-num" style="color:#444;"><?php echo number_format( $total_audit ); ?></div>
-			<div class="sft-stat-label">Audit Events</div>
+		<div class="folio-drawbridge-stat" style="border-top:3px solid #6c757d;">
+			<div class="folio-drawbridge-stat-num" style="color:#444;"><?php echo number_format( $total_audit ); ?></div>
+			<div class="folio-drawbridge-stat-label">Audit Events</div>
 		</div>
 	</div>
 
 	<div style="display:flex; gap:20px; margin-top:20px; align-items:flex-start; flex-wrap:wrap;">
 
 		<!-- ── Download sparkline ─────────────────────────────────────────── -->
-		<div class="sft-card" style="flex:1; min-width:260px; margin-top:0;">
+		<div class="folio-drawbridge-card" style="flex:1; min-width:260px; margin-top:0;">
 			<h3 style="margin:0 0 12px;">Downloads — Last 7 Days</h3>
 			<?php
 			$vals    = array_values( $spark );
@@ -155,12 +155,12 @@ function sft_render_tab_dashboard(): void {
 		</div>
 
 		<!-- ── Recent activity ──────────────────────────────────────────────── -->
-		<div class="sft-card" style="flex:2; min-width:320px; margin-top:0;">
+		<div class="folio-drawbridge-card" style="flex:2; min-width:320px; margin-top:0;">
 			<h3 style="margin:0 0 12px;">Recent Activity</h3>
 			<?php if ( ! $recent ) : ?>
 				<p style="color:#888;font-size:13px;">No activity recorded yet.</p>
 			<?php else : ?>
-				<table class="sft-table">
+				<table class="folio-drawbridge-table">
 					<thead><tr>
 						<th>Event</th><th>Vault</th><th>Actor</th><th>Time</th>
 					</tr></thead>
@@ -174,7 +174,7 @@ function sft_render_tab_dashboard(): void {
 						$vault_label = $row->vault_id ? '#' . (int) $row->vault_id : '—';
 					?>
 						<tr>
-							<td><strong><?php echo esc_html( sft_audit_event_label( $row->event_type ) ); ?></strong></td>
+							<td><strong><?php echo esc_html( folio_drawbridge_audit_event_label( $row->event_type ) ); ?></strong></td>
 							<td><?php echo esc_html( $vault_label ); ?></td>
 							<td><?php echo $actor ? esc_html( $actor->user_login ) : '<em>system</em>'; ?></td>
 							<td style="color:#888;white-space:nowrap;"><?php echo esc_html( gmdate( 'M j, H:i', strtotime( $row->created_at ) ) ); ?></td>
@@ -183,7 +183,7 @@ function sft_render_tab_dashboard(): void {
 					</tbody>
 				</table>
 				<p style="text-align:right;margin:8px 0 0;">
-					<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) ); ?>">
+					<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) ); ?>">
 						View full audit log →
 					</a>
 				</p>
@@ -193,16 +193,16 @@ function sft_render_tab_dashboard(): void {
 
 	<!-- ── Security notes ── -->
 	<?php
-	$master_key_source = defined( 'SFT_MASTER_KEY' ) ? 'wp-config.php constant (recommended)' : 'database (consider moving to SFT_MASTER_KEY in wp-config.php)';
+	$master_key_source = defined( 'FOLIO_DRAWBRIDGE_MASTER_KEY' ) ? 'wp-config.php constant (recommended)' : 'database (consider moving to FOLIO_DRAWBRIDGE_MASTER_KEY in wp-config.php)';
 	?>
-	<div class="sft-card" style="margin-top:20px; border-left:4px solid #2271b1;">
+	<div class="folio-drawbridge-card" style="margin-top:20px; border-left:4px solid #2271b1;">
 		<h3 style="margin:0 0 8px;">Security Status</h3>
 		<ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;">
 			<li>Master encryption key source: <strong><?php echo esc_html( $master_key_source ); ?></strong></li>
 			<li>Encryption algorithm: <strong>AES-256-CBC</strong> with per-file random IV and per-vault derived key</li>
-			<li>OTP validity: <strong><?php echo (int) get_option( 'sft_otp_ttl_minutes', 15 ); ?> minutes</strong>, max 5 attempts</li>
-			<li>File storage: <strong><?php echo esc_html( SFT_VAULT_DIR ); ?></strong> (HTTP-blocked)</li>
-			<li>WP-Cron lifecycle: <strong><?php echo wp_next_scheduled( 'sft_lifecycle_cron' ) ? 'scheduled' : '⚠ not scheduled — reactivate plugin'; ?></strong></li>
+			<li>OTP validity: <strong><?php echo (int) get_option( 'folio_drawbridge_otp_ttl_minutes', 15 ); ?> minutes</strong>, max 5 attempts</li>
+			<li>File storage: <strong><?php echo esc_html( FOLIO_DRAWBRIDGE_VAULT_DIR ); ?></strong> (HTTP-blocked)</li>
+			<li>WP-Cron lifecycle: <strong><?php echo wp_next_scheduled( 'folio_drawbridge_lifecycle_sweep' ) ? 'scheduled' : '⚠ not scheduled — reactivate plugin'; ?></strong></li>
 		</ul>
 	</div>
 	<?php

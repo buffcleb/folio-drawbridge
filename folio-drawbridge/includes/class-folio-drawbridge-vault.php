@@ -9,7 +9,7 @@
  *
  * Vault statuses: active | expired | revoked | archived
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -31,18 +31,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $expires_at  MySQL datetime or empty string for no expiry.
  * @return int|false New vault ID, or false on failure.
  */
-function sft_create_vault( int $owner_id, string $name, string $description = '', string $expires_at = '' ) {
+function folio_drawbridge_create_vault( int $owner_id, string $name, string $description = '', string $expires_at = '' ) {
 	global $wpdb;
 
 	$now = current_time( 'mysql', true );
 
 	$result = $wpdb->insert(
-		"{$wpdb->prefix}sft_vaults",
+		"{$wpdb->prefix}folio_drawbridge_vaults",
 		[
 			'owner_id'    => $owner_id,
 			'name'        => sanitize_text_field( $name ),
 			'description' => sanitize_textarea_field( $description ),
-			'vault_salt'  => sft_generate_vault_salt(),
+			'vault_salt'  => folio_drawbridge_generate_vault_salt(),
 			'status'      => 'active',
 			'expires_at'  => $expires_at ?: null,
 			'created_at'  => $now,
@@ -57,8 +57,8 @@ function sft_create_vault( int $owner_id, string $name, string $description = ''
 
 	$vault_id = (int) $wpdb->insert_id;
 
-	sft_log(
-		SFT_EVT_VAULT_CREATED,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_VAULT_CREATED,
 		$vault_id,
 		null,
 		[ 'name' => $name, 'owner_id' => $owner_id, 'expires_at' => $expires_at ?: 'never' ]
@@ -70,11 +70,11 @@ function sft_create_vault( int $owner_id, string $name, string $description = ''
 /**
  * Returns a single vault row, or null if not found.
  */
-function sft_get_vault( int $vault_id ): ?object {
+function folio_drawbridge_get_vault( int $vault_id ): ?object {
 	global $wpdb;
 
 	$row = $wpdb->get_row(
-		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults WHERE id = %d", $vault_id )
+		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}folio_drawbridge_vaults WHERE id = %d", $vault_id )
 	);
 
 	return $row ?: null;
@@ -86,7 +86,7 @@ function sft_get_vault( int $vault_id ): ?object {
  * @param int   $owner_id
  * @param array $args  Optional: status (string), per_page (int), paged (int).
  */
-function sft_get_user_vaults( int $owner_id, array $args = [] ): array {
+function folio_drawbridge_get_user_vaults( int $owner_id, array $args = [] ): array {
 	global $wpdb;
 
 	$status   = sanitize_key( $args['status'] ?? '' );
@@ -112,23 +112,23 @@ function sft_get_user_vaults( int $owner_id, array $args = [] ): array {
 	// above, $where_sql holds only literal "%d"/"%s" placeholder clauses whose
 	// values are in $values, and $limit_sql is pre-prepared.
 	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, PluginCheck.Security.DirectDB.UnescapedDBParameter
-	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values ) ) ?: [];
+	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}folio_drawbridge_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values ) ) ?: [];
 }
 
 /**
  * Returns all vaults (admin view) with optional filtering and pagination.
  */
-function sft_get_all_vaults( array $args = [] ): array {
+function folio_drawbridge_get_all_vaults( array $args = [] ): array {
 	global $wpdb;
 
-	[ $where_sql, $values, $limit_sql, $orderby, $order ] = sft_vaults_query_parts( $args );
+	[ $where_sql, $values, $limit_sql, $orderby, $order ] = folio_drawbridge_vaults_query_parts( $args );
 
-	$sql = "SELECT v.*, u.user_login as owner_login FROM {$wpdb->prefix}sft_vaults v
+	$sql = "SELECT v.*, u.user_login as owner_login FROM {$wpdb->prefix}folio_drawbridge_vaults v
 	        LEFT JOIN {$wpdb->users} u ON u.ID = v.owner_id
 	        {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}";
 
 	// Safe interpolation: whitelisted orderby/order, placeholder-only WHERE with
-	// values in $values, integer-cast LIMIT (see sft_vaults_query_parts()).
+	// values in $values, integer-cast LIMIT (see folio_drawbridge_vaults_query_parts()).
 	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	return $values
 		? ( $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [] )
@@ -136,12 +136,12 @@ function sft_get_all_vaults( array $args = [] ): array {
 	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 }
 
-function sft_count_all_vaults( array $args = [] ): int {
+function folio_drawbridge_count_all_vaults( array $args = [] ): int {
 	global $wpdb;
 
-	[ $where_sql, $values ] = sft_vaults_query_parts( $args );
+	[ $where_sql, $values ] = folio_drawbridge_vaults_query_parts( $args );
 
-	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}sft_vaults v {$where_sql}";
+	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults v {$where_sql}";
 
 	// Safe interpolation: placeholder-only WHERE, values in $values (see above).
 	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
@@ -152,13 +152,13 @@ function sft_count_all_vaults( array $args = [] ): int {
 }
 
 /**
- * Builds shared WHERE / ORDER / LIMIT fragments used by sft_get_all_vaults() and
- * sft_count_all_vaults() so the filtering logic lives in one place.
+ * Builds shared WHERE / ORDER / LIMIT fragments used by folio_drawbridge_get_all_vaults() and
+ * folio_drawbridge_count_all_vaults() so the filtering logic lives in one place.
  *
  * @internal
  * @return array{ string, array, string, string, string } [where_sql, values, limit_sql, orderby, order]
  */
-function sft_vaults_query_parts( array $args ): array {
+function folio_drawbridge_vaults_query_parts( array $args ): array {
 	$where  = [];
 	$values = [];
 
@@ -192,7 +192,7 @@ function sft_vaults_query_parts( array $args ): array {
 /**
  * Updates vault status and writes an audit event.
  */
-function sft_update_vault_status( int $vault_id, string $new_status, ?int $actor_id = null ): bool {
+function folio_drawbridge_update_vault_status( int $vault_id, string $new_status, ?int $actor_id = null ): bool {
 	global $wpdb;
 
 	$allowed = [ 'active', 'expired', 'revoked', 'archived' ];
@@ -201,7 +201,7 @@ function sft_update_vault_status( int $vault_id, string $new_status, ?int $actor
 	}
 
 	$result = $wpdb->update(
-		"{$wpdb->prefix}sft_vaults",
+		"{$wpdb->prefix}folio_drawbridge_vaults",
 		[ 'status' => $new_status, 'updated_at' => current_time( 'mysql', true ) ],
 		[ 'id' => $vault_id ],
 		[ '%s', '%s' ],
@@ -209,7 +209,7 @@ function sft_update_vault_status( int $vault_id, string $new_status, ?int $actor
 	);
 
 	if ( $result !== false ) {
-		sft_log( SFT_EVT_VAULT_STATUS, $vault_id, null, [ 'new_status' => $new_status ], $actor_id );
+		folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_VAULT_STATUS, $vault_id, null, [ 'new_status' => $new_status ], $actor_id );
 	}
 
 	return $result !== false;
@@ -218,11 +218,11 @@ function sft_update_vault_status( int $vault_id, string $new_status, ?int $actor
 /**
  * Updates a vault's expiry date. Pass an empty string to remove the expiry.
  */
-function sft_update_vault_expiry( int $vault_id, string $expires_at, int $actor_id ): bool {
+function folio_drawbridge_update_vault_expiry( int $vault_id, string $expires_at, int $actor_id ): bool {
 	global $wpdb;
 
 	$result = $wpdb->update(
-		"{$wpdb->prefix}sft_vaults",
+		"{$wpdb->prefix}folio_drawbridge_vaults",
 		[
 			'expires_at' => $expires_at ?: null,
 			'updated_at' => current_time( 'mysql', true ),
@@ -233,8 +233,8 @@ function sft_update_vault_expiry( int $vault_id, string $expires_at, int $actor_
 	);
 
 	if ( $result !== false ) {
-		sft_log(
-			SFT_EVT_VAULT_STATUS,
+		folio_drawbridge_log(
+			FOLIO_DRAWBRIDGE_EVT_VAULT_STATUS,
 			$vault_id,
 			null,
 			[ 'action' => 'expiry_updated', 'expires_at' => $expires_at ?: 'never' ],
@@ -254,7 +254,7 @@ function sft_update_vault_expiry( int $vault_id, string $expires_at, int $actor_
  * @param int    $actor_id    WP user performing the edit (for audit log).
  * @return true|WP_Error
  */
-function sft_update_vault_meta( int $vault_id, string $name, string $description, int $actor_id ) {
+function folio_drawbridge_update_vault_meta( int $vault_id, string $name, string $description, int $actor_id ) {
 	global $wpdb;
 
 	$name = sanitize_text_field( $name );
@@ -268,7 +268,7 @@ function sft_update_vault_meta( int $vault_id, string $name, string $description
 	$description = sanitize_textarea_field( $description );
 
 	$result = $wpdb->update(
-		"{$wpdb->prefix}sft_vaults",
+		"{$wpdb->prefix}folio_drawbridge_vaults",
 		[
 			'name'        => $name,
 			'description' => $description,
@@ -283,7 +283,7 @@ function sft_update_vault_meta( int $vault_id, string $name, string $description
 		return new WP_Error( 'db_error', 'Could not update vault.' );
 	}
 
-	sft_log( SFT_EVT_VAULT_UPDATED, $vault_id, null,
+	folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_VAULT_UPDATED, $vault_id, null,
 		[ 'name' => $name, 'description' => $description ],
 		$actor_id
 	);
@@ -295,35 +295,35 @@ function sft_update_vault_meta( int $vault_id, string $name, string $description
  * Permanently deletes a vault, all its files (from disk + DB), and all shares.
  * Writes a single audit event before deletion.
  */
-function sft_delete_vault( int $vault_id ): bool {
+function folio_drawbridge_delete_vault( int $vault_id ): bool {
 	global $wpdb;
 
-	$vault = sft_get_vault( $vault_id );
+	$vault = folio_drawbridge_get_vault( $vault_id );
 	if ( ! $vault ) {
 		return false;
 	}
 
-	sft_log( SFT_EVT_VAULT_DELETED, $vault_id, null, [ 'name' => $vault->name ] );
+	folio_drawbridge_log( FOLIO_DRAWBRIDGE_EVT_VAULT_DELETED, $vault_id, null, [ 'name' => $vault->name ] );
 
 	// Delete all encrypted files from disk.
-	$files = sft_get_vault_files( $vault_id );
+	$files = folio_drawbridge_get_vault_files( $vault_id );
 	foreach ( $files as $file ) {
-		$path = sft_vault_file_path( $vault_id, $file->stored_name );
+		$path = folio_drawbridge_vault_file_path( $vault_id, $file->stored_name );
 		if ( file_exists( $path ) ) {
 			unlink( $path );
 		}
 	}
 
 	// Remove the now-empty vault subdirectory.
-	$subdir = SFT_VAULT_DIR . $vault_id . '/';
+	$subdir = FOLIO_DRAWBRIDGE_VAULT_DIR . $vault_id . '/';
 	if ( is_dir( $subdir ) ) {
 		rmdir( $subdir );
 	}
 
 	// Cascade delete in dependency order.
-	$wpdb->delete( "{$wpdb->prefix}sft_files",  [ 'vault_id' => $vault_id ], [ '%d' ] );
-	$wpdb->delete( "{$wpdb->prefix}sft_shares", [ 'vault_id' => $vault_id ], [ '%d' ] );
-	$wpdb->delete( "{$wpdb->prefix}sft_vaults", [ 'id'       => $vault_id ], [ '%d' ] );
+	$wpdb->delete( "{$wpdb->prefix}folio_drawbridge_files",  [ 'vault_id' => $vault_id ], [ '%d' ] );
+	$wpdb->delete( "{$wpdb->prefix}folio_drawbridge_shares", [ 'vault_id' => $vault_id ], [ '%d' ] );
+	$wpdb->delete( "{$wpdb->prefix}folio_drawbridge_vaults", [ 'id'       => $vault_id ], [ '%d' ] );
 
 	return true;
 }
@@ -333,19 +333,19 @@ function sft_delete_vault( int $vault_id ): bool {
 /**
  * Encrypts and stores an uploaded file in the vault.
  *
- * Validates the $_FILES entry, then delegates to sft_encrypt_and_store_file().
+ * Validates the $_FILES entry, then delegates to folio_drawbridge_encrypt_and_store_file().
  *
  * @param int   $vault_id    Target vault.
  * @param array $file        Single element from $_FILES.
  * @param int   $uploader_id WP user ID performing the upload.
  * @return int|WP_Error File ID on success, or WP_Error on failure.
  */
-function sft_upload_file_to_vault( int $vault_id, array $file, int $uploader_id ) {
+function folio_drawbridge_upload_file_to_vault( int $vault_id, array $file, int $uploader_id ) {
 	if ( (int) $file['error'] !== UPLOAD_ERR_OK ) {
-		return new WP_Error( 'upload_error', sft_upload_error_message( (int) $file['error'] ) );
+		return new WP_Error( 'upload_error', folio_drawbridge_upload_error_message( (int) $file['error'] ) );
 	}
 
-	return sft_encrypt_and_store_file(
+	return folio_drawbridge_encrypt_and_store_file(
 		$vault_id,
 		$file['tmp_name'],
 		$file['name'],
@@ -355,7 +355,7 @@ function sft_upload_file_to_vault( int $vault_id, array $file, int $uploader_id 
 }
 
 /**
- * Core encrypt-and-store routine. Called by sft_upload_file_to_vault() for
+ * Core encrypt-and-store routine. Called by folio_drawbridge_upload_file_to_vault() for
  * normal single-POST uploads and by the chunk-assembly handler for large files.
  *
  * @param int    $vault_id      Target vault.
@@ -365,7 +365,7 @@ function sft_upload_file_to_vault( int $vault_id, array $file, int $uploader_id 
  * @param int    $uploader_id   WP user ID performing the upload.
  * @return int|WP_Error File ID on success, or WP_Error on failure.
  */
-function sft_encrypt_and_store_file(
+function folio_drawbridge_encrypt_and_store_file(
 	int    $vault_id,
 	string $tmp_path,
 	string $original_name,
@@ -374,30 +374,30 @@ function sft_encrypt_and_store_file(
 ) {
 	global $wpdb;
 
-	$vault = sft_get_vault( $vault_id );
+	$vault = folio_drawbridge_get_vault( $vault_id );
 	if ( ! $vault || $vault->status !== 'active' ) {
 		return new WP_Error( 'invalid_vault', 'Vault not found or not active.' );
 	}
 
-	$max_mb    = (int) get_option( 'sft_max_file_mb', 50 );
+	$max_mb    = (int) get_option( 'folio_drawbridge_max_file_mb', 50 );
 	$max_bytes = $max_mb * 1024 * 1024;
 	if ( $file_size > $max_bytes ) {
 		return new WP_Error( 'file_too_large', "File exceeds the {$max_mb} MB limit." );
 	}
 
 	// File type restriction — admins are exempt.
-	if ( ! sft_is_admin( $uploader_id ) ) {
+	if ( ! folio_drawbridge_is_admin( $uploader_id ) ) {
 		$ext = strtolower( pathinfo( $original_name, PATHINFO_EXTENSION ) );
-		if ( ! sft_is_allowed_file_type( $ext ) ) {
+		if ( ! folio_drawbridge_is_allowed_file_type( $ext ) ) {
 			return new WP_Error( 'file_type_not_allowed', "File type '.{$ext}' is not permitted." );
 		}
 	}
 
 	// Per-user storage quota — admins and a quota of 0 (unlimited) are exempt.
-	if ( ! sft_is_admin( $uploader_id ) ) {
-		$quota_mb = (int) get_option( 'sft_storage_quota_mb', 0 );
+	if ( ! folio_drawbridge_is_admin( $uploader_id ) ) {
+		$quota_mb = (int) get_option( 'folio_drawbridge_storage_quota_mb', 0 );
 		if ( $quota_mb > 0 ) {
-			$used_bytes  = sft_get_user_storage_used( $uploader_id );
+			$used_bytes  = folio_drawbridge_get_user_storage_used( $uploader_id );
 			$quota_bytes = $quota_mb * 1024 * 1024;
 			if ( $used_bytes + $file_size > $quota_bytes ) {
 				return new WP_Error( 'quota_exceeded', "Upload would exceed your {$quota_mb} MB storage quota." );
@@ -405,8 +405,8 @@ function sft_encrypt_and_store_file(
 		}
 	}
 
-	$vault_subdir = sft_ensure_vault_subdir( $vault_id );
-	$stored_name  = sft_generate_token( 16 ) . '.enc';
+	$vault_subdir = folio_drawbridge_ensure_vault_subdir( $vault_id );
+	$stored_name  = folio_drawbridge_generate_token( 16 ) . '.enc';
 	$dest_path    = $vault_subdir . $stored_name;
 	$original     = sanitize_file_name( $original_name );
 
@@ -417,13 +417,13 @@ function sft_encrypt_and_store_file(
 		? $detected['type']
 		: 'application/octet-stream';
 
-	$iv_hex = sft_encrypt_file( $tmp_path, $dest_path, $vault->vault_salt );
+	$iv_hex = folio_drawbridge_encrypt_file( $tmp_path, $dest_path, $vault->vault_salt );
 	if ( $iv_hex === false ) {
 		return new WP_Error( 'encrypt_failed', 'File encryption failed.' );
 	}
 
 	$wpdb->insert(
-		"{$wpdb->prefix}sft_files",
+		"{$wpdb->prefix}folio_drawbridge_files",
 		[
 			'vault_id'      => $vault_id,
 			'original_name' => $original,
@@ -440,15 +440,15 @@ function sft_encrypt_and_store_file(
 	$file_id = (int) $wpdb->insert_id;
 
 	$wpdb->update(
-		"{$wpdb->prefix}sft_vaults",
+		"{$wpdb->prefix}folio_drawbridge_vaults",
 		[ 'updated_at' => current_time( 'mysql', true ) ],
 		[ 'id' => $vault_id ],
 		[ '%s' ],
 		[ '%d' ]
 	);
 
-	sft_log(
-		SFT_EVT_FILE_UPLOADED,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_FILE_UPLOADED,
 		$vault_id,
 		null,
 		[ 'file_id' => $file_id, 'original_name' => $original, 'size_bytes' => $file_size ],
@@ -461,12 +461,12 @@ function sft_encrypt_and_store_file(
 /**
  * Returns all file records for a vault.
  */
-function sft_get_vault_files( int $vault_id ): array {
+function folio_drawbridge_get_vault_files( int $vault_id ): array {
 	global $wpdb;
 
 	return $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}sft_files WHERE vault_id = %d ORDER BY uploaded_at DESC",
+			"SELECT * FROM {$wpdb->prefix}folio_drawbridge_files WHERE vault_id = %d ORDER BY uploaded_at DESC",
 			$vault_id
 		)
 	) ?: [];
@@ -475,11 +475,11 @@ function sft_get_vault_files( int $vault_id ): array {
 /**
  * Returns a single file record, or null.
  */
-function sft_get_file( int $file_id ): ?object {
+function folio_drawbridge_get_file( int $file_id ): ?object {
 	global $wpdb;
 
 	$row = $wpdb->get_row(
-		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}sft_files WHERE id = %d", $file_id )
+		$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}folio_drawbridge_files WHERE id = %d", $file_id )
 	);
 
 	return $row ?: null;
@@ -488,28 +488,28 @@ function sft_get_file( int $file_id ): ?object {
 /**
  * Deletes a file record and its on-disk ciphertext.
  */
-function sft_delete_file( int $file_id, int $actor_id ): bool {
+function folio_drawbridge_delete_file( int $file_id, int $actor_id ): bool {
 	global $wpdb;
 
-	$file = sft_get_file( $file_id );
+	$file = folio_drawbridge_get_file( $file_id );
 	if ( ! $file ) {
 		return false;
 	}
 
-	$path = sft_vault_file_path( (int) $file->vault_id, $file->stored_name );
+	$path = folio_drawbridge_vault_file_path( (int) $file->vault_id, $file->stored_name );
 	if ( file_exists( $path ) ) {
 		unlink( $path );
 	}
 
-	sft_log(
-		SFT_EVT_FILE_DELETED,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_FILE_DELETED,
 		(int) $file->vault_id,
 		null,
 		[ 'file_id' => $file_id, 'original_name' => $file->original_name ],
 		$actor_id
 	);
 
-	$wpdb->delete( "{$wpdb->prefix}sft_files", [ 'id' => $file_id ], [ '%d' ] );
+	$wpdb->delete( "{$wpdb->prefix}folio_drawbridge_files", [ 'id' => $file_id ], [ '%d' ] );
 
 	return true;
 }
@@ -530,7 +530,7 @@ function sft_delete_file( int $file_id, int $actor_id ): bool {
  * Also disables compression: an encoded body would no longer match the
  * Content-Length we declare.
  */
-function sft_prepare_binary_response(): void {
+function folio_drawbridge_prepare_binary_response(): void {
 	while ( ob_get_level() > 0 ) {
 		ob_end_clean();
 	}
@@ -556,7 +556,7 @@ function sft_prepare_binary_response(): void {
  * @param string $filename Original filename.
  * @return string Complete header value, e.g. attachment; filename="a.pdf"; filename*=UTF-8''a.pdf
  */
-function sft_content_disposition( string $filename ): string {
+function folio_drawbridge_content_disposition( string $filename ): string {
 	// ASCII fallback: drop anything outside printable ASCII, then the characters
 	// that would terminate or inject into the quoted string.
 	$fallback = preg_replace( '/[^\x20-\x7E]/', '_', $filename );
@@ -575,21 +575,21 @@ function sft_content_disposition( string $filename ): string {
  *
  * Logs either FILE_DOWNLOADED (external recipient) or FILE_SERVED_ADMIN (admin).
  *
- * @param object   $file      Row from sft_files.
- * @param object   $vault     Row from sft_vaults (for vault_salt).
+ * @param object   $file      Row from folio_drawbridge_files.
+ * @param object   $vault     Row from folio_drawbridge_vaults (for vault_salt).
  * @param int|null $share_id  Associated share ID (null for admin access).
  * @param bool     $is_admin  True when served by an admin action.
  */
-function sft_serve_file( object $file, object $vault, ?int $share_id = null, bool $is_admin = false ): void {
-	$path = sft_vault_file_path( (int) $vault->id, $file->stored_name );
+function folio_drawbridge_serve_file( object $file, object $vault, ?int $share_id = null, bool $is_admin = false ): void {
+	$path = folio_drawbridge_vault_file_path( (int) $vault->id, $file->stored_name );
 
 	if ( ! file_exists( $path ) || ! is_readable( $path ) ) {
 		wp_die( 'File not found. Please contact the site administrator.' );
 	}
 
-	$event = $is_admin ? SFT_EVT_FILE_SERVED_ADMIN : SFT_EVT_FILE_DOWNLOADED;
+	$event = $is_admin ? FOLIO_DRAWBRIDGE_EVT_FILE_SERVED_ADMIN : FOLIO_DRAWBRIDGE_EVT_FILE_DOWNLOADED;
 
-	sft_log(
+	folio_drawbridge_log(
 		$event,
 		(int) $vault->id,
 		$share_id,
@@ -600,10 +600,10 @@ function sft_serve_file( object $file, object $vault, ?int $share_id = null, boo
 		]
 	);
 
-	sft_prepare_binary_response();
+	folio_drawbridge_prepare_binary_response();
 
 	header( 'Content-Type: ' . $file->mime_type );
-	header( 'Content-Disposition: ' . sft_content_disposition( $file->original_name ) );
+	header( 'Content-Disposition: ' . folio_drawbridge_content_disposition( $file->original_name ) );
 	header( 'Content-Length: ' . (int) $file->file_size );
 	header( 'Cache-Control: private, no-cache, no-store, must-revalidate' );
 	header( 'Pragma: no-cache' );
@@ -614,7 +614,7 @@ function sft_serve_file( object $file, object $vault, ?int $share_id = null, boo
 	// and append it to what it already has — producing a corrupt file.
 	header( 'Accept-Ranges: none' );
 
-	sft_stream_decrypt_file( $path, $vault->vault_salt, $file->iv, (int) $file->file_size );
+	folio_drawbridge_stream_decrypt_file( $path, $vault->vault_salt, $file->iv, (int) $file->file_size );
 	exit;
 }
 
@@ -623,7 +623,7 @@ function sft_serve_file( object $file, object $vault, ?int $share_id = null, boo
 /**
  * Returns a safe MIME type validated against the actual file contents.
  */
-function sft_safe_mime( string $tmp_path, string $supplied_type ): string {
+function folio_drawbridge_safe_mime( string $tmp_path, string $supplied_type ): string {
 	$allowed  = wp_get_mime_types();
 	$detected = wp_check_filetype_and_ext( $tmp_path, basename( $tmp_path ) );
 
@@ -644,7 +644,7 @@ function sft_safe_mime( string $tmp_path, string $supplied_type ): string {
  * Returns the safe chunk size in bytes derived from the server's PHP ini limits.
  * 75% of the lower of upload_max_filesize and post_max_size, clamped to [256 KB, 4 MB].
  */
-function sft_chunk_size_bytes(): int {
+function folio_drawbridge_chunk_size_bytes(): int {
 	$to_bytes = static function ( string $val ): int {
 		$val  = trim( $val );
 		$unit = strtolower( substr( $val, -1 ) );
@@ -668,8 +668,8 @@ function sft_chunk_size_bytes(): int {
  * Creates and protects the chunk temp directory.
  * Returns the absolute path with trailing slash.
  */
-function sft_ensure_chunks_dir(): string {
-	$dir = WP_CONTENT_DIR . '/uploads/sft-chunks/';
+function folio_drawbridge_ensure_chunks_dir(): string {
+	$dir = WP_CONTENT_DIR . '/uploads/folio-drawbridge-chunks/';
 
 	if ( ! is_dir( $dir ) ) {
 		wp_mkdir_p( $dir );
@@ -694,8 +694,8 @@ function sft_ensure_chunks_dir(): string {
  *
  * @return int Number of directories removed.
  */
-function sft_cleanup_orphaned_chunks( int $max_age = 86400 ): int {
-	$base  = WP_CONTENT_DIR . '/uploads/sft-chunks/';
+function folio_drawbridge_cleanup_orphaned_chunks( int $max_age = 86400 ): int {
+	$base  = WP_CONTENT_DIR . '/uploads/folio-drawbridge-chunks/';
 	$count = 0;
 
 	if ( ! is_dir( $base ) ) {
@@ -728,7 +728,7 @@ function sft_cleanup_orphaned_chunks( int $max_age = 86400 ): int {
 	return $count;
 }
 
-function sft_upload_error_message( int $code ): string {
+function folio_drawbridge_upload_error_message( int $code ): string {
 	$messages = [
 		UPLOAD_ERR_INI_SIZE   => 'File exceeds the server upload_max_filesize limit.',
 		UPLOAD_ERR_FORM_SIZE  => 'File exceeds the form MAX_FILE_SIZE limit.',
@@ -754,7 +754,7 @@ function sft_upload_error_message( int $code ): string {
  * @param int[] $owner_ids WordPress user IDs.
  * @return array<int,object[]> Owner ID → vault rows (id, name, status), newest first.
  */
-function sft_get_vaults_by_owner( array $owner_ids ): array {
+function folio_drawbridge_get_vaults_by_owner( array $owner_ids ): array {
 	global $wpdb;
 
 	$owner_ids = array_values( array_unique( array_map( 'intval', $owner_ids ) ) );
@@ -773,7 +773,7 @@ function sft_get_vaults_by_owner( array $owner_ids ): array {
 
 	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	$rows = $wpdb->get_results(
-		"SELECT id, name, status, owner_id FROM {$wpdb->prefix}sft_vaults
+		"SELECT id, name, status, owner_id FROM {$wpdb->prefix}folio_drawbridge_vaults
 		  WHERE owner_id IN ({$in}) ORDER BY created_at DESC"
 	) ?: [];
 	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
@@ -791,8 +791,8 @@ function sft_get_vaults_by_owner( array $owner_ids ): array {
  * @param int[] $vault_ids
  * @return array<int,object[]>
  */
-function sft_get_files_by_vault( array $vault_ids ): array {
-	return sft_group_rows_by_vault( $vault_ids, 'sft_files', 'uploaded_at' );
+function folio_drawbridge_get_files_by_vault( array $vault_ids ): array {
+	return folio_drawbridge_group_rows_by_vault( $vault_ids, 'folio_drawbridge_files', 'uploaded_at' );
 }
 
 /**
@@ -801,8 +801,8 @@ function sft_get_files_by_vault( array $vault_ids ): array {
  * @param int[] $vault_ids
  * @return array<int,object[]>
  */
-function sft_get_shares_by_vault( array $vault_ids ): array {
-	return sft_group_rows_by_vault( $vault_ids, 'sft_shares', 'created_at' );
+function folio_drawbridge_get_shares_by_vault( array $vault_ids ): array {
+	return folio_drawbridge_group_rows_by_vault( $vault_ids, 'folio_drawbridge_shares', 'created_at' );
 }
 
 /**
@@ -813,18 +813,18 @@ function sft_get_shares_by_vault( array $vault_ids ): array {
  * literals, but this is a public function — a future caller that forwarded
  * request data would otherwise have an injection point.
  *
- * @internal Shared by sft_get_files_by_vault() and sft_get_shares_by_vault().
+ * @internal Shared by folio_drawbridge_get_files_by_vault() and folio_drawbridge_get_shares_by_vault().
  * @param int[]  $vault_ids
  * @param string $table    Unprefixed plugin table name. Must be a known table.
  * @param string $order_by Column to sort within each vault, newest first.
  * @return array<int,object[]> Empty when $table/$order_by are not recognised.
  */
-function sft_group_rows_by_vault( array $vault_ids, string $table, string $order_by ): array {
+function folio_drawbridge_group_rows_by_vault( array $vault_ids, string $table, string $order_by ): array {
 	global $wpdb;
 
 	$allowed = [
-		'sft_files'  => [ 'uploaded_at', 'id' ],
-		'sft_shares' => [ 'created_at', 'id' ],
+		'folio_drawbridge_files'  => [ 'uploaded_at', 'id' ],
+		'folio_drawbridge_shares' => [ 'created_at', 'id' ],
 	];
 
 	if ( ! isset( $allowed[ $table ] ) || ! in_array( $order_by, $allowed[ $table ], true ) ) {
@@ -877,7 +877,7 @@ function sft_group_rows_by_vault( array $vault_ids, string $table, string $order
  * @return array<int,array{files:int,bytes:int,shares:int}> Keyed by vault ID;
  *         every requested ID is present, zero-filled when it has no rows.
  */
-function sft_get_vault_counts( array $vault_ids ): array {
+function folio_drawbridge_get_vault_counts( array $vault_ids ): array {
 	global $wpdb;
 
 	$vault_ids = array_values( array_unique( array_map( 'intval', $vault_ids ) ) );
@@ -897,12 +897,12 @@ function sft_get_vault_counts( array $vault_ids ): array {
 	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	$files = $wpdb->get_results(
 		"SELECT vault_id, COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b
-		   FROM {$wpdb->prefix}sft_files WHERE vault_id IN ({$in}) GROUP BY vault_id"
+		   FROM {$wpdb->prefix}folio_drawbridge_files WHERE vault_id IN ({$in}) GROUP BY vault_id"
 	) ?: [];
 
 	$shares = $wpdb->get_results(
 		"SELECT vault_id, COUNT(*) AS c
-		   FROM {$wpdb->prefix}sft_shares WHERE vault_id IN ({$in}) GROUP BY vault_id"
+		   FROM {$wpdb->prefix}folio_drawbridge_shares WHERE vault_id IN ({$in}) GROUP BY vault_id"
 	) ?: [];
 	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
@@ -920,25 +920,25 @@ function sft_get_vault_counts( array $vault_ids ): array {
 /**
  * Returns count of files in a vault.
  *
- * Prefer sft_get_vault_counts() when rendering a list — this issues one query
+ * Prefer folio_drawbridge_get_vault_counts() when rendering a list — this issues one query
  * per call.
  */
-function sft_get_vault_file_count( int $vault_id ): int {
+function folio_drawbridge_get_vault_file_count( int $vault_id ): int {
 	global $wpdb;
 
 	return (int) $wpdb->get_var(
-		$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}sft_files WHERE vault_id = %d", $vault_id )
+		$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_files WHERE vault_id = %d", $vault_id )
 	);
 }
 
 /**
  * Returns total encrypted file size (bytes) for a vault.
  */
-function sft_get_vault_total_size( int $vault_id ): int {
+function folio_drawbridge_get_vault_total_size( int $vault_id ): int {
 	global $wpdb;
 
 	return (int) $wpdb->get_var(
-		$wpdb->prepare( "SELECT COALESCE(SUM(file_size),0) FROM {$wpdb->prefix}sft_files WHERE vault_id = %d", $vault_id )
+		$wpdb->prepare( "SELECT COALESCE(SUM(file_size),0) FROM {$wpdb->prefix}folio_drawbridge_files WHERE vault_id = %d", $vault_id )
 	);
 }
 
@@ -947,14 +947,14 @@ function sft_get_vault_total_size( int $vault_id ): int {
 /**
  * Returns true when the file is allowed by the site's extension allowlist.
  *
- * The allowlist is a comma-separated string of extensions in sft_allowed_file_extensions.
+ * The allowlist is a comma-separated string of extensions in folio_drawbridge_allowed_file_extensions.
  * An empty allowlist means all types are permitted.
  *
  * @param string $extension  Lowercase extension without leading dot (e.g. 'pdf').
  * @return bool
  */
-function sft_is_allowed_file_type( string $extension ): bool {
-	$raw = (string) get_option( 'sft_allowed_file_extensions', '' );
+function folio_drawbridge_is_allowed_file_type( string $extension ): bool {
+	$raw = (string) get_option( 'folio_drawbridge_allowed_file_extensions', '' );
 	if ( $raw === '' ) {
 		return true; // no restriction
 	}
@@ -968,14 +968,14 @@ function sft_is_allowed_file_type( string $extension ): bool {
 /**
  * Returns the total bytes stored across all vaults owned by $user_id.
  */
-function sft_get_user_storage_used( int $user_id ): int {
+function folio_drawbridge_get_user_storage_used( int $user_id ): int {
 	global $wpdb;
 
 	return (int) $wpdb->get_var(
 		$wpdb->prepare(
 			"SELECT COALESCE(SUM(f.file_size), 0)
-			 FROM {$wpdb->prefix}sft_files f
-			 JOIN {$wpdb->prefix}sft_vaults v ON v.id = f.vault_id
+			 FROM {$wpdb->prefix}folio_drawbridge_files f
+			 JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = f.vault_id
 			 WHERE v.owner_id = %d",
 			$user_id
 		)
@@ -987,7 +987,7 @@ function sft_get_user_storage_used( int $user_id ): int {
 /**
  * Transfers vault ownership to a different WordPress user.
  *
- * The new owner must have the use_sft_vaults or sft_admin capability.
+ * The new owner must have the folio_drawbridge_use_vaults or folio_drawbridge_admin capability.
  * Admins are always permitted to own vaults regardless of capability.
  *
  * @param int $vault_id      Vault to transfer.
@@ -995,10 +995,10 @@ function sft_get_user_storage_used( int $user_id ): int {
  * @param int $actor_id      WP user ID performing the transfer (for audit log).
  * @return true|WP_Error
  */
-function sft_transfer_vault( int $vault_id, int $new_owner_id, int $actor_id ) {
+function folio_drawbridge_transfer_vault( int $vault_id, int $new_owner_id, int $actor_id ) {
 	global $wpdb;
 
-	$vault = sft_get_vault( $vault_id );
+	$vault = folio_drawbridge_get_vault( $vault_id );
 	if ( ! $vault ) {
 		return new WP_Error( 'not_found', 'Vault not found.' );
 	}
@@ -1008,10 +1008,10 @@ function sft_transfer_vault( int $vault_id, int $new_owner_id, int $actor_id ) {
 		return new WP_Error( 'user_not_found', 'New owner user not found.' );
 	}
 
-	if ( ! sft_is_admin( $new_owner_id )
-		&& ! $new_owner->has_cap( 'use_sft_vaults' )
-		&& ! $new_owner->has_cap( 'sft_admin' ) ) {
-		return new WP_Error( 'no_capability', 'The new owner must have vault access. Grant them Vault User or SFT Admin access first.' );
+	if ( ! folio_drawbridge_is_admin( $new_owner_id )
+		&& ! $new_owner->has_cap( 'folio_drawbridge_use_vaults' )
+		&& ! $new_owner->has_cap( 'folio_drawbridge_manage_vaults' ) ) {
+		return new WP_Error( 'no_capability', 'The new owner must have vault access. Grant them Vault User or Drawbridge Admin access first.' );
 	}
 
 	if ( (int) $vault->owner_id === $new_owner_id ) {
@@ -1021,7 +1021,7 @@ function sft_transfer_vault( int $vault_id, int $new_owner_id, int $actor_id ) {
 	$old_owner_id = (int) $vault->owner_id;
 
 	$result = $wpdb->update(
-		"{$wpdb->prefix}sft_vaults",
+		"{$wpdb->prefix}folio_drawbridge_vaults",
 		[ 'owner_id' => $new_owner_id, 'updated_at' => current_time( 'mysql', true ) ],
 		[ 'id' => $vault_id ],
 		[ '%d', '%s' ],
@@ -1032,8 +1032,8 @@ function sft_transfer_vault( int $vault_id, int $new_owner_id, int $actor_id ) {
 		return new WP_Error( 'db_error', 'Could not update vault ownership.' );
 	}
 
-	sft_log(
-		SFT_EVT_VAULT_TRANSFERRED,
+	folio_drawbridge_log(
+		FOLIO_DRAWBRIDGE_EVT_VAULT_TRANSFERRED,
 		$vault_id,
 		null,
 		[

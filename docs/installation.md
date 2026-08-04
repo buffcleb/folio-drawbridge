@@ -25,10 +25,10 @@ var_dump( extension_loaded('openssl'), extension_loaded('mbstring') );
 2. In wp-admin navigate to **Plugins → Installed Plugins** and activate **Folio Drawbridge**.
 
 On first activation the plugin automatically:
-- Creates five database tables (`sft_vaults`, `sft_files`, `sft_shares`, `sft_otps`, `sft_audit`).
-- Creates `wp-content/uploads/sft-vaults/` with an `.htaccess` file blocking direct HTTP access.
-- Creates `wp-content/uploads/sft-chunks/` (chunked upload staging area, also `.htaccess` protected).
-- Schedules the hourly lifecycle cron event (`sft_hourly_lifecycle`).
+- Creates five database tables (`folio_drawbridge_vaults`, `folio_drawbridge_files`, `folio_drawbridge_shares`, `folio_drawbridge_otps`, `folio_drawbridge_audit`).
+- Creates `wp-content/uploads/folio-drawbridge-vaults/` with an `.htaccess` file blocking direct HTTP access.
+- Creates `wp-content/uploads/folio-drawbridge-chunks/` (chunked upload staging area, also `.htaccess` protected).
+- Schedules the hourly lifecycle cron event (`folio_drawbridge_hourly_lifecycle`).
 
 ---
 
@@ -50,7 +50,7 @@ After activation, complete these steps before accepting uploads:
 
 Upgrades are non-destructive. The plugin does not run `DROP TABLE` statements on update — only `CREATE TABLE IF NOT EXISTS`, so existing data is always preserved.
 
-From v1.2.0 onwards the plugin tracks its own database version via the `sft_db_version` option (matching the `SFT_DB_VERSION` constant). On `plugins_loaded`, `sft_maybe_upgrade_db()` compares the stored version to the current constant and runs `dbDelta()` if they differ, adding any new columns or indexes without touching existing data. This means upgrading from an older version is handled automatically on the next page load after the plugin files are replaced — no manual activation step required for schema changes.
+From v1.2.0 onwards the plugin tracks its own database version via the `folio_drawbridge_db_version` option (matching the `FOLIO_DRAWBRIDGE_DB_VERSION` constant). On `plugins_loaded`, `folio_drawbridge_maybe_upgrade_db()` compares the stored version to the current constant and runs `dbDelta()` if they differ, adding any new columns or indexes without touching existing data. This means upgrading from an older version is handled automatically on the next page load after the plugin files are replaced — no manual activation step required for schema changes.
 
 ---
 

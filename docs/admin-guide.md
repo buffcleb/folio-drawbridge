@@ -1,6 +1,6 @@
 # Administrator Guide
 
-This guide covers the Folio Drawbridge admin panel, accessible at **Folio Drawbridge** in the wp-admin sidebar. Access requires `manage_options` (WordPress administrator) or the `sft_admin` capability.
+This guide covers the Folio Drawbridge admin panel, accessible at **Folio Drawbridge** in the wp-admin sidebar. Access requires `manage_options` (WordPress administrator) or the `folio_drawbridge_manage_vaults` capability.
 
 ![Admin Dashboard - Full With Menu](/images/AdminDashboard_FullWithMenu.jpg)
 
@@ -66,7 +66,7 @@ The inspector shows:
 - **Shares** — current status, recipient, download count, last access. Edit download limit/expiry, resend the invite, or revoke any share.
 - **Vault Audit Log** — last 25 events for this vault.
 - **Edit Name & Description** — rename the vault or update its description inline without affecting files or shares.
-- **Transfer Ownership** — reassign the vault to any user who already has Vault User or SFT Admin access. The previous owner immediately loses access; the new owner sees the vault in their list.
+- **Transfer Ownership** — reassign the vault to any user who already has Vault User or Drawbridge Admin access. The previous owner immediately loses access; the new owner sees the vault in their list.
 - **Vault Status** — change to active, expired, revoked, or archived. Non-active vaults block new uploads and share creation.
 - **Vault Expiry** — edit or clear the vault's expiry date.
 - **Delete Vault** — permanently remove the vault, all files, and all shares. Cannot be undone.
@@ -118,26 +118,26 @@ Manage which non-administrator users have access to vault features.
 | Role | Capability | What they can do |
 |---|---|---|
 | **WordPress Admin** | `manage_options` | Everything — implicit, not listed |
-| **SFT Admin** | `sft_admin` | Full admin panel — all tabs, vault inspector, audit export, settings, Users tab |
-| **Vault User** | `use_sft_vaults` | My Vaults only — create, upload, share, revoke |
+| **Drawbridge Admin** | `folio_drawbridge_manage_vaults` | Full admin panel — all tabs, vault inspector, audit export, settings, Users tab |
+| **Vault User** | `folio_drawbridge_use_vaults` | My Vaults only — create, upload, share, revoke |
 
 ### Granting access
 
-Search for any non-administrator by username or email. The search panel shows their current SFT status and presents contextual action buttons:
+Search for any non-administrator by username or email. The search panel shows their current Drawbridge status and presents contextual action buttons:
 
-- **Grant Vault Access** — adds `use_sft_vaults`.
-- **Grant SFT Admin Access** — adds `sft_admin`.
-- **Promote to SFT Admin** — upgrades an existing Vault User.
+- **Grant Vault Access** — adds `folio_drawbridge_use_vaults`.
+- **Grant Drawbridge Admin Access** — adds `folio_drawbridge_manage_vaults`.
+- **Promote to Drawbridge Admin** — upgrades an existing Vault User.
 
 ### Modifying access
 
-From the SFT Admins table:
-- **Demote to User** — removes `sft_admin`, retains `use_sft_vaults`. The user keeps their vaults.
+From the Drawbridge Admins table:
+- **Demote to User** — removes `folio_drawbridge_manage_vaults`, retains `folio_drawbridge_use_vaults`. The user keeps their vaults.
 - **Remove All** — removes both capabilities. Vaults and files are preserved.
 
 From the Vault Users table:
-- **Make SFT Admin** — promotes to SFT Admin.
-- **Revoke** — removes `use_sft_vaults`. Vaults and files are preserved.
+- **Make Drawbridge Admin** — promotes to Drawbridge Admin.
+- **Revoke** — removes `folio_drawbridge_use_vaults`. Vaults and files are preserved.
 
 Both tables are sortable by clicking column headers.
 
@@ -157,14 +157,14 @@ Quick summary for new installs:
 
 1. Go to **Folio Drawbridge → Users**.
 2. Type the user's login name or email in the search box and click **Search**.
-3. Click **Grant Vault Access** (for a standard vault user) or **Grant SFT Admin Access** (for a delegated admin).
+3. Click **Grant Vault Access** (for a standard vault user) or **Grant Drawbridge Admin Access** (for a delegated admin).
 4. The user immediately sees the appropriate menu item in their wp-admin sidebar.
 
 ---
 
 ## WordPress Dashboard Widget
 
-An **admin vault overview** widget appears on the WordPress dashboard for all SFT Admins. It shows:
+An **admin vault overview** widget appears on the WordPress dashboard for all Drawbridge Admins. It shows:
 - Total and active vault counts
 - File count and total encrypted storage size
 - Active share count

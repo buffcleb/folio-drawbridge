@@ -6,13 +6,13 @@
  * schedules WP-Cron events, and tears them down on deactivation.
  *
  * Tables:
- *   sft_vaults      — encrypted file vaults owned by authenticated users
- *   sft_files       — individual encrypted files within vaults
- *   sft_shares      — time-limited share records linking vaults to recipients
- *   sft_otps        — 2FA one-time passwords for share access verification
- *   sft_audit       — immutable audit log for all plugin events
+ *   folio_drawbridge_vaults      — encrypted file vaults owned by authenticated users
+ *   folio_drawbridge_files       — individual encrypted files within vaults
+ *   folio_drawbridge_shares      — time-limited share records linking vaults to recipients
+ *   folio_drawbridge_otps        — 2FA one-time passwords for share access verification
+ *   folio_drawbridge_audit       — immutable audit log for all plugin events
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -25,34 +25,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ─── Activation ───────────────────────────────────────────────────────────────
 
-register_activation_hook( SFT_DIR . 'folio-drawbridge.php', 'sft_activate' );
+register_activation_hook( FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'folio-drawbridge.php', 'folio_drawbridge_activate' );
 
-function sft_activate() {
-	sft_create_tables();
-	sft_ensure_vault_dir();
-	sft_schedule_lifecycle_cron();
+function folio_drawbridge_activate() {
+	folio_drawbridge_create_tables();
+	folio_drawbridge_ensure_vault_dir();
+	folio_drawbridge_schedule_lifecycle_cron();
 	flush_rewrite_rules();
 }
 
 // ─── Deactivation ─────────────────────────────────────────────────────────────
 
-register_deactivation_hook( SFT_DIR . 'folio-drawbridge.php', 'sft_deactivate' );
+register_deactivation_hook( FOLIO_DRAWBRIDGE_PLUGIN_DIR . 'folio-drawbridge.php', 'folio_drawbridge_deactivate' );
 
-function sft_deactivate() {
-	wp_clear_scheduled_hook( 'sft_lifecycle_cron' );
+function folio_drawbridge_deactivate() {
+	wp_clear_scheduled_hook( 'folio_drawbridge_lifecycle_sweep' );
 	flush_rewrite_rules();
 }
 
 // ─── Table creation ───────────────────────────────────────────────────────────
 
-function sft_create_tables() {
+function folio_drawbridge_create_tables() {
 	global $wpdb;
 
 	$charset = $wpdb->get_charset_collate();
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 	// Vaults: the top-level container owned by a WordPress user.
-	$sql_vaults = "CREATE TABLE {$wpdb->prefix}sft_vaults (
+	$sql_vaults = "CREATE TABLE {$wpdb->prefix}folio_drawbridge_vaults (
 		id          bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 		owner_id    bigint(20) unsigned NOT NULL,
 		name        varchar(255)        NOT NULL,
@@ -68,7 +68,7 @@ function sft_create_tables() {
 	) $charset;";
 
 	// Files: individual AES-256-CBC encrypted files within a vault.
-	$sql_files = "CREATE TABLE {$wpdb->prefix}sft_files (
+	$sql_files = "CREATE TABLE {$wpdb->prefix}folio_drawbridge_files (
 		id            bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 		vault_id      bigint(20) unsigned NOT NULL,
 		original_name varchar(255)        NOT NULL,
@@ -83,7 +83,7 @@ function sft_create_tables() {
 	) $charset;";
 
 	// Shares: a record granting a specific email address access to a vault.
-	$sql_shares = "CREATE TABLE {$wpdb->prefix}sft_shares (
+	$sql_shares = "CREATE TABLE {$wpdb->prefix}folio_drawbridge_shares (
 		id                    bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 		vault_id              bigint(20) unsigned NOT NULL,
 		created_by            bigint(20) unsigned NOT NULL,
@@ -103,7 +103,7 @@ function sft_create_tables() {
 	) $charset;";
 
 	// OTPs: hashed one-time passwords for 2FA share verification.
-	$sql_otps = "CREATE TABLE {$wpdb->prefix}sft_otps (
+	$sql_otps = "CREATE TABLE {$wpdb->prefix}folio_drawbridge_otps (
 		id         bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 		share_id   bigint(20) unsigned NOT NULL,
 		email      varchar(255)        NOT NULL,
@@ -117,7 +117,7 @@ function sft_create_tables() {
 	) $charset;";
 
 	// Audit: append-only event log — never updated after insert.
-	$sql_audit = "CREATE TABLE {$wpdb->prefix}sft_audit (
+	$sql_audit = "CREATE TABLE {$wpdb->prefix}folio_drawbridge_audit (
 		id          bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 		event_type  varchar(60)         NOT NULL,
 		vault_id    bigint(20) unsigned DEFAULT NULL,
@@ -139,19 +139,19 @@ function sft_create_tables() {
 
 // ─── Vault storage directory ──────────────────────────────────────────────────
 
-function sft_ensure_vault_dir() {
-	if ( ! is_dir( SFT_VAULT_DIR ) ) {
-		wp_mkdir_p( SFT_VAULT_DIR );
+function folio_drawbridge_ensure_vault_dir() {
+	if ( ! is_dir( FOLIO_DRAWBRIDGE_VAULT_DIR ) ) {
+		wp_mkdir_p( FOLIO_DRAWBRIDGE_VAULT_DIR );
 	}
 
 	// Block all direct HTTP access — encrypted files must only be served by PHP.
-	$htaccess = SFT_VAULT_DIR . '.htaccess';
+	$htaccess = FOLIO_DRAWBRIDGE_VAULT_DIR . '.htaccess';
 	if ( ! file_exists( $htaccess ) ) {
 		file_put_contents( $htaccess, "Deny from all\n" );
 	}
 
 	// Prevent directory listing.
-	$index = SFT_VAULT_DIR . 'index.php';
+	$index = FOLIO_DRAWBRIDGE_VAULT_DIR . 'index.php';
 	if ( ! file_exists( $index ) ) {
 		file_put_contents( $index, "<?php // Silence is golden.\n" );
 	}
@@ -159,11 +159,11 @@ function sft_ensure_vault_dir() {
 
 /**
  * Ensures the per-vault subdirectory exists and returns its path.
- * Encrypted files are stored in SFT_VAULT_DIR/{vault_id}/ for isolation.
+ * Encrypted files are stored in FOLIO_DRAWBRIDGE_VAULT_DIR/{vault_id}/ for isolation.
  */
-function sft_ensure_vault_subdir( int $vault_id ): string {
-	sft_ensure_vault_dir();
-	$dir = SFT_VAULT_DIR . $vault_id . '/';
+function folio_drawbridge_ensure_vault_subdir( int $vault_id ): string {
+	folio_drawbridge_ensure_vault_dir();
+	$dir = FOLIO_DRAWBRIDGE_VAULT_DIR . $vault_id . '/';
 	if ( ! is_dir( $dir ) ) {
 		wp_mkdir_p( $dir );
 	}
@@ -174,27 +174,27 @@ function sft_ensure_vault_subdir( int $vault_id ): string {
  * Returns the absolute path to an encrypted file on disk.
  * Single source of truth for file path construction.
  */
-function sft_vault_file_path( int $vault_id, string $stored_name ): string {
-	return SFT_VAULT_DIR . $vault_id . '/' . $stored_name;
+function folio_drawbridge_vault_file_path( int $vault_id, string $stored_name ): string {
+	return FOLIO_DRAWBRIDGE_VAULT_DIR . $vault_id . '/' . $stored_name;
 }
 
 // ─── DB version migration ─────────────────────────────────────────────────────
 
-add_action( 'plugins_loaded', 'sft_maybe_upgrade_db' );
+add_action( 'plugins_loaded', 'folio_drawbridge_maybe_upgrade_db' );
 
 /**
- * Runs dbDelta() when the stored DB version is behind SFT_DB_VERSION.
+ * Runs dbDelta() when the stored DB version is behind FOLIO_DRAWBRIDGE_DB_VERSION.
  * Safe to call on every page load — dbDelta does nothing when the schema matches.
  */
-function sft_maybe_upgrade_db(): void {
-	if ( get_option( 'sft_db_version' ) === SFT_DB_VERSION ) {
+function folio_drawbridge_maybe_upgrade_db(): void {
+	if ( get_option( 'folio_drawbridge_db_version' ) === FOLIO_DRAWBRIDGE_DB_VERSION ) {
 		return;
 	}
 
-	sft_create_tables();
-	sft_drop_superseded_indexes();
+	folio_drawbridge_create_tables();
+	folio_drawbridge_drop_superseded_indexes();
 
-	update_option( 'sft_db_version', SFT_DB_VERSION );
+	update_option( 'folio_drawbridge_db_version', FOLIO_DRAWBRIDGE_DB_VERSION );
 }
 
 /**
@@ -204,12 +204,12 @@ function sft_maybe_upgrade_db(): void {
  * columns become the leftmost prefix of a composite one would keep costing
  * write time and space for nothing.
  *
- * sft_audit.event_type is covered by event_created (event_type, created_at).
+ * folio_drawbridge_audit.event_type is covered by event_created (event_type, created_at).
  */
-function sft_drop_superseded_indexes(): void {
+function folio_drawbridge_drop_superseded_indexes(): void {
 	global $wpdb;
 
-	$table = $wpdb->prefix . 'sft_audit';
+	$table = $wpdb->prefix . 'folio_drawbridge_audit';
 
 	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- $table is $wpdb->prefix plus a literal; index names are literals. Schema changes are the point of this function, and it runs once per version bump.
 	$has_composite = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_created' ) );
@@ -226,12 +226,12 @@ function sft_drop_superseded_indexes(): void {
 /**
  * Deletes audit entries older than $days days. Returns the count deleted.
  */
-function sft_prune_audit_log( int $days ): int {
+function folio_drawbridge_prune_audit_log( int $days ): int {
 	global $wpdb;
 
 	$result = $wpdb->query(
 		$wpdb->prepare(
-			"DELETE FROM {$wpdb->prefix}sft_audit WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+			"DELETE FROM {$wpdb->prefix}folio_drawbridge_audit WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
 			$days
 		)
 	);

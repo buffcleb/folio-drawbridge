@@ -21,7 +21,7 @@ Folio Drawbridge lets authenticated WordPress users upload files into named **va
 * **Multi-file and chunked upload** — files split client-side and reassembled server-side, bypassing PHP `upload_max_filesize` limits.
 * **ZIP bulk download** — recipients can download all vault files as a single archive (requires PHP `ZipArchive`).
 * **File type restrictions and per-user storage quotas** — enforced server-side at upload time.
-* **Role-based access** — two tiers of non-admin access: SFT Admin (full panel) and Vault User (My Vaults only).
+* **Role-based access** — two tiers of non-admin access: Drawbridge Admin (full panel) and Vault User (My Vaults only).
 * **Global share limits** — default and maximum download counts and link expiration windows, retroactively enforceable.
 * **OTP rate limiting** — configurable cooldown between one-time-code requests.
 * **Lifecycle management** — hourly WP-Cron expires vaults and shares, sends expiry warnings, prunes stale OTPs, and cleans orphaned upload chunks.
@@ -48,11 +48,11 @@ Requires the PHP `openssl` and `mbstring` extensions. The optional `zip` extensi
 
 = Where are uploaded files stored? =
 
-Encrypted files are written to `wp-content/uploads/sft-vaults/`, protected by an `.htaccess` deny-all rule. Files are never served directly — every download is decrypted and streamed through PHP after authorization.
+Encrypted files are written to `wp-content/uploads/folio-drawbridge/vaults/`, protected by an `.htaccess` deny-all rule. Files are never served directly — every download is decrypted and streamed through PHP after authorization.
 
 = What happens if I lose the master encryption key? =
 
-Encrypted files cannot be recovered without the master key. If you define `SFT_MASTER_KEY` in `wp-config.php`, back it up securely. Replacing the key permanently breaks decryption of existing files.
+Encrypted files cannot be recovered without the master key. If you define `FOLIO_DRAWBRIDGE_MASTER_KEY` in `wp-config.php`, back it up securely. Replacing the key permanently breaks decryption of existing files.
 
 = Do share recipients need a WordPress account? =
 
@@ -101,7 +101,7 @@ Yes. Each share can have a download limit and an expiry date, and site-wide defa
 * New documentation set under docs/.
 
 = 1.0.2 =
-* SFT Admin capability for non-administrator panel access.
+* Drawbridge Admin capability for non-administrator panel access.
 * Users tab redesign with search and contextual actions.
 * All timestamps display in the site's configured timezone.
 * SIEM logging to OS file (NDJSON or CSV).

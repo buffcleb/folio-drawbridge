@@ -5,7 +5,7 @@
  * Filters: event type, vault ID, date range.
  * Export: CSV of the filtered result set.
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,26 +17,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 // phpcs:disable WordPress.WP.AlternativeFunctions -- CSV export streams rows to php://output; WP_Filesystem has no output-stream support.
 
 // ─── CSV export (must run before any output — hooked via admin_init in admin class) ──
-add_action( 'admin_init', 'sft_maybe_export_audit_csv' );
+add_action( 'admin_init', 'folio_drawbridge_maybe_export_audit_csv' );
 
-function sft_maybe_export_audit_csv(): void {
-	if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'sft-pro' ) {
+function folio_drawbridge_maybe_export_audit_csv(): void {
+	if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'folio-drawbridge' ) {
 		return;
 	}
-	if ( sanitize_key( wp_unslash( $_GET['tab'] ?? '' ) ) !== 'audit' || ! isset( $_GET['sft_export_audit'] ) ) {
+	if ( sanitize_key( wp_unslash( $_GET['tab'] ?? '' ) ) !== 'audit' || ! isset( $_GET['folio_drawbridge_export_audit'] ) ) {
 		return;
 	}
-	if ( ! sft_is_admin() ) {
+	if ( ! folio_drawbridge_is_admin() ) {
 		return;
 	}
-	check_admin_referer( 'sft_export_audit' );
+	check_admin_referer( 'folio_drawbridge_export_audit' );
 
-	$args = sft_audit_filter_args_from_get();
+	$args = folio_drawbridge_audit_filter_args_from_get();
 	$args['per_page'] = 9999;
-	$rows = sft_get_audit_logs( $args );
+	$rows = folio_drawbridge_get_audit_logs( $args );
 
 	header( 'Content-Type: text/csv; charset=UTF-8' );
-	header( 'Content-Disposition: attachment; filename="sft-audit-' . gmdate( 'Y-m-d' ) . '.csv"' );
+	header( 'Content-Disposition: attachment; filename="folio-drawbridge-audit-' . gmdate( 'Y-m-d' ) . '.csv"' );
 	header( 'Pragma: no-cache' );
 
 	$fh = fopen( 'php://output', 'w' );
@@ -48,15 +48,15 @@ function sft_maybe_export_audit_csv(): void {
 	foreach ( $rows as $row ) {
 		$actor  = $row->actor_id ? ( get_userdata( (int) $row->actor_id )->user_login ?? $row->actor_id ) : 'system';
 		$detail = $row->details ? str_replace( [ "\r", "\n" ], ' ', $row->details ) : '';
-		fputcsv( $fh, array_map( 'sft_csv_safe', [
+		fputcsv( $fh, array_map( 'folio_drawbridge_csv_safe', [
 			$row->id,
-			sft_audit_event_label( $row->event_type ),
+			folio_drawbridge_audit_event_label( $row->event_type ),
 			$row->vault_id ?? '',
 			$row->share_id ?? '',
 			$actor,
 			$row->ip_address,
 			$detail,
-			sft_format_date( $row->created_at, 'Y-m-d H:i:s' ),
+			folio_drawbridge_format_date( $row->created_at, 'Y-m-d H:i:s' ),
 		] ) );
 	}
 
@@ -66,8 +66,8 @@ function sft_maybe_export_audit_csv(): void {
 
 // ─── Tab renderer ─────────────────────────────────────────────────────────────
 
-function sft_render_tab_audit(): void {
-	$args        = sft_audit_filter_args_from_get();
+function folio_drawbridge_render_tab_audit(): void {
+	$args        = folio_drawbridge_audit_filter_args_from_get();
 	$per_page    = 25;
 	$paged       = max( 1, absint( wp_unslash( $_GET['paged'] ?? 1 ) ) );
 	$a_orderby   = sanitize_key( wp_unslash( $_GET['orderby'] ?? 'created_at' ) );
@@ -77,8 +77,8 @@ function sft_render_tab_audit(): void {
 	$args['orderby']  = $a_orderby;
 	$args['order']    = $a_order;
 
-	$rows        = sft_get_audit_logs( $args );
-	$total       = sft_count_audit_logs( $args );
+	$rows        = folio_drawbridge_get_audit_logs( $args );
+	$total       = folio_drawbridge_count_audit_logs( $args );
 	$total_pages = (int) ceil( $total / $per_page );
 
 	$f_event    = sanitize_key( wp_unslash( $_GET['f_event'] ?? '' ) );
@@ -97,13 +97,13 @@ function sft_render_tab_audit(): void {
 
 	// All distinct event types for the filter dropdown.
 	global $wpdb;
-	$event_types = $wpdb->get_col( "SELECT DISTINCT event_type FROM {$wpdb->prefix}sft_audit ORDER BY event_type ASC" ) ?: [];
+	$event_types = $wpdb->get_col( "SELECT DISTINCT event_type FROM {$wpdb->prefix}folio_drawbridge_audit ORDER BY event_type ASC" ) ?: [];
 
 	$export_url = add_query_arg(
 		array_merge(
-			[ 'page' => 'sft-pro', 'tab' => 'audit', 'sft_export_audit' => '1' ],
+			[ 'page' => 'folio-drawbridge', 'tab' => 'audit', 'folio_drawbridge_export_audit' => '1' ],
 			$filter_args,
-			[ '_wpnonce' => wp_create_nonce( 'sft_export_audit' ) ]
+			[ '_wpnonce' => wp_create_nonce( 'folio_drawbridge_export_audit' ) ]
 		),
 		admin_url( 'admin.php' )
 	);
@@ -112,10 +112,10 @@ function sft_render_tab_audit(): void {
 	<div style="display:flex; gap:20px; align-items:flex-start; margin-top:20px;">
 
 		<!-- Filter panel -->
-		<div class="sft-card sft-filter-panel" style="margin-top:0;">
+		<div class="folio-drawbridge-card folio-drawbridge-filter-panel" style="margin-top:0;">
 			<h3 style="margin-top:0;">Filter Events</h3>
 			<form method="get">
-				<input type="hidden" name="page" value="sft-pro">
+				<input type="hidden" name="page" value="folio-drawbridge">
 				<input type="hidden" name="tab"  value="audit">
 
 				<p style="margin:0 0 8px;">
@@ -124,7 +124,7 @@ function sft_render_tab_audit(): void {
 						<option value="">All</option>
 						<?php foreach ( $event_types as $et ) : ?>
 							<option value="<?php echo esc_attr( $et ); ?>" <?php selected( $f_event, $et ); ?>>
-								<?php echo esc_html( sft_audit_event_label( $et ) ); ?>
+								<?php echo esc_html( folio_drawbridge_audit_event_label( $et ) ); ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
@@ -152,7 +152,7 @@ function sft_render_tab_audit(): void {
 
 				<input type="submit" value="Apply" class="button button-primary" style="width:100%;">
 				<?php if ( $filter_args ) : ?>
-					<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) ); ?>"
+					<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) ); ?>"
 					   class="button" style="width:100%;margin-top:6px;text-align:center;box-sizing:border-box;">Clear</a>
 				<?php endif; ?>
 			</form>
@@ -160,33 +160,33 @@ function sft_render_tab_audit(): void {
 			<!-- Manual prune -->
 			<hr style="margin:16px 0;">
 			<h4 style="margin:0 0 8px;font-size:13px;">Manual Prune</h4>
-			<form method="post" action="<?php echo esc_url( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) ); ?>"
+			<form method="post" action="<?php echo esc_url( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'audit' ], admin_url( 'admin.php' ) ) ); ?>"
 			      onsubmit="return confirm('Delete all audit entries older than the specified number of days?');">
-				<?php wp_nonce_field( 'sft_admin_action', 'sft_nonce' ); ?>
+				<?php wp_nonce_field( 'folio_drawbridge_admin_action', 'folio_drawbridge_nonce' ); ?>
 				<label style="display:block;font-size:12px;margin-bottom:4px;">Keep last N days:</label>
-				<input type="number" name="sft_prune_days_manual" value="<?php echo (int) get_option( 'sft_audit_prune_days', 365 ); ?>"
+				<input type="number" name="folio_drawbridge_prune_days_manual" value="<?php echo (int) get_option( 'folio_drawbridge_audit_prune_days', 365 ); ?>"
 				       min="1" style="width:100%;margin-bottom:8px;">
-				<input type="submit" name="sft_manual_prune" value="Prune Now" class="button" style="width:100%;">
+				<input type="submit" name="folio_drawbridge_manual_prune" value="Prune Now" class="button" style="width:100%;">
 			</form>
 		</div>
 
 		<!-- Table -->
-		<div class="sft-filter-body">
+		<div class="folio-drawbridge-filter-body">
 			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
 				<span style="color:#888;font-size:13px;"><?php echo esc_html( number_format( $total ) ); ?> event<?php echo $total !== 1 ? 's' : ''; ?> found</span>
 				<a href="<?php echo esc_url( $export_url ); ?>" class="button">Export to CSV</a>
 			</div>
 
-			<?php $audit_sort_base = array_merge( [ 'page' => 'sft-pro', 'tab' => 'audit' ], $filter_args ); ?>
-			<table class="sft-table widefat striped">
+			<?php $audit_sort_base = array_merge( [ 'page' => 'folio-drawbridge', 'tab' => 'audit' ], $filter_args ); ?>
+			<table class="folio-drawbridge-table widefat striped">
 				<thead><tr>
-					<?php echo sft_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo sft_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo sft_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo sft_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo folio_drawbridge_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo folio_drawbridge_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo folio_drawbridge_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo folio_drawbridge_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 					<th data-nosort>IP</th>
 					<th data-nosort>Details</th>
-					<?php echo sft_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php echo folio_drawbridge_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
 				</tr></thead>
 				<tbody>
 				<?php if ( ! $rows ) : ?>
@@ -201,23 +201,23 @@ function sft_render_tab_audit(): void {
 						? implode( '; ', array_map( fn( $k, $v ) => "{$k}: {$v}", array_keys( $detail ), $detail ) )
 						: '';
 					$vault_link = $row->vault_id
-						? '<a href="' . esc_url( add_query_arg( [ 'page' => 'sft-pro', 'tab' => 'vaults', 'vault_id' => (int) $row->vault_id ], admin_url( 'admin.php' ) ) ) . '">#' . (int) $row->vault_id . '</a>'
+						? '<a href="' . esc_url( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => (int) $row->vault_id ], admin_url( 'admin.php' ) ) ) . '">#' . (int) $row->vault_id . '</a>'
 						: '—';
 				?>
 					<tr>
-						<td><strong><?php echo esc_html( sft_audit_event_label( $row->event_type ) ); ?></strong></td>
+						<td><strong><?php echo esc_html( folio_drawbridge_audit_event_label( $row->event_type ) ); ?></strong></td>
 						<td><?php echo $vault_link; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built above from esc_url/esc_html parts. ?></td>
 						<td><?php echo $row->share_id ? '#' . (int) $row->share_id : '—'; ?></td>
 						<td><?php echo $actor ? esc_html( $actor->user_login ) : '<em>system</em>'; ?></td>
 						<td style="font-size:11px;color:#888;"><?php echo esc_html( $row->ip_address ); ?></td>
 						<td style="font-size:12px;color:#666;max-width:260px;word-break:break-word;"><?php echo esc_html( $detail_str ); ?></td>
-						<td style="color:#888;white-space:nowrap;font-size:12px;"><?php echo esc_html( sft_format_date( $row->created_at ) ); ?></td>
+						<td style="color:#888;white-space:nowrap;font-size:12px;"><?php echo esc_html( folio_drawbridge_format_date( $row->created_at ) ); ?></td>
 					</tr>
 				<?php endforeach; endif; ?>
 				</tbody>
 			</table>
 
-			<?php sft_render_pagination( $paged, $total_pages, array_merge( [ 'tab' => 'audit' ], $filter_args ) ); ?>
+			<?php folio_drawbridge_render_pagination( $paged, $total_pages, array_merge( [ 'tab' => 'audit' ], $filter_args ) ); ?>
 		</div>
 	</div>
 	<?php
@@ -225,7 +225,7 @@ function sft_render_tab_audit(): void {
 
 // ─── Helper: extract filter args from $_GET ───────────────────────────────────
 
-function sft_audit_filter_args_from_get(): array {
+function folio_drawbridge_audit_filter_args_from_get(): array {
 	$f_from    = sanitize_text_field( wp_unslash( $_GET['f_from'] ?? '' ) );
 	$f_to      = sanitize_text_field( wp_unslash( $_GET['f_to'] ?? '' ) );
 	$f_details = sanitize_text_field( wp_unslash( $_GET['f_details'] ?? '' ) );

@@ -10,7 +10,7 @@
  * The dashboard auto-discovers installed plugins whose folder starts with
  * "folio-" and shows the suite at a glance.
  *
- * @package FolioDrawbridge
+ * @package Folio_Drawbridge
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -98,7 +98,7 @@ class Folio_Drawbridge_Hub {
 			'folio-drawbridge' => array(
 				'name' => __( 'Folio Drawbridge', 'folio-drawbridge' ),
 				'desc' => __( 'Encrypted file vaults with secure, two-factor external sharing.', 'folio-drawbridge' ),
-				'page' => 'sft-pro',
+				'page' => 'folio-drawbridge',
 			),
 			'folio-keep'       => array(
 				'name' => __( 'Folio Keep', 'folio-drawbridge' ),
