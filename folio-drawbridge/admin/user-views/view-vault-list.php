@@ -50,12 +50,12 @@ function folio_drawbridge_render_user_vault_list(): void {
 		<?php else : ?>
 			<table class="folio-drawbridge-table widefat striped">
 				<thead><tr>
-					<?php echo folio_drawbridge_sortable_th( 'Vault Name', 'name',       $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo folio_drawbridge_sortable_th( 'Status',     'status',     $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Vault Name', 'name',       $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<?php folio_drawbridge_sortable_th( 'Status',     'status',     $vl_orderby, $vl_order, $vl_sort_base ); ?>
 					<th data-nosort>Files</th>
 					<th data-nosort>Shares</th>
-					<?php echo folio_drawbridge_sortable_th( 'Created',    'created_at', $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo folio_drawbridge_sortable_th( 'Expires',    'expires_at', $vl_orderby, $vl_order, $vl_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Created',    'created_at', $vl_orderby, $vl_order, $vl_sort_base ); ?>
+					<?php folio_drawbridge_sortable_th( 'Expires',    'expires_at', $vl_orderby, $vl_order, $vl_sort_base ); ?>
 					<th data-nosort></th>
 				</tr></thead>
 				<tbody>

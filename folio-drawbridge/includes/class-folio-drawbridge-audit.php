@@ -129,18 +129,13 @@ function folio_drawbridge_csv_safe( $value ): string {
 // ─── SIEM file logger ─────────────────────────────────────────────────────────
 
 /**
- * Returns why a SIEM log path must be refused, or '' when it is acceptable.
+ * Returns why an operator-supplied SIEM log path must be refused, or '' when it
+ * is acceptable.
  *
- * The log receives attacker-influenced text — a recipient's typed email is
- * recorded on OTP mismatch, and filenames come from uploads — so the
- * destination must never be a file the web server can execute or serve.
- * Required: an absolute path, no traversal, outside the WordPress directory,
- * and a non-executable extension.
- *
- * Settings validates a path before storing it, and the writer checks again
- * before every append. The second check is not redundant: a path stored before
- * this rule existed is still sitting in the options table, and only the writer
- * is in a position to refuse it.
+ * Only reachable through the FOLIO_DRAWBRIDGE_SIEM_PATH constant. The log
+ * receives attacker-influenced text — a recipient's typed email is recorded on
+ * OTP mismatch, and filenames come from uploads — so the destination must never
+ * be a file the web server can execute or serve.
  *
  * @param string $path Candidate log path.
  * @return string Empty when acceptable, otherwise a human-readable reason.
@@ -170,11 +165,42 @@ function folio_drawbridge_siem_path_error( string $path ): string {
 }
 
 /**
+ * Returns the file the SIEM log is written to, or '' when it cannot be used.
+ *
+ * The default sits inside this plugin's uploads directory, alongside the vaults
+ * and upload staging, protected by the same .htaccess and index.php guards.
+ * Plugins are not permitted to write outside the uploads directory, and the
+ * previous behaviour — an operator-supplied absolute path entered through a
+ * settings field — is exactly what that rule prohibits.
+ *
+ * Sites that must feed an agent reading from somewhere like /var/log can still
+ * do so by defining FOLIO_DRAWBRIDGE_SIEM_PATH in wp-config.php. That is a
+ * deliberate server-level decision made in code by whoever administers the
+ * machine, rather than the plugin writing wherever a web form points it, and it
+ * is still validated before every append.
+ */
+function folio_drawbridge_siem_log_file(): string {
+	if ( defined( 'FOLIO_DRAWBRIDGE_SIEM_PATH' ) && FOLIO_DRAWBRIDGE_SIEM_PATH ) {
+		$path = (string) FOLIO_DRAWBRIDGE_SIEM_PATH;
+
+		return folio_drawbridge_siem_path_error( $path ) === '' ? $path : '';
+	}
+
+	$dir = folio_drawbridge_logs_dir();
+	folio_drawbridge_ensure_protected_dir( $dir );
+
+	$ext = get_option( 'folio_drawbridge_siem_format', 'json' ) === 'csv' ? 'csv' : 'log';
+
+	return $dir . 'audit.' . $ext;
+}
+
+
+/**
  * Appends an audit event to the SIEM log file if file logging is enabled.
  *
  * Controlled by three options set in Settings:
  *   folio_drawbridge_siem_enabled   — '1' to enable
- *   folio_drawbridge_siem_log_path  — absolute path to the log file
+ *   (path resolved by folio_drawbridge_siem_log_file())
  *   folio_drawbridge_siem_format    — 'json' (one JSON object per line) or 'csv'
  *
  * The file is written with LOCK_EX so concurrent requests don't interleave.
@@ -193,7 +219,7 @@ function folio_drawbridge_siem_write(
 		return;
 	}
 
-	$path = trim( (string) get_option( 'folio_drawbridge_siem_log_path', '' ) );
+	$path = folio_drawbridge_siem_log_file();
 	if ( ! $path ) {
 		return;
 	}
@@ -201,9 +227,6 @@ function folio_drawbridge_siem_write(
 	// A stored path may predate the validation in Settings. Never append to a
 	// location the web server could serve or execute; the event is still in the
 	// database audit log either way.
-	if ( folio_drawbridge_siem_path_error( $path ) !== '' ) {
-		return;
-	}
 
 	$format = get_option( 'folio_drawbridge_siem_format', 'json' );
 

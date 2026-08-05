@@ -28,7 +28,7 @@ Folio Drawbridge lets authenticated WordPress users upload files into named **va
 * **Download notifications and expiry warnings** — vault owners are emailed on recipient downloads and before share links expire.
 * **Customisable email templates** — subject and body for all four system emails with `{placeholder}` tokens.
 * **Immutable audit log** — every event logged with actor, IP, and timestamp. Filterable, sortable, exportable to CSV.
-* **SIEM logging** — append every audit event to an OS log file in JSON (NDJSON) or CSV for Splunk, Datadog, ELK, and similar tools.
+* **SIEM logging** — append every audit event to a log file in JSON (NDJSON) or CSV for Splunk, Datadog, ELK, and similar tools. Written inside your uploads directory and protected from direct web access; redirectable with a `wp-config.php` constant.
 * **Vault inspector** — administrators can browse every vault, download files, edit metadata, transfer ownership, and revoke shares. All actions audited.
 
 = Part of the Folio suite =
@@ -57,6 +57,17 @@ Encrypted files cannot be recovered without the master key. If you define `FOLIO
 = Do share recipients need a WordPress account? =
 
 No. Recipients verify their identity with their email address and a one-time code — no account or login required.
+
+= Where does the plugin write files? =
+
+Everything lives in one folder inside your uploads directory, named `folio-drawbridge`
+by default and changeable under Settings → Storage:
+
+* `vaults/` — encrypted files
+* `chunks/` — temporary upload staging
+* `logs/` — SIEM export, when enabled
+
+Each is protected from direct web access. The plugin writes nowhere else.
 
 = Can I limit how many times a share link is used? =
 

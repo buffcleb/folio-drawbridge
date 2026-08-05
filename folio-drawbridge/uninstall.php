@@ -109,7 +109,6 @@ $options = [
 	'folio_drawbridge_audit_prune_days',
 	// SIEM logging.
 	'folio_drawbridge_siem_enabled',
-	'folio_drawbridge_siem_log_path',
 	'folio_drawbridge_siem_format',
 	// Email templates.
 	'folio_drawbridge_email_invite_subject',

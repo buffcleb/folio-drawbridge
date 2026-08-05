@@ -154,23 +154,49 @@ Files are uploaded in chunks computed from the server's `upload_max_filesize` an
 
 ## SIEM Logging
 
-Writes every audit event to an OS-level log file for ingestion by SIEM tools (Splunk, Datadog, ELK, etc.).
+Writes every audit event to a log file for ingestion by SIEM tools (Splunk, Datadog, ELK, etc.).
 
 | Setting | Description |
 |---|---|
 | Enable SIEM Log | Turns file-based logging on or off |
-| Log File Path | Absolute path to the log file. Must be **outside** the WordPress directory and must not use an executable or web-servable extension (`.php`, `.html`, …). Directory must exist and be writable. |
+| Log File | Read-only. Shows where events are written. |
 | Log Format | JSON (NDJSON — one object per line) or CSV |
 
 Both formats include: `timestamp_utc`, `event`, `vault_id`, `share_id`, `actor_id`, `ip`, `details`, `site`.
 
-**Requirements:**
-- Path must be an absolute path (e.g. `/Sites/secure-download/app/public/folio-drawbridge-events.json`).
-- Path must not contain `..` segments.
-- The directory must already exist; the file is created on first write.
-- The web server process must have write permission to the directory.
+### Where the log is written
 
-If the path fails validation, the previous value is retained and a warning is shown. The invalid path is never saved.
+By default:
+
+```
+wp-content/uploads/<storage folder>/logs/audit.log     (JSON format)
+wp-content/uploads/<storage folder>/logs/audit.csv     (CSV format)
+```
+
+The directory carries the same `.htaccess` and `index.php` guards as the encrypted
+vaults, so the log cannot be requested over the web. Point your SIEM agent at this file.
+
+Plugins are not permitted to write outside the uploads directory, which is why the
+destination is no longer a free-text setting.
+
+### Writing somewhere else
+
+If your collector already tails a specific path, define it in `wp-config.php`:
+
+```php
+define( 'FOLIO_DRAWBRIDGE_SIEM_PATH', '/var/log/folio-drawbridge-audit.log' );
+```
+
+This is a deliberate server-level decision made by whoever administers the machine,
+rather than the plugin writing wherever a web form points it. The path is validated
+before every append and must:
+
+- be absolute, with no `..` segments;
+- sit **outside** the WordPress directory, so it can never be served;
+- not use an executable or web-servable extension (`.php`, `.html`, `.js`, …).
+
+If it fails any of these, nothing is written to it and the Settings screen says so.
+The event is still recorded in the database audit log either way.
 
 ![Admin Dashboard - Full](/images/AdminDashboard_Settings_SIEMLogging.jpg)
 

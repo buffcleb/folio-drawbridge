@@ -180,13 +180,13 @@ function folio_drawbridge_render_tab_audit(): void {
 			<?php $audit_sort_base = array_merge( [ 'page' => 'folio-drawbridge', 'tab' => 'audit' ], $filter_args ); ?>
 			<table class="folio-drawbridge-table widefat striped">
 				<thead><tr>
-					<?php echo folio_drawbridge_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo folio_drawbridge_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo folio_drawbridge_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
-					<?php echo folio_drawbridge_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Event',     'event_type', $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php folio_drawbridge_sortable_th( 'Vault',     'vault_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php folio_drawbridge_sortable_th( 'Share',     'share_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
+					<?php folio_drawbridge_sortable_th( 'Actor',     'actor_id',   $a_orderby, $a_order, $audit_sort_base ); ?>
 					<th data-nosort>IP</th>
 					<th data-nosort>Details</th>
-					<?php echo folio_drawbridge_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML. ?>
+					<?php folio_drawbridge_sortable_th( 'Date/Time', 'created_at', $a_orderby, $a_order, $audit_sort_base ); ?>
 				</tr></thead>
 				<tbody>
 				<?php if ( ! $rows ) : ?>
@@ -200,13 +200,19 @@ function folio_drawbridge_render_tab_audit(): void {
 					$detail_str = $detail
 						? implode( '; ', array_map( fn( $k, $v ) => "{$k}: {$v}", array_keys( $detail ), $detail ) )
 						: '';
-					$vault_link = $row->vault_id
-						? '<a href="' . esc_url( add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => (int) $row->vault_id ], admin_url( 'admin.php' ) ) ) . '">#' . (int) $row->vault_id . '</a>'
-						: '—';
+					$vault_url = $row->vault_id
+						? add_query_arg( [ 'page' => 'folio-drawbridge', 'tab' => 'vaults', 'vault_id' => (int) $row->vault_id ], admin_url( 'admin.php' ) )
+						: '';
 				?>
 					<tr>
 						<td><strong><?php echo esc_html( folio_drawbridge_audit_event_label( $row->event_type ) ); ?></strong></td>
-						<td><?php echo $vault_link; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built above from esc_url/esc_html parts. ?></td>
+						<td>
+							<?php if ( $vault_url ) : ?>
+								<a href="<?php echo esc_url( $vault_url ); ?>">#<?php echo (int) $row->vault_id; ?></a>
+							<?php else : ?>
+								—
+							<?php endif; ?>
+						</td>
 						<td><?php echo $row->share_id ? '#' . (int) $row->share_id : '—'; ?></td>
 						<td><?php echo $actor ? esc_html( $actor->user_login ) : '<em>system</em>'; ?></td>
 						<td style="font-size:11px;color:#888;"><?php echo esc_html( $row->ip_address ); ?></td>
