@@ -245,7 +245,14 @@ function folio_drawbridge_share_page_header( string $site_name, string $home_url
 
 function folio_drawbridge_share_page_footer(): void {
 	?>
-<div class="folio-drawbridge-footer">Secured by Folio Drawbridge &mdash; <a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a></div>
+<?php
+	// Only the site's own identity appears here. Guideline 10 requires any
+	// "Powered By" credit on a public-facing page to be optional and to default
+	// to not showing, and a recipient gains nothing from being told which plugin
+	// served the page — whereas knowing whose site sent them the files is real
+	// context for deciding whether to trust the download.
+	?>
+<div class="folio-drawbridge-footer"><a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a></div>
 </div>
 <?php wp_footer(); ?>
 </body></html>
