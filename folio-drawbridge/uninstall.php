@@ -83,7 +83,9 @@ function folio_drawbridge_uninstall(): void {
 	];
 
 	foreach ( $tables as $table ) {
-		$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" ); // phpcs:ignore WordPress.DB.PreparedSQL
+		// %i quotes the table name as an identifier, so nothing is concatenated
+		// into the statement even though these names are plugin constants.
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $table ) );
 	}
 
 	// ─── Remove all plugin options ────────────────────────────────────────────────
@@ -138,7 +140,11 @@ function folio_drawbridge_uninstall(): void {
 
 	// ─── Remove any leftover transients ──────────────────────────────────────────
 
-	$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_folio_drawbridge_dl_%' OR option_name LIKE '_transient_timeout_folio_drawbridge_dl_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL
+	$wpdb->query( $wpdb->prepare(
+		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+		$wpdb->esc_like( '_transient_folio_drawbridge_dl_' ) . '%',
+		$wpdb->esc_like( '_transient_timeout_folio_drawbridge_dl_' ) . '%'
+	) );
 }
 
 folio_drawbridge_uninstall();

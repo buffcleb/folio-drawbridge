@@ -93,26 +93,35 @@ function folio_drawbridge_get_user_vaults( int $owner_id, array $args = [] ): ar
 	$per_page = (int) ( $args['per_page'] ?? 0 ); // 0 = no limit
 	$paged    = max( 1, (int) ( $args['paged'] ?? 1 ) );
 
-	$where  = [ 'owner_id = %d' ];
+	$allowed_cols = [ 'name', 'status', 'created_at', 'expires_at' ];
+	$orderby      = in_array( $args['orderby'] ?? '', $allowed_cols, true ) ? $args['orderby'] : 'created_at';
+
+	// Every fragment appended below is a string literal. Caller input reaches
+	// the statement only as a placeholder value in $values, so the finished
+	// query is entirely built from constants plus $wpdb->prepare() arguments.
+	$sql    = "SELECT * FROM {$wpdb->prefix}folio_drawbridge_vaults WHERE owner_id = %d";
 	$values = [ $owner_id ];
 
 	if ( $status ) {
-		$where[]  = 'status = %s';
+		$sql     .= ' AND status = %s';
 		$values[] = $status;
 	}
 
-	$allowed_cols = [ 'name', 'status', 'created_at', 'expires_at' ];
-	$orderby = in_array( $args['orderby'] ?? '', $allowed_cols, true ) ? $args['orderby'] : 'created_at';
-	$order   = strtoupper( $args['order'] ?? 'DESC' ) === 'ASC' ? 'ASC' : 'DESC';
+	// %i is the identifier placeholder: $wpdb quotes it as a column name, so
+	// the sort column is never concatenated into the SQL as raw text. The
+	// whitelist above still applies, which keeps an unknown column from
+	// reaching the database and erroring out.
+	$sql     .= strtoupper( $args['order'] ?? 'DESC' ) === 'ASC' ? ' ORDER BY %i ASC' : ' ORDER BY %i DESC';
+	$values[] = $orderby;
 
-	$where_sql = 'WHERE ' . implode( ' AND ', $where );
-	$limit_sql = $per_page > 0 ? $wpdb->prepare( 'LIMIT %d OFFSET %d', $per_page, ( $paged - 1 ) * $per_page ) : '';
+	if ( $per_page > 0 ) {
+		$sql     .= ' LIMIT %d OFFSET %d';
+		$values[] = $per_page;
+		$values[] = ( $paged - 1 ) * $per_page;
+	}
 
-	// Interpolated fragments are safe: $orderby/$order come from the whitelists
-	// above, $where_sql holds only literal "%d"/"%s" placeholder clauses whose
-	// values are in $values, and $limit_sql is pre-prepared.
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, PluginCheck.Security.DirectDB.UnescapedDBParameter
-	return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}folio_drawbridge_vaults {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}", $values ) ) ?: [];
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $sql is assembled from string literals only; every caller-supplied value is a placeholder passed in $values.
+	return $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [];
 }
 
 /**
@@ -121,34 +130,43 @@ function folio_drawbridge_get_user_vaults( int $owner_id, array $args = [] ): ar
 function folio_drawbridge_get_all_vaults( array $args = [] ): array {
 	global $wpdb;
 
-	[ $where_sql, $values, $limit_sql, $orderby, $order ] = folio_drawbridge_vaults_query_parts( $args );
+	[ $filter_sql, $values, $orderby, $ascending, $per_page, $paged ] = folio_drawbridge_vaults_query_parts( $args );
 
+	// "WHERE 1 = %d" seeds the clause list with a placeholder so that every
+	// path through this function ends in $wpdb->prepare(), including the
+	// unfiltered one. prepare() refuses a query with no placeholders at all.
 	$sql = "SELECT v.*, u.user_login as owner_login FROM {$wpdb->prefix}folio_drawbridge_vaults v
 	        LEFT JOIN {$wpdb->users} u ON u.ID = v.owner_id
-	        {$where_sql} ORDER BY {$orderby} {$order} {$limit_sql}";
+	        WHERE 1 = %d";
+	array_unshift( $values, 1 );
 
-	// Safe interpolation: whitelisted orderby/order, placeholder-only WHERE with
-	// values in $values, integer-cast LIMIT (see folio_drawbridge_vaults_query_parts()).
-	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-	return $values
-		? ( $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [] )
-		: ( $wpdb->get_results( $sql ) ?: [] );
-	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	$sql     .= $filter_sql;
+	$sql     .= $ascending ? ' ORDER BY v.%i ASC' : ' ORDER BY v.%i DESC';
+	$values[] = $orderby;
+
+	if ( $per_page > 0 ) {
+		$sql     .= ' LIMIT %d OFFSET %d';
+		$values[] = $per_page;
+		$values[] = ( $paged - 1 ) * $per_page;
+	}
+
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $sql is assembled from string literals only; every caller-supplied value is a placeholder passed in $values.
+	return $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [];
 }
 
 function folio_drawbridge_count_all_vaults( array $args = [] ): int {
 	global $wpdb;
 
-	[ $where_sql, $values ] = folio_drawbridge_vaults_query_parts( $args );
+	[ $filter_sql, $values ] = folio_drawbridge_vaults_query_parts( $args );
 
-	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults v {$where_sql}";
+	// See folio_drawbridge_get_all_vaults() for why the WHERE opens with a placeholder.
+	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults v WHERE 1 = %d";
+	array_unshift( $values, 1 );
 
-	// Safe interpolation: placeholder-only WHERE, values in $values (see above).
-	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-	return (int) ( $values
-		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
-		: $wpdb->get_var( $sql ) );
-	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	$sql .= $filter_sql;
+
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $sql is assembled from string literals only; every caller-supplied value is a placeholder passed in $values.
+	return (int) $wpdb->get_var( $wpdb->prepare( $sql, $values ) );
 }
 
 /**
@@ -156,37 +174,40 @@ function folio_drawbridge_count_all_vaults( array $args = [] ): int {
  * folio_drawbridge_count_all_vaults() so the filtering logic lives in one place.
  *
  * @internal
- * @return array{ string, array, string, string, string } [where_sql, values, limit_sql, orderby, order]
+ * @return array{ string, array, string, bool, int, int } [filter_sql, values, orderby, ascending, per_page, paged]
  */
 function folio_drawbridge_vaults_query_parts( array $args ): array {
-	$where  = [];
-	$values = [];
+	global $wpdb;
+
+	// Each clause is a literal carrying only placeholders; the matching value
+	// is pushed onto $values in the same order, ready for $wpdb->prepare().
+	$filter_sql = '';
+	$values     = [];
 
 	if ( ! empty( $args['status'] ) ) {
-		$where[]  = 'v.status = %s';
-		$values[] = sanitize_key( $args['status'] );
+		$filter_sql .= ' AND v.status = %s';
+		$values[]    = sanitize_key( $args['status'] );
 	}
 	if ( ! empty( $args['owner_id'] ) ) {
-		$where[]  = 'v.owner_id = %d';
-		$values[] = (int) $args['owner_id'];
+		$filter_sql .= ' AND v.owner_id = %d';
+		$values[]    = (int) $args['owner_id'];
 	}
 	if ( ! empty( $args['search'] ) ) {
-		$where[]  = 'v.name LIKE %s';
-		global $wpdb;
-		$values[] = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+		$filter_sql .= ' AND v.name LIKE %s';
+		$values[]    = '%' . $wpdb->esc_like( $args['search'] ) . '%';
 	}
 
-	$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
-
+	// Bare column name only: %i quotes its argument as a single identifier, so
+	// a qualified "v.created_at" would become `v.created_at` and fail. The
+	// table alias stays a literal in the ORDER BY clause instead.
 	$allowed_cols = [ 'name', 'status', 'created_at', 'expires_at' ];
-	$orderby  = in_array( $args['orderby'] ?? '', $allowed_cols, true ) ? ( 'v.' . $args['orderby'] ) : 'v.created_at';
-	$order    = strtoupper( $args['order'] ?? 'DESC' ) === 'ASC' ? 'ASC' : 'DESC';
+	$orderby      = in_array( $args['orderby'] ?? '', $allowed_cols, true ) ? $args['orderby'] : 'created_at';
+	$ascending    = strtoupper( $args['order'] ?? 'DESC' ) === 'ASC';
 
-	$per_page  = (int) ( $args['per_page'] ?? 25 );
-	$paged     = max( 1, (int) ( $args['paged'] ?? 1 ) );
-	$limit_sql = $per_page > 0 ? "LIMIT {$per_page} OFFSET " . ( ( $paged - 1 ) * $per_page ) : '';
+	$per_page = (int) ( $args['per_page'] ?? 25 );
+	$paged    = max( 1, (int) ( $args['paged'] ?? 1 ) );
 
-	return [ $where_sql, $values, $limit_sql, $orderby, $order ];
+	return [ $filter_sql, $values, $orderby, $ascending, $per_page, $paged ];
 }
 
 /**
@@ -755,15 +776,18 @@ function folio_drawbridge_get_vaults_by_owner( array $owner_ids ): array {
 		return $by_owner;
 	}
 
-	// Safe interpolation: every element was cast to int above.
-	$in = implode( ',', $owner_ids );
+	// One %d per ID, with the IDs themselves passed to prepare() as values.
+	$placeholders = implode( ',', array_fill( 0, count( $owner_ids ), '%d' ) );
 
-	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 	$rows = $wpdb->get_results(
-		"SELECT id, name, status, owner_id FROM {$wpdb->prefix}folio_drawbridge_vaults
-		  WHERE owner_id IN ({$in}) ORDER BY created_at DESC"
+		$wpdb->prepare(
+			"SELECT id, name, status, owner_id FROM {$wpdb->prefix}folio_drawbridge_vaults
+			  WHERE owner_id IN ({$placeholders}) ORDER BY created_at DESC",
+			$owner_ids
+		)
 	) ?: [];
-	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	foreach ( $rows as $row ) {
 		$by_owner[ (int) $row->owner_id ][] = $row;
@@ -834,15 +858,19 @@ function folio_drawbridge_group_rows_by_vault( array $vault_ids, string $table, 
 		return $grouped;
 	}
 
-	// Safe interpolation: IDs are int-cast above; $table and $order_by come from
-	// the two wrappers as literals and never carry request data.
-	$in = implode( ',', $vault_ids );
+	// The table and sort column go through %i, the identifier placeholder, so
+	// neither is concatenated into the SQL; the whitelist check above still
+	// runs first so an unknown name fails loudly rather than at the database.
+	$placeholders = implode( ',', array_fill( 0, count( $vault_ids ), '%d' ) );
 
-	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 	$rows = $wpdb->get_results(
-		"SELECT * FROM {$wpdb->prefix}{$table} WHERE vault_id IN ({$in}) ORDER BY {$order_by} DESC"
+		$wpdb->prepare(
+			"SELECT * FROM %i WHERE vault_id IN ({$placeholders}) ORDER BY %i DESC",
+			array_merge( [ $wpdb->prefix . $table ], $vault_ids, [ $order_by ] )
+		)
 	) ?: [];
-	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	foreach ( $rows as $row ) {
 		$grouped[ (int) $row->vault_id ][] = $row;
@@ -878,20 +906,28 @@ function folio_drawbridge_get_vault_counts( array $vault_ids ): array {
 		return $counts;
 	}
 
-	// Safe interpolation: every element was cast to int above.
-	$in = implode( ',', $vault_ids );
+	// One %d per ID; the IDs are passed to prepare() rather than inlined.
+	$placeholders = implode( ',', array_fill( 0, count( $vault_ids ), '%d' ) );
 
-	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 	$files = $wpdb->get_results(
-		"SELECT vault_id, COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b
-		   FROM {$wpdb->prefix}folio_drawbridge_files WHERE vault_id IN ({$in}) GROUP BY vault_id"
+		$wpdb->prepare(
+			"SELECT vault_id, COUNT(*) AS c, COALESCE(SUM(file_size),0) AS b
+			   FROM {$wpdb->prefix}folio_drawbridge_files WHERE vault_id IN ({$placeholders}) GROUP BY vault_id",
+			$vault_ids
+		)
 	) ?: [];
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 	$shares = $wpdb->get_results(
-		"SELECT vault_id, COUNT(*) AS c
-		   FROM {$wpdb->prefix}folio_drawbridge_shares WHERE vault_id IN ({$in}) GROUP BY vault_id"
+		$wpdb->prepare(
+			"SELECT vault_id, COUNT(*) AS c
+			   FROM {$wpdb->prefix}folio_drawbridge_shares WHERE vault_id IN ({$placeholders}) GROUP BY vault_id",
+			$vault_ids
+		)
 	) ?: [];
-	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	foreach ( $files as $row ) {
 		$counts[ (int) $row->vault_id ]['files'] = (int) $row->c;

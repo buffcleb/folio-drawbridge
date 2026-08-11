@@ -1,7 +1,7 @@
 === Folio Drawbridge ===
 Contributors: buffcleb
 Tags: encryption, file-sharing, secure-files, two-factor, audit-log
-Requires at least: 5.3
+Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
 Stable tag: 1.2.0

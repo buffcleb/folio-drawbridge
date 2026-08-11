@@ -691,63 +691,79 @@ function folio_drawbridge_enforce_share_limits(): int {
 	) );
 	$exempt = array_values( array_unique( $exempt ) );
 
-	// Values are integers cast above; an empty list needs a never-matching id.
-	$not_exempt = 'v.owner_id NOT IN (' . ( $exempt ? implode( ',', $exempt ) : '0' ) . ')';
-
-	$shares = $wpdb->prefix . 'folio_drawbridge_shares';
-	$vaults = $wpdb->prefix . 'folio_drawbridge_vaults';
+	// An empty exempt list still needs one placeholder, filled with a
+	// never-matching id, so the NOT IN clause stays syntactically valid.
+	if ( ! $exempt ) {
+		$exempt = [ 0 ];
+	}
+	$exempt_placeholders = implode( ',', array_fill( 0, count( $exempt ), '%d' ) );
 
 	// Every statement below targets the same rows: non-admin-owned shares that
-	// are still pending or active. Written out in full rather than assembled
-	// from a template — a placeholder-bearing string built by str_replace() is
-	// hard to read and hard to verify against $wpdb->prepare()'s argument list.
-	$join  = "JOIN {$vaults} v ON v.id = s.vault_id";
-	$where = "WHERE s.status IN ('pending','active') AND {$not_exempt}";
-
+	// are still pending or active. Each is written out in full rather than
+	// assembled from a shared template, so that the placeholders in the query
+	// can be read against the argument list directly beneath it.
 	$updated = 0;
-
-	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $join/$where are built from $wpdb->prefix and an int-only ID list; all values are prepared.
 
 	// Unlimited no longer permitted: give limitless shares the default.
 	if ( ! $allow_unlimited && $default_dl > 0 ) {
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			"UPDATE {$shares} s {$join} SET s.max_downloads = %d {$where} AND s.max_downloads = 0",
-			$default_dl
+			"UPDATE {$wpdb->prefix}folio_drawbridge_shares s
+			   JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = s.vault_id
+			    SET s.max_downloads = %d
+			  WHERE s.status IN ('pending','active')
+			    AND v.owner_id NOT IN ({$exempt_placeholders})
+			    AND s.max_downloads = 0",
+			array_merge( [ $default_dl ], $exempt )
 		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
 
 	// Apply the ceiling to anything above it, and to unlimited shares.
 	if ( $ceiling > 0 ) {
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			"UPDATE {$shares} s {$join} SET s.max_downloads = %d {$where} AND ( s.max_downloads = 0 OR s.max_downloads > %d )",
-			$ceiling,
-			$ceiling
+			"UPDATE {$wpdb->prefix}folio_drawbridge_shares s
+			   JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = s.vault_id
+			    SET s.max_downloads = %d
+			  WHERE s.status IN ('pending','active')
+			    AND v.owner_id NOT IN ({$exempt_placeholders})
+			    AND ( s.max_downloads = 0 OR s.max_downloads > %d )",
+			array_merge( [ $ceiling ], $exempt, [ $ceiling ] )
 		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
 
 	// No-expiry no longer permitted: give open-ended shares the default window.
 	if ( ! $allow_no_expiry && $default_expiry > 0 ) {
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			"UPDATE {$shares} s {$join}
+			"UPDATE {$wpdb->prefix}folio_drawbridge_shares s
+			   JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = s.vault_id
 			    SET s.expires_at = DATE_ADD( UTC_TIMESTAMP(), INTERVAL %d DAY )
-			  {$where} AND s.expires_at IS NULL",
-			$default_expiry
+			  WHERE s.status IN ('pending','active')
+			    AND v.owner_id NOT IN ({$exempt_placeholders})
+			    AND s.expires_at IS NULL",
+			array_merge( [ $default_expiry ], $exempt )
 		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
 
 	// Pull anything expiring beyond the maximum window back to it.
 	if ( $max_days > 0 ) {
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the only interpolated value is a generated list of %d placeholders, one per ID; the IDs themselves are passed to prepare() as arguments. PHPCS cannot count placeholders it did not see written literally.
 		$updated += (int) $wpdb->query( $wpdb->prepare(
-			"UPDATE {$shares} s {$join}
+			"UPDATE {$wpdb->prefix}folio_drawbridge_shares s
+			   JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = s.vault_id
 			    SET s.expires_at = DATE_ADD( UTC_TIMESTAMP(), INTERVAL %d DAY )
-			  {$where} AND s.expires_at IS NOT NULL
+			  WHERE s.status IN ('pending','active')
+			    AND v.owner_id NOT IN ({$exempt_placeholders})
+			    AND s.expires_at IS NOT NULL
 			    AND s.expires_at > DATE_ADD( UTC_TIMESTAMP(), INTERVAL %d DAY )",
-			$max_days,
-			$max_days
+			array_merge( [ $max_days ], $exempt, [ $max_days ] )
 		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
-
-	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 	return $updated;
 }

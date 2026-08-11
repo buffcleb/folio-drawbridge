@@ -4,7 +4,7 @@
 
 | Requirement | Minimum |
 |---|---|
-| WordPress | 5.3 |
+| WordPress | 6.2 |
 | PHP | 7.4 |
 | PHP extensions | `openssl`, `mbstring` |
 | PHP extensions (optional) | `zip` — required for ZIP bulk download on recipient pages |

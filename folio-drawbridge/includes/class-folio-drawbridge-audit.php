@@ -358,19 +358,24 @@ function folio_drawbridge_get_audit_logs( array $args = [] ): array {
 		$orderby = 'id';
 	}
 
-	$order   = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
-
-	[ $where_sql, $values ] = folio_drawbridge_audit_build_where( $args );
+	[ $filter_sql, $values ] = folio_drawbridge_audit_build_where( $args );
 
 	$per_page = max( 1, (int) $args['per_page'] );
 	$offset   = ( max( 1, (int) $args['paged'] ) - 1 ) * $per_page;
 
-	$sql = "SELECT * FROM {$wpdb->prefix}folio_drawbridge_audit {$where_sql} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
+	// "WHERE 1 = %d" keeps a placeholder in every variant of this query, so the
+	// unfiltered case still goes through prepare(); %i quotes the sort column.
+	$sql = "SELECT * FROM {$wpdb->prefix}folio_drawbridge_audit WHERE 1 = %d";
+	array_unshift( $values, 1 );
+
+	$sql     .= $filter_sql;
+	$sql     .= strtoupper( $args['order'] ) === 'ASC' ? ' ORDER BY %i ASC' : ' ORDER BY %i DESC';
+	$values[] = $orderby;
+
+	$sql .= ' LIMIT %d OFFSET %d';
 	array_push( $values, $per_page, $offset );
 
-	// Safe interpolation: $orderby/$order come from the whitelists above and
-	// $where_sql holds only placeholder clauses whose values are in $values.
-	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $sql is assembled from string literals only; every caller-supplied value is a placeholder passed in $values.
 	return $wpdb->get_results( $wpdb->prepare( $sql, $values ) ) ?: [];
 }
 
@@ -380,16 +385,16 @@ function folio_drawbridge_get_audit_logs( array $args = [] ): array {
 function folio_drawbridge_count_audit_logs( array $args = [] ): int {
 	global $wpdb;
 
-	[ $where_sql, $values ] = folio_drawbridge_audit_build_where( $args );
+	[ $filter_sql, $values ] = folio_drawbridge_audit_build_where( $args );
 
-	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit {$where_sql}";
+	// See folio_drawbridge_get_audit_logs() for why the WHERE opens with a placeholder.
+	$sql = "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit WHERE 1 = %d";
+	array_unshift( $values, 1 );
 
-	// Safe interpolation: placeholder-only WHERE, values in $values (see folio_drawbridge_audit_build_where()).
-	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-	return (int) ( $values
-		? $wpdb->get_var( $wpdb->prepare( $sql, $values ) )
-		: $wpdb->get_var( $sql ) );
-	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+	$sql .= $filter_sql;
+
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $sql is assembled from string literals only; every caller-supplied value is a placeholder passed in $values.
+	return (int) $wpdb->get_var( $wpdb->prepare( $sql, $values ) );
 }
 
 /**
@@ -401,37 +406,38 @@ function folio_drawbridge_count_audit_logs( array $args = [] ): int {
 function folio_drawbridge_audit_build_where( array $args ): array {
 	global $wpdb;
 
-	$where  = [];
-	$values = [];
+	// Each clause is a literal carrying only placeholders, appended in step with
+	// its value so the pair stays aligned for $wpdb->prepare(). Callers open
+	// their own WHERE with a placeholder, so every clause here starts " AND ".
+	$filter_sql = '';
+	$values     = [];
 
 	if ( ! empty( $args['event_type'] ) ) {
-		$where[]  = 'event_type = %s';
-		$values[] = sanitize_key( $args['event_type'] );
+		$filter_sql .= ' AND event_type = %s';
+		$values[]    = sanitize_key( $args['event_type'] );
 	}
 	if ( ! empty( $args['vault_id'] ) ) {
-		$where[]  = 'vault_id = %d';
-		$values[] = (int) $args['vault_id'];
+		$filter_sql .= ' AND vault_id = %d';
+		$values[]    = (int) $args['vault_id'];
 	}
 	if ( ! empty( $args['share_id'] ) ) {
-		$where[]  = 'share_id = %d';
-		$values[] = (int) $args['share_id'];
+		$filter_sql .= ' AND share_id = %d';
+		$values[]    = (int) $args['share_id'];
 	}
 	if ( ! empty( $args['date_from'] ) ) {
-		$where[]  = 'created_at >= %s';
-		$values[] = sanitize_text_field( $args['date_from'] );
+		$filter_sql .= ' AND created_at >= %s';
+		$values[]    = sanitize_text_field( $args['date_from'] );
 	}
 	if ( ! empty( $args['date_to'] ) ) {
-		$where[]  = 'created_at <= %s';
-		$values[] = sanitize_text_field( $args['date_to'] );
+		$filter_sql .= ' AND created_at <= %s';
+		$values[]    = sanitize_text_field( $args['date_to'] );
 	}
 	if ( ! empty( $args['details_search'] ) ) {
-		$where[]  = 'details LIKE %s';
-		$values[] = '%' . $wpdb->esc_like( sanitize_text_field( $args['details_search'] ) ) . '%';
+		$filter_sql .= ' AND details LIKE %s';
+		$values[]    = '%' . $wpdb->esc_like( sanitize_text_field( $args['details_search'] ) ) . '%';
 	}
 
-	$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
-
-	return [ $where_sql, $values ];
+	return [ $filter_sql, $values ];
 }
 
 /**
