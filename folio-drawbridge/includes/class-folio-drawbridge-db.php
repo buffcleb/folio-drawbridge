@@ -289,14 +289,16 @@ function folio_drawbridge_drop_superseded_indexes(): void {
 
 	$table = $wpdb->prefix . 'folio_drawbridge_audit';
 
-	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- $table is $wpdb->prefix plus a literal; index names are literals. Schema changes are the point of this function, and it runs once per version bump.
-	$has_composite = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_created' ) );
-	$has_old       = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'event_type' ) );
+	// The table name goes through %i, the identifier placeholder, so nothing is
+	// concatenated into these statements; index names are literals.
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- schema changes are the point of this function, and it runs once per version bump.
+	$has_composite = $wpdb->get_var( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'event_created' ) );
+	$has_old       = $wpdb->get_var( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'event_type' ) );
 
 	if ( $has_composite && $has_old ) {
-		$wpdb->query( "ALTER TABLE `{$table}` DROP INDEX event_type" );
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP INDEX event_type', $table ) );
 	}
-	// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+	// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 }
 
 // ─── Audit log pruning ────────────────────────────────────────────────────────

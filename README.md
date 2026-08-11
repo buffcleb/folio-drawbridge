@@ -1,7 +1,7 @@
 # Folio Drawbridge
 
 **Version:** 1.2.0  
-**Requires WordPress:** 5.3+  
+**Requires WordPress:** 6.2+  
 **Requires PHP:** 7.4+  
 **License:** GPL-3.0-or-later
 
@@ -49,7 +49,7 @@ Folio Drawbridge lets authenticated WordPress users upload files into named **va
 
 | Requirement | Minimum |
 |---|---|
-| WordPress | 5.3 |
+| WordPress | 6.2 |
 | PHP | 7.4 |
 | PHP extensions | `openssl`, `mbstring` |
 | PHP extensions (optional) | `zip` — required for ZIP bulk download |

@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- data lives in this plugin's custom tables; $wpdb with prepared statements is the supported API and result sets are request-scoped. Only \$wpdb->prefix table names are interpolated; all values go through \$wpdb->prepare().
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- data lives in this plugin's custom tables, so $wpdb is the supported API and these dashboard figures are request-scoped. Every value goes through $wpdb->prepare(); only $wpdb->prefix appears in the SQL itself.
 
 add_action( 'admin_enqueue_scripts', 'folio_drawbridge_enqueue_widget_assets' );
 
@@ -63,33 +63,32 @@ function folio_drawbridge_register_dashboard_widgets(): void {
 function folio_drawbridge_render_admin_overview_widget(): void {
 	global $wpdb;
 
-	$prefix = $wpdb->prefix;
 
 	// Vault counts.
-	$total_vaults  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$prefix}folio_drawbridge_vaults" );
+	$total_vaults  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults" );
 	$active_vaults = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_vaults WHERE status = %s", 'active'
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults WHERE status = %s", 'active'
 	) );
 
 	// File count and total encrypted size.
-	$file_row = $wpdb->get_row( "SELECT COUNT(*) AS cnt, COALESCE(SUM(file_size),0) AS total_size FROM {$prefix}folio_drawbridge_files" );
+	$file_row = $wpdb->get_row( "SELECT COUNT(*) AS cnt, COALESCE(SUM(file_size),0) AS total_size FROM {$wpdb->prefix}folio_drawbridge_files" );
 	$file_count = (int) ( $file_row->cnt ?? 0 );
 	$total_size = (int) ( $file_row->total_size ?? 0 );
 
 	// Active/pending shares.
 	$active_shares = (int) $wpdb->get_var(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_shares WHERE status IN ('active','pending')"
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_shares WHERE status IN ('active','pending')"
 	);
 
 	// OTP failures last 30 days.
 	$otp_failures = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_audit WHERE event_type = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit WHERE event_type = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
 		FOLIO_DRAWBRIDGE_EVT_OTP_FAILED
 	) );
 
 	// Downloads last 7 days.
 	$downloads_7d = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_audit WHERE event_type = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_audit WHERE event_type = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
 		FOLIO_DRAWBRIDGE_EVT_FILE_DOWNLOADED
 	) );
 
@@ -138,35 +137,34 @@ function folio_drawbridge_render_user_vaults_widget(): void {
 	global $wpdb;
 
 	$user_id = get_current_user_id();
-	$prefix  = $wpdb->prefix;
 
 	// Personal vault counts.
 	$total_vaults  = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_vaults WHERE owner_id = %d", $user_id
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults WHERE owner_id = %d", $user_id
 	) );
 	$active_vaults = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_vaults WHERE owner_id = %d AND status = %s", $user_id, 'active'
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_vaults WHERE owner_id = %d AND status = %s", $user_id, 'active'
 	) );
 
 	// File count across all owned vaults.
 	$file_count = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_files f
-		 INNER JOIN {$prefix}folio_drawbridge_vaults v ON v.id = f.vault_id
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_files f
+		 INNER JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = f.vault_id
 		 WHERE v.owner_id = %d", $user_id
 	) );
 
 	// Active/pending shares on owned vaults.
 	$active_shares = (int) $wpdb->get_var( $wpdb->prepare(
-		"SELECT COUNT(*) FROM {$prefix}folio_drawbridge_shares s
-		 INNER JOIN {$prefix}folio_drawbridge_vaults v ON v.id = s.vault_id
+		"SELECT COUNT(*) FROM {$wpdb->prefix}folio_drawbridge_shares s
+		 INNER JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = s.vault_id
 		 WHERE v.owner_id = %d AND s.status IN ('active','pending')", $user_id
 	) );
 
 	// Last 5 audit events for this user's vaults.
 	$recent = $wpdb->get_results( $wpdb->prepare(
 		"SELECT a.event_type, a.created_at, v.name AS vault_name
-		 FROM {$prefix}folio_drawbridge_audit a
-		 INNER JOIN {$prefix}folio_drawbridge_vaults v ON v.id = a.vault_id
+		 FROM {$wpdb->prefix}folio_drawbridge_audit a
+		 INNER JOIN {$wpdb->prefix}folio_drawbridge_vaults v ON v.id = a.vault_id
 		 WHERE v.owner_id = %d
 		 ORDER BY a.created_at DESC
 		 LIMIT 5",
