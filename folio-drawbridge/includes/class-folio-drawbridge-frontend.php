@@ -785,14 +785,43 @@ function folio_drawbridge_upload_chunk_handler(): void {
 		wp_mkdir_p( $upload_dir );
 	}
 
-	// wp_handle_upload() cannot be used here: each POST carries one raw chunk of a
-	// larger file, which must land in the chunk staging area under its sequence
-	// number — not in the media library. is_uploaded_file() guarantees the source
-	// really came through this HTTP POST before we move it.
-	$chunk_tmp = $_FILES['chunk']['tmp_name']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- PHP-populated temp path, verified by is_uploaded_file() below.
-	if ( ! is_uploaded_file( $chunk_tmp )
-		|| ! move_uploaded_file( $chunk_tmp, $upload_dir . $chunk_index . '.part' ) // phpcs:ignore Generic.PHP.ForbiddenFunctions.Found -- chunked upload staging; see comment above.
-	) {
+	// Hand the chunk to WordPress' own uploader, pointed at the staging
+	// directory for the duration of this one call. Each POST carries a single
+	// raw slice of a larger file, so it must land beside its siblings under its
+	// sequence number rather than in the media library.
+	require_once ABSPATH . 'wp-admin/includes/file.php';
+
+	$stage_dir = untrailingslashit( $upload_dir );
+
+	$stage_upload_dir = static function ( array $dirs ) use ( $stage_dir ): array {
+		$dirs['path']   = $stage_dir;
+		$dirs['subdir'] = '';
+		$dirs['url']    = ''; // Never linked: the staging directory is not web-reachable.
+		return $dirs;
+	};
+
+	add_filter( 'upload_dir', $stage_upload_dir );
+
+	$staged = wp_handle_upload(
+		$_FILES['chunk'], // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- passed whole to wp_handle_upload(), which validates it.
+		[
+			// This is an AJAX action rather than a form POST, so there is no
+			// "action" field for wp_handle_upload() to compare against.
+			'test_form'                => false,
+			// A chunk is a fragment of a file, not a file of any type, so a
+			// MIME check on it would reject every upload. The assembled file's
+			// extension is checked against the allowlist further down, once
+			// the parts have been joined.
+			'test_type'                => false,
+			'unique_filename_callback' => static function () use ( $chunk_index ): string {
+				return $chunk_index . '.part';
+			},
+		]
+	);
+
+	remove_filter( 'upload_dir', $stage_upload_dir );
+
+	if ( ! is_array( $staged ) || isset( $staged['error'] ) || empty( $staged['file'] ) ) {
 		wp_send_json_error( 'Failed to save chunk to disk.' );
 	}
 
