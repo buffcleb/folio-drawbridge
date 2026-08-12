@@ -79,7 +79,12 @@ function folioDrawbridgeMvMakeQueueRow(fileName) {
 async function folioDrawbridgeUploadOneFile(file, rowEl) {
 	var bar   = rowEl.querySelector('.folio-drawbridge-mv-qbar');
 	var lbl   = rowEl.querySelector('.folio-drawbridge-mv-qlbl');
-	var CHUNK = folioDrawbridgeUserData.chunkSize;
+	// wp_localize_script() casts every top-level scalar to a string, so this
+	// arrives as "4194304". Number() is required before it is used in addition:
+	// "start + CHUNK" would otherwise concatenate rather than add, and every
+	// chunk after the first would be sliced to the end of the file.
+	var CHUNK = Number(folioDrawbridgeUserData.chunkSize);
+	if (!CHUNK || CHUNK < 1) { throw new Error('Upload chunk size is not configured correctly.'); }
 	var total = Math.ceil(file.size / CHUNK) || 1;
 	var uid   = folioDrawbridgeGenerateUploadId();
 	lbl.textContent = 'Uploading…';
