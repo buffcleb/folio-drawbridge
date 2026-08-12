@@ -138,7 +138,7 @@ function folio_drawbridge_enqueue_user_dashboard_assets( string $hook ): void {
 		'folio-drawbridge-user-dash',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/css/user-dashboard.css',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION
+		folio_drawbridge_asset_version( 'admin/css/user-dashboard.css' )
 	);
 
 	// Shared table sorting and the inline-edit toggles.
@@ -146,7 +146,7 @@ function folio_drawbridge_enqueue_user_dashboard_assets( string $hook ): void {
 		'folio-drawbridge-admin',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/admin.js',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION,
+		folio_drawbridge_asset_version( 'admin/js/admin.js' ),
 		true
 	);
 
@@ -157,7 +157,7 @@ function folio_drawbridge_enqueue_user_dashboard_assets( string $hook ): void {
 			'folio-drawbridge-vault-detail',
 			FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/vault-detail.js',
 			[ 'folio-drawbridge-admin' ],
-			FOLIO_DRAWBRIDGE_VERSION,
+			folio_drawbridge_asset_version( 'admin/js/vault-detail.js' ),
 			true
 		);
 

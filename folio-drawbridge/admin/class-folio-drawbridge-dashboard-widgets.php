@@ -34,7 +34,7 @@ function folio_drawbridge_enqueue_widget_assets( string $hook ): void {
 		'folio-drawbridge-widgets',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/css/widgets.css',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION
+		folio_drawbridge_asset_version( 'admin/css/widgets.css' )
 	);
 }
 

@@ -111,14 +111,14 @@ function folio_drawbridge_enqueue_share_assets(): void {
 		'folio-drawbridge-share',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/css/share.css',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION
+		folio_drawbridge_asset_version( 'public/css/share.css' )
 	);
 
 	wp_enqueue_script(
 		'folio-drawbridge-share',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/js/share.js',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION,
+		folio_drawbridge_asset_version( 'public/js/share.js' ),
 		true
 	);
 
@@ -551,14 +551,14 @@ function folio_drawbridge_render_my_vaults_shortcode(): string {
 		'folio-drawbridge-vaults',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/css/vaults.css',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION
+		folio_drawbridge_asset_version( 'public/css/vaults.css' )
 	);
 
 	wp_enqueue_script(
 		'folio-drawbridge-vaults',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'public/js/vaults.js',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION,
+		folio_drawbridge_asset_version( 'public/js/vaults.js' ),
 		true
 	);
 
