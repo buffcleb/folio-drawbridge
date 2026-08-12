@@ -83,7 +83,7 @@ Yes. Each share can have a download limit and an expiry date, and site-wide defa
 6. Settings — encryption key source and generator, SIEM log file export, and owner notification options.
 7. Settings — file type allowlist and per-user storage quotas.
 8. Settings — customisable templates for all four system emails, each with its available placeholder tokens.
-9. Settings — data removal policy on uninstall, and encrypted storage location with its protection status.
+9. Settings — data removal policy on uninstall, the storage folder name inside the uploads directory, and the resolved encrypted storage location with its protection status.
 
 == Changelog ==
 
