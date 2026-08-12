@@ -57,6 +57,26 @@ add_filter( 'user_has_cap', static function ( array $allcaps ): array {
 	return $allcaps;
 } );
 
+// ─── Asset versioning ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the cache-busting version string for one of this plugin's assets.
+ *
+ * The plugin version alone is not enough: an asset edited between releases
+ * keeps the same URL, so browsers keep serving the copy they already have and
+ * the change appears not to have taken effect. Appending the file's
+ * modification time gives every edit a distinct URL while leaving the plugin
+ * version visible at the front, which is useful when reading a bug report.
+ *
+ * @param string $relative_path Asset path relative to the plugin directory.
+ */
+function folio_drawbridge_asset_version( string $relative_path ): string {
+	$file  = FOLIO_DRAWBRIDGE_PLUGIN_DIR . ltrim( $relative_path, '/' );
+	$mtime = file_exists( $file ) ? filemtime( $file ) : false;
+
+	return $mtime ? FOLIO_DRAWBRIDGE_VERSION . '.' . $mtime : FOLIO_DRAWBRIDGE_VERSION;
+}
+
 // ─── Date formatting helper ───────────────────────────────────────────────────
 
 /**

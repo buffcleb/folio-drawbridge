@@ -702,14 +702,14 @@ function folio_drawbridge_enqueue_admin_assets( string $hook ): void {
 		'folio-drawbridge-admin',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/css/admin.css',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION
+		folio_drawbridge_asset_version( 'admin/css/admin.css' )
 	);
 
 	wp_enqueue_script(
 		'folio-drawbridge-admin',
 		FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/admin.js',
 		[],
-		FOLIO_DRAWBRIDGE_VERSION,
+		folio_drawbridge_asset_version( 'admin/js/admin.js' ),
 		true
 	);
 
@@ -731,7 +731,7 @@ function folio_drawbridge_enqueue_admin_assets( string $hook ): void {
 			'folio-drawbridge-settings',
 			FOLIO_DRAWBRIDGE_PLUGIN_URL . 'admin/js/settings.js',
 			[ 'folio-drawbridge-admin' ],
-			FOLIO_DRAWBRIDGE_VERSION,
+			folio_drawbridge_asset_version( 'admin/js/settings.js' ),
 			true
 		);
 
