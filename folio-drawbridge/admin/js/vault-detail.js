@@ -17,7 +17,12 @@ function folioDrawbridgeUdToggle(id) {
 async function folioDrawbridgeUdUploadOne(file, rowEl) {
 	var bar = rowEl.querySelector('.folio-drawbridge-ud-bar');
 	var lbl = rowEl.querySelector('.folio-drawbridge-ud-lbl');
-	var CHUNK = folioDrawbridgeUd.chunkSize;
+	// wp_localize_script() casts every top-level scalar to a string, so this
+	// arrives as "4194304". Number() is required before it is used in addition:
+	// "start + CHUNK" would otherwise concatenate rather than add, and every
+	// chunk after the first would be sliced to the end of the file.
+	var CHUNK = Number(folioDrawbridgeUd.chunkSize);
+	if (!CHUNK || CHUNK < 1) { throw new Error('Upload chunk size is not configured correctly.'); }
 	var total = Math.ceil(file.size / CHUNK) || 1;
 	var uid   = folioDrawbridgeUdGenId();
 	for (var i = 0; i < total; i++) {

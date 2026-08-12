@@ -774,8 +774,44 @@ function folio_drawbridge_upload_chunk_handler(): void {
 		wp_send_json_error( "File exceeds the {$max_mb} MB limit." );
 	}
 
-	if ( empty( $_FILES['chunk'] ) || (int) $_FILES['chunk']['error'] !== UPLOAD_ERR_OK ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- PHP-populated upload metadata; error code is strictly compared.
-		wp_send_json_error( 'Chunk upload failed — check server upload limits.' );
+	if ( empty( $_FILES['chunk'] ) ) {
+		wp_send_json_error( 'Chunk upload failed — no file data was received.' );
+	}
+
+	// Report what PHP actually objected to. "Check your upload limits" is
+	// misleading when the real cause is an oversized chunk or a dropped
+	// connection, and it sends people to the wrong setting.
+	$upload_error = (int) $_FILES['chunk']['error']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- PHP-populated upload metadata, cast to int.
+	if ( $upload_error !== UPLOAD_ERR_OK ) {
+		$reasons = [
+			UPLOAD_ERR_INI_SIZE   => 'the chunk exceeded the server upload_max_filesize limit',
+			UPLOAD_ERR_FORM_SIZE  => 'the chunk exceeded the form-declared size limit',
+			UPLOAD_ERR_PARTIAL    => 'the chunk was only partially uploaded — the connection dropped',
+			UPLOAD_ERR_NO_FILE    => 'no chunk was received',
+			UPLOAD_ERR_NO_TMP_DIR => 'the server has no writable temporary directory',
+			UPLOAD_ERR_CANT_WRITE => 'the server could not write the chunk to disk',
+			UPLOAD_ERR_EXTENSION  => 'a PHP extension blocked the upload',
+		];
+		$reason = $reasons[ $upload_error ] ?? "PHP upload error {$upload_error}";
+		wp_send_json_error( "Chunk upload failed — {$reason}." );
+	}
+
+	// The client slices the file at the size this server advertised, so a chunk
+	// arriving at a different size means the two disagree. Assembling those
+	// pieces would produce a corrupt file that still looks successful, so stop
+	// here instead. The final chunk is the remainder and so may be smaller.
+	$expected = folio_drawbridge_chunk_size_bytes();
+	$received = (int) $_FILES['chunk']['size']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- PHP-populated upload metadata, cast to int.
+	$is_last  = ( $chunk_index === $total_chunks - 1 );
+	if ( $received > $expected || ( ! $is_last && $received !== $expected ) ) {
+		wp_send_json_error(
+			sprintf(
+				'Chunk %d was %d bytes but %d was expected — please reload the page and try again.',
+				$chunk_index,
+				$received,
+				$expected
+			)
+		);
 	}
 
 	// Write chunk to temp directory.
